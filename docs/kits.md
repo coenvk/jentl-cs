@@ -183,6 +183,13 @@ internal sealed class FreeCellScene : CardGameScene
 Unlike the puzzle and card kits there is no undo: an RPG turn is final. Every command returns a `TurnResult` listing
 what happened (moves, hits, deaths, pickups), which the screen animates.
 
+`RpgWorld.Save()` writes the whole game as JSON (a few kilobytes), and `RpgWorld.Load(content, createArea, save)`
+restores it. A save records the seed, the player, bag, equipment, flags, variables, quests and recent messages, and
+for each visited area its actors, floor items, fired triggers and explored cells. On load the area factory rebuilds
+each area (generated floors come back from `world.Seed`), and the saved contents replace what it placed. Unvisited
+areas are simply made fresh later. Monsters forget where they last saw the player. A save from an older content
+version that refers to an item or actor that no longer exists throws `ContentException`, so a game can discard it.
+
 ### Content
 
 A game's content is four JSON files plus maps. Items and actors:

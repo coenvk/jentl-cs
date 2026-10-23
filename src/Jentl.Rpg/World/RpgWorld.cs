@@ -37,7 +37,7 @@ public sealed record TurnResult(IReadOnlyList<WorldEvent> Events, bool TookTurn,
 /// talks to them, onto items picks them up, onto a portal travels. Areas are created on first visit by
 /// the game's area factory and kept afterwards.
 /// </summary>
-public sealed class RpgWorld
+public sealed partial class RpgWorld
 {
     private const int LogLength = 60;
     private const int PlayerSight = 7;
@@ -59,10 +59,11 @@ public sealed class RpgWorld
         ArgumentNullException.ThrowIfNull(createArea);
         Content = content;
         _createArea = createArea;
+        Seed = seed;
         Random = new Random(seed);
         State = new RpgState(content.Items, content.Quests);
         State.Said += Log;
-        Player = new Actor(_nextId++, content.Actors[playerKind], default, new StillBrain(), "player");
+        Player = new Actor(_nextId++, content.Actors[playerKind], default, new StillBrain(), "still", "player");
         State.Player = Player;
     }
 
@@ -72,7 +73,10 @@ public sealed class RpgWorld
 
     public Actor Player { get; }
 
-    public Random Random { get; }
+    /// <summary>The seed the game started with; a game factory can lay out areas from it.</summary>
+    public int Seed { get; }
+
+    public Random Random { get; private set; }
 
     /// <summary>The area the player is in.</summary>
     public Area Area => _area ?? throw new InvalidOperationException("Enter an area first.");
@@ -249,7 +253,8 @@ public sealed class RpgWorld
     {
         ArgumentNullException.ThrowIfNull(area);
         var definition = Content.Actors[kind];
-        var actor = new Actor(_nextId++, definition, cell, Brains.Create(brain ?? definition.Brain), tag);
+        brain ??= definition.Brain;
+        var actor = new Actor(_nextId++, definition, cell, Brains.Create(brain), brain, tag);
         area.Add(actor);
         return actor;
     }

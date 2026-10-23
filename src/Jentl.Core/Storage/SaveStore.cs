@@ -51,6 +51,8 @@ public sealed class SaveStore : ISaveStore
         File.Move(temp, path, overwrite: true);
     }
 
+    public void Delete(string name) => File.Delete(PathOf(name));
+
     public string? Quarantine(string name, DateTimeOffset now)
     {
         var path = PathOf(name);

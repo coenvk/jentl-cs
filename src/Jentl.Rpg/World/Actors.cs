@@ -76,8 +76,9 @@ public sealed record ActorDefinition(
 /// </summary>
 public sealed class Actor
 {
-    internal Actor(int id, ActorDefinition definition, Cell position, IBrain brain, string? tag)
+    internal Actor(int id, ActorDefinition definition, Cell position, IBrain brain, string brainName, string? tag)
     {
+        BrainName = brainName;
         Id = id;
         Definition = definition;
         Position = position;
@@ -113,6 +114,9 @@ public sealed class Actor
     public Cell Home { get; internal set; }
 
     public IBrain Brain { get; set; }
+
+    /// <summary>The registered name of its brain (see <see cref="Brains"/>), which is what a save game records.</summary>
+    public string BrainName { get; }
 
     public string? Dialogue { get; set; }
 

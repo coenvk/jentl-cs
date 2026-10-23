@@ -8,6 +8,9 @@ public interface ISaveStore
 
     void WriteText(string name, string contents);
 
+    /// <summary>Removes the file, if there is one.</summary>
+    void Delete(string name);
+
     /// <summary>Moves an unreadable file aside (keeping it for inspection) and returns where it went.</summary>
     string? Quarantine(string name, DateTimeOffset now);
 }
