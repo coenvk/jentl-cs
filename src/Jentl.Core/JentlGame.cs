@@ -3,6 +3,7 @@ using Jentl.Core.Scenes;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Input.Touch;
 
 namespace Jentl.Core;
 
@@ -12,7 +13,11 @@ namespace Jentl.Core;
 /// </summary>
 public abstract class JentlGame : Game
 {
+    private static readonly TimeSpan TouchMouseGuard = TimeSpan.FromMilliseconds(600);
+
     private SpriteBatch? _batch;
+    private TimeSpan _lastTouch = TimeSpan.MinValue / 2;
+    private PointerState _lastPointer;
 
     protected JentlGame(int width, int height)
     {
@@ -49,10 +54,36 @@ public abstract class JentlGame : Game
     /// <summary>The keyboard state for this frame. Override to feed scripted input.</summary>
     protected virtual KeyboardState ReadKeyboard() => Keyboard.GetState();
 
+    /// <summary>
+    /// The pointer for this frame: the first touch if there is one, otherwise the mouse. Mobile browsers
+    /// follow every tap with emulated mouse events, so the mouse is ignored briefly after any touch.
+    /// Override to feed scripted input.
+    /// </summary>
+    protected virtual PointerState ReadPointer(TimeSpan now)
+    {
+        var touches = TouchPanel.GetState();
+        if (touches.Count > 0)
+        {
+            _lastTouch = now;
+            var touch = touches[0];
+            _lastPointer = new PointerState(touch.State is TouchLocationState.Pressed or TouchLocationState.Moved, touch.Position);
+            return _lastPointer;
+        }
+
+        if (now - _lastTouch < TouchMouseGuard)
+        {
+            return _lastPointer with { IsDown = false };
+        }
+
+        var mouse = Mouse.GetState();
+        _lastPointer = new PointerState(mouse.LeftButton == ButtonState.Pressed, new Vector2(mouse.X, mouse.Y));
+        return _lastPointer;
+    }
+
     protected override void Update(GameTime gameTime)
     {
         ArgumentNullException.ThrowIfNull(gameTime);
-        Input.Update(ReadKeyboard());
+        Input.Update(ReadKeyboard(), ReadPointer(gameTime.TotalGameTime));
         Scenes.Update(gameTime.ElapsedGameTime, Input);
         if (Scenes.IsEmpty)
         {
