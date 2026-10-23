@@ -6,7 +6,7 @@ namespace Jentl.Core.Storage;
 /// Reads and writes small save files in one directory. Writes go to a temporary file that
 /// then replaces the original, so a crash mid-write never leaves a half-written save.
 /// </summary>
-public sealed class SaveStore
+public sealed class SaveStore : ISaveStore
 {
     public SaveStore(string directory)
     {
@@ -36,7 +36,6 @@ public sealed class SaveStore
         return Path.Combine(Directory, name);
     }
 
-    /// <summary>Returns the file's contents, or null if it does not exist.</summary>
     public string? ReadText(string name)
     {
         var path = PathOf(name);
@@ -52,7 +51,6 @@ public sealed class SaveStore
         File.Move(temp, path, overwrite: true);
     }
 
-    /// <summary>Moves an unreadable file aside (keeping it for inspection) and returns its new path.</summary>
     public string? Quarantine(string name, DateTimeOffset now)
     {
         var path = PathOf(name);

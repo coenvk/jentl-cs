@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework.Audio;
+﻿using Jentl.Core.Content;
+using Microsoft.Xna.Framework.Audio;
 
 namespace Jentl.Core.Audio;
 
@@ -21,7 +22,7 @@ public sealed class SoundPlayer : IDisposable
 
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Loads <c>&lt;directory&gt;/&lt;name&gt;.wav</c> for each name (16-bit PCM or float).</summary>
+    /// <summary>Loads <c>&lt;directory&gt;/&lt;name&gt;.wav</c> for each name (16-bit PCM or float), relative to the game root.</summary>
     public static SoundPlayer Load(string directory, params string[] names)
     {
         var sounds = new Dictionary<string, SoundEffect>();
@@ -29,7 +30,8 @@ public sealed class SoundPlayer : IDisposable
         {
             foreach (var name in names)
             {
-                sounds[name] = SoundEffect.FromFile(Path.Combine(directory, name + ".wav"));
+                using var stream = GameFiles.Open($"{directory}/{name}.wav");
+                sounds[name] = SoundEffect.FromStream(stream);
             }
 
             return new SoundPlayer(sounds, isAvailable: true);

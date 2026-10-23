@@ -66,7 +66,7 @@ public abstract class JentlGame : Game
     {
         GraphicsDevice.Clear(ClearColor);
 
-        // Textures loaded with Texture2D.FromFile are not premultiplied, so blend accordingly.
+        // Textures loaded from PNG files are not premultiplied, so blend accordingly.
         _batch!.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
         Scenes.Draw(_batch, GraphicsDevice.Viewport.Bounds);
         _batch.End();
