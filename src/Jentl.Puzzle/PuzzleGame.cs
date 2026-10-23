@@ -1,4 +1,4 @@
-namespace Jentl.Puzzle;
+﻿namespace Jentl.Puzzle;
 
 /// <summary>A game's rules: how one input changes the board, and when the puzzle is solved.</summary>
 /// <typeparam name="TInput">What the player does in a turn: a direction, a tapped cell, a command.</typeparam>

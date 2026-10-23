@@ -1,4 +1,4 @@
-namespace Jentl.Puzzle.Tests;
+﻿namespace Jentl.Puzzle.Tests;
 
 /// <summary>A minimal push puzzle: the player walks, pushes one box at a time, and wins with every box on a target.</summary>
 internal sealed class PushRules : IPuzzleRules<GridDirection>

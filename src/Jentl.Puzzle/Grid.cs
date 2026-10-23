@@ -1,4 +1,4 @@
-namespace Jentl.Puzzle;
+﻿namespace Jentl.Puzzle;
 
 public enum GridDirection
 {

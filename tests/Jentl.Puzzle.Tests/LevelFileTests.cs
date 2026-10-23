@@ -1,4 +1,4 @@
-namespace Jentl.Puzzle.Tests;
+﻿namespace Jentl.Puzzle.Tests;
 
 public class LevelFileTests
 {

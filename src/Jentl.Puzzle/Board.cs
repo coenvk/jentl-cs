@@ -1,4 +1,4 @@
-namespace Jentl.Puzzle;
+﻿namespace Jentl.Puzzle;
 
 /// <summary>
 /// A grid of tiles with at most one piece per cell. Set it up with <see cref="SetTile"/> and

@@ -1,4 +1,4 @@
-namespace Jentl.Puzzle;
+﻿namespace Jentl.Puzzle;
 
 /// <summary>One recorded change to a board. A turn is a list of these, which is what undo, redo and animation use.</summary>
 public abstract record Change
