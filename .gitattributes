@@ -5,7 +5,7 @@
 ###############################################################################
 # Set default behavior to automatically normalize line endings.
 ###############################################################################
-* text=auto
+* text=auto eol=lf
 
 ###############################################################################
 # Set the merge driver for project and solution files
@@ -19,23 +19,23 @@
 # uncomment the group further below
 ###############################################################################
 
-*.sln        text eol=crlf
-*.csproj     text eol=crlf
-*.vbproj     text eol=crlf
-*.vcxproj    text eol=crlf
-*.vcproj     text eol=crlf
-*.dbproj     text eol=crlf
-*.fsproj     text eol=crlf
-*.lsproj     text eol=crlf
-*.wixproj    text eol=crlf
-*.modelproj  text eol=crlf
-*.sqlproj    text eol=crlf
-*.wmaproj    text eol=crlf
+*.sln        text eol=lf
+*.csproj     text eol=lf
+*.vbproj     text eol=lf
+*.vcxproj    text eol=lf
+*.vcproj     text eol=lf
+*.dbproj     text eol=lf
+*.fsproj     text eol=lf
+*.lsproj     text eol=lf
+*.wixproj    text eol=lf
+*.modelproj  text eol=lf
+*.sqlproj    text eol=lf
+*.wmaproj    text eol=lf
 
-*.xproj      text eol=crlf
-*.props      text eol=crlf
-*.filters    text eol=crlf
-*.vcxitems   text eol=crlf
+*.xproj      text eol=lf
+*.props      text eol=lf
+*.filters    text eol=lf
+*.vcxitems   text eol=lf
 
 
 #*.sln       merge=binary

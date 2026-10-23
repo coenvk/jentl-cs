@@ -11,14 +11,14 @@ trim_trailing_whitespace = true
 
 # Solution files
 [*.sln]
-end_of_line = crlf
+end_of_line = lf
 charset = utf-8-bom
 indent_style = tab
 indent_size = 8
 
 # Code files
 [*.{cs,csx,vb,vbx,cake}]
-end_of_line = crlf
+end_of_line = lf
 charset = utf-8-bom
 
 # XML project files
@@ -47,7 +47,7 @@ indent_size = 2
 
 # Windows batch files
 [*.{bat,cmd}]
-end_of_line = crlf
+end_of_line = lf
 
 # Markdown files
 [*.md]
@@ -56,5 +56,5 @@ trim_trailing_whitespace = false
 
 # InnoSetup files
 [*.iss]
-end_of_line = crlf
+end_of_line = lf
 indent_size = 2
