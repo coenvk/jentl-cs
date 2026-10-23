@@ -35,11 +35,18 @@ public sealed class Table
 {
     private readonly List<Pile> _piles = [];
     private readonly Dictionary<string, Pile> _byName = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _counters = new(StringComparer.Ordinal);
 
     public IReadOnlyList<Pile> Piles => _piles;
 
     public Pile this[string name] =>
         _byName.TryGetValue(name, out var pile) ? pile : throw new KeyNotFoundException($"No pile named '{name}'.");
+
+    /// <summary>
+    /// A named number that is part of the game state, such as how often the stock was turned over; 0 until
+    /// rules change it with <see cref="CardTurnBuilder.Count"/>, which undo reverts like any card move.
+    /// </summary>
+    public int Counter(string name) => _counters.GetValueOrDefault(name);
 
     public Pile Add(string name)
     {
@@ -53,6 +60,8 @@ public sealed class Table
         _piles.Add(pile);
         return pile;
     }
+
+    internal void AddToCounter(string name, int amount) => _counters[name] = Counter(name) + amount;
 
     /// <summary>Where a card is, or null if it is not on the table.</summary>
     public (Pile Pile, int Index)? Find(Card card)

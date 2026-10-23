@@ -33,6 +33,14 @@ public sealed record CardFlipped(Pile Pile, int Index, bool FaceUp) : CardChange
     internal override void Revert() => Pile.Mutable[Index] = Pile.Mutable[Index] with { FaceUp = !FaceUp };
 }
 
+/// <summary>A table counter changed by <paramref name="Amount"/>.</summary>
+public sealed record CounterChanged(Table Table, string Name, int Amount) : CardChange
+{
+    internal override void Apply() => Table.AddToCounter(Name, Amount);
+
+    internal override void Revert() => Table.AddToCounter(Name, -Amount);
+}
+
 /// <summary>What the player did. Games can add their own inputs by deriving from this.</summary>
 public abstract record CardInput;
 
@@ -106,6 +114,16 @@ public sealed class CardTurnBuilder
         if (pile[index].FaceUp != faceUp)
         {
             Record(new CardFlipped(pile, index, faceUp));
+        }
+    }
+
+    /// <summary>Changes the table counter <paramref name="name"/> by <paramref name="amount"/>; see <see cref="Table.Counter"/>.</summary>
+    public void Count(string name, int amount = 1)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        if (amount != 0)
+        {
+            Record(new CounterChanged(Table, name, amount));
         }
     }
 

@@ -115,6 +115,25 @@ public class CardKitTests
     }
 
     [Fact]
+    public void Counters_AreUndoneWithTheirTurn()
+    {
+        var table = new Table();
+        var a = table.Add("a");
+        a.Deal(Card.Parse("AS"), faceUp: true);
+        var game = new CardGame(table, new CountingRules());
+
+        game.Play(new ClickPile(a, 0));
+        game.Play(new ClickPile(a, 0));
+        table.Counter("clicks").Should().Be(2);
+
+        game.Undo();
+        table.Counter("clicks").Should().Be(1);
+        game.Restart();
+        table.Counter("clicks").Should().Be(0);
+        table.Counter("unknown").Should().Be(0);
+    }
+
+    [Fact]
     public void Table_FindsCards()
     {
         var (table, _) = TwoPiles("AS 2S", "KD");
@@ -150,6 +169,17 @@ public class CardKitTests
     }
 
     private static IEnumerable<string> Codes(Pile pile) => pile.Cards.Select(c => c.Card.ToString());
+
+    private sealed class CountingRules : ICardRules
+    {
+        public bool Play(CardTurnBuilder turn, CardInput input)
+        {
+            turn.Count("clicks");
+            return true;
+        }
+
+        public bool IsWon(Table table) => false;
+    }
 
     /// <summary>Drags anything anywhere and turns up the new top card; a click moves a card and then rejects.</summary>
     private sealed class AnyMoveRules : ICardRules

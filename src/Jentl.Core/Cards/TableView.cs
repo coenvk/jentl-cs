@@ -46,6 +46,12 @@ public sealed class TableView
     /// <summary>Optional label inside an empty pile's outline, e.g. "A" on foundations.</summary>
     public Func<Pile, string?> EmptyLabel { get; set; } = _ => null;
 
+    /// <summary>
+    /// Whether an empty pile still shows an outline and takes taps and drops (default yes). Turn it off for
+    /// places that simply vanish once cleared, such as the cards of a pyramid.
+    /// </summary>
+    public Func<Pile, bool> HasSlot { get; set; } = _ => true;
+
     public bool IsDragging => _dragging is not null;
 
     /// <summary>Forgets the layout; call before placing the piles for this frame.</summary>
@@ -88,7 +94,7 @@ public sealed class TableView
                 }
             }
 
-            if (pile.IsEmpty && new Rectangle(_spots[s].Position, CardSize).Contains(point))
+            if (pile.IsEmpty && HasSlot(pile) && new Rectangle(_spots[s].Position, CardSize).Contains(point))
             {
                 return (pile, -1);
             }
@@ -99,6 +105,8 @@ public sealed class TableView
 
     /// <summary>Outlines a card (or an empty pile, index -1) for a while, e.g. to show a hint.</summary>
     public void Highlight(Pile pile, int index, TimeSpan duration) => _highlight = (pile, index, duration);
+
+    public void ClearHighlight() => _highlight = null;
 
     /// <summary>
     /// Handles the pointer: a press on a draggable card followed by movement drags it (and the cards on
@@ -156,6 +164,11 @@ public sealed class TableView
         // Outlines, then resting cards, then cards in flight (so they pass over others), then the dragged run.
         foreach (var spot in _spots)
         {
+            if (spot.Pile.IsEmpty && !HasSlot(spot.Pile))
+            {
+                continue;
+            }
+
             cards.DrawSlot(batch, new Rectangle(spot.Position, CardSize), spot.Pile.IsEmpty ? EmptyLabel(spot.Pile) : null);
         }
 
@@ -236,9 +249,12 @@ public sealed class TableView
         var dragged = new Rectangle((cursor - drag.Grab).ToPoint(), CardSize);
         Pile? best = null;
         var bestArea = 0;
-        foreach (var spot in _spots)
+
+        // Topmost first, as for taps, so a drop lands on the card that is drawn over the others.
+        for (var s = _spots.Count - 1; s >= 0; s--)
         {
-            if (spot.Pile == drag.Pile)
+            var spot = _spots[s];
+            if (spot.Pile == drag.Pile || (spot.Pile.IsEmpty && !HasSlot(spot.Pile)))
             {
                 continue;
             }

@@ -7,7 +7,7 @@ desktop and in the browser.
 | Kit | Core | Screen layer | Games built on it |
 |---|---|---|---|
 | Puzzle | `Jentl.Puzzle` | `Jentl.Core.Puzzle.GridView` | Sokoban (`SokobanRules`), and Lights Out and a push puzzle in the tests |
-| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`), FreeCell (`src/FreeCell`) and Spider (`src/Spider`) |
+| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`), FreeCell (`src/FreeCell`), Pyramid (`src/Pyramid`) and Spider (`src/Spider`) |
 
 Both cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
@@ -107,6 +107,8 @@ sealed class TurnOver : ICardRules
 - `turn.Move(from, index, to)` moves the card at `index` and every card on top of it (a run), keeping their order.
 - Games with several decks give each card a `Copy` number (`Deck.Standard52(copy: 1)`, or `Deck.Suits(...)` for
   Spider-style one-suit decks), so every card on the table is unique; rules compare `Rank` and `Suit`.
+- State that is not a card, such as how often Pyramid's stock was turned over, goes in a table counter:
+  `turn.Count("redeals")` in the rules, `table.Counter("redeals")` to read it. Undo reverts it with the turn.
 - `Deck.Shuffled` with a seeded `Random` always gives the same deal, which makes deal numbers and tests easy.
 - `CardGame.PlayAutoMove()` plays the rules' `AutoMove` (for example, finishing a solitaire whose outcome is
   settled); call it once per animation step.
@@ -129,12 +131,15 @@ view.Draw(batch, cardRenderer, input.Cursor.Position);
 
 `CardArt` draws card faces, backs and suits in code, so no card images are needed; `CardRenderer` takes an
 `ITextDrawer` for the rank text, so the kit works with any font.
+`TableView.HasSlot` hides the outline of piles that should vanish once empty, and when piles overlap (a pyramid)
+taps and drops go to the pile placed last, which is drawn on top.
 
 ### A game screen in the app
 
 In this app, `CardGameScene` (in `Sokoban.Desktop/Scenes`) provides everything card game screens share: the top bar,
 New deal / Undo / Hint / Menu buttons, keys, hint messages, the timer, automatic moves (paused after an undo, so an
-undone move is not immediately replayed), a message when the rules refuse a move (`DescribeRejected`), and the win and pause screens. A new game then only supplies its deal and
+undone move is not immediately replayed), a message when the rules refuse a move (`DescribeRejected`), a hook to handle taps and drags itself (`OnInput`; Pyramid
+uses it to pair two tapped cards), and the win and pause screens. A new game then only supplies its deal and
 where its piles go; `FreeCellScene` is about 60 lines:
 
 ```csharp
