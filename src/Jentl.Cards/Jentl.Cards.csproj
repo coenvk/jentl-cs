@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Framework-free: no MonoGame, so it runs in tests, tools, solvers and any front end. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Cards.Tests" />
+  </ItemGroup>
+
+</Project>
