@@ -24,6 +24,11 @@ Declare the tiles and pieces, a legend for level files, and the rules. Here is a
 ```csharp
 using Jentl.Puzzle;
 
+var level = LevelFile.ReadPack(".O.\nOOO\n.O.", LightsOut.Legend).Single();
+var game = new PuzzleGame<Cell>(level.Board, new LightsOut());
+game.Play(new Cell(1, 1));   // game.IsSolved == true
+game.Undo();                 // back to the plus
+
 sealed class LightsOut : IPuzzleRules<Cell>
 {
     public static readonly TileKind On = new("on");
@@ -50,11 +55,6 @@ sealed class LightsOut : IPuzzleRules<Cell>
 
     public bool IsSolved(Board board) => !board.CellsOf(On).Any();
 }
-
-var level = LevelFile.ReadPack(".O.\nOOO\n.O.", LightsOut.Legend).Single();
-var game = new PuzzleGame<Cell>(level.Board, new LightsOut());
-game.Play(new Cell(1, 1));   // game.IsSolved == true
-game.Undo();                 // back to the plus
 ```
 
 - **Pieces** (`board.Place`, `turn.Move/Add/Remove`) keep their identity across moves, undo and redo, so the screen
@@ -81,6 +81,7 @@ foreach (var card in Deck.Shuffled(Deck.Standard52(), new Random(dealNumber)))
 {
     stock.Deal(card, faceUp: false);
 }
+var game = new CardGame(table, new TurnOver());
 
 sealed class TurnOver : ICardRules
 {
@@ -101,8 +102,6 @@ sealed class TurnOver : ICardRules
     // Optional: suggestions for a Hint button, and moves the game makes by itself.
     public IEnumerable<CardInput> Hints(Table table) => [new ClickPile(table["stock"], table["stock"].Count - 1)];
 }
-
-var game = new CardGame(table, new TurnOver());
 ```
 
 - `turn.Move(from, index, to)` moves the card at `index` and every card on top of it (a run), keeping their order.
