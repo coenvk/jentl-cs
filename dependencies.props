@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Testing -->
+    <MicrosoftNetTestSdkVersion>17.14.1</MicrosoftNetTestSdkVersion>
+    <XUnitVersion>2.9.3</XUnitVersion>
+    <XUnitRunnerVersion>3.1.4</XUnitRunnerVersion>
+    <FluentAssertionsVersion>6.12.0</FluentAssertionsVersion>
+  </PropertyGroup>
+</Project>

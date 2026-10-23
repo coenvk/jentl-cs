@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <RootNamespace>$(MSBuildProjectName.Replace('-', '_'))</RootNamespace>
+    <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+    <Authors>Coen van Kampen</Authors>
+    <Company>Coen van Kampen</Company>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)dependencies.props" />
+</Project>
