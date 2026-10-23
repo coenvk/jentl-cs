@@ -187,6 +187,19 @@ public class WorldTests
     }
 
     [Fact]
+    public void Actors_NeverStepOntoPortals()
+    {
+        var world = Fixtures.World("@.r");
+        world.Area.Portals.Add(new Portal(new Cell(1, 0), "elsewhere", "start"));
+        var rat = world.Area.Actors.Single(a => a.Kind == "rat");
+
+        world.Wait();
+        world.Wait();
+
+        rat.Position.Should().Be(new Cell(2, 0), "the only way to the player is through the doorway");
+    }
+
+    [Fact]
     public void LoadArea_ReadsMapObjects()
     {
         const string tsx = """

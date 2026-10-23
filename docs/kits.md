@@ -235,7 +235,7 @@ objects in an object layer by class (Tiled's "type"); `RpgWorld.LoadArea` turns 
 | `spawn` | (its name) | An arrival point, e.g. `start` |
 | `actor` | `kind` (else the object name), optional `dialogue`, `brain`, `name` | An actor; the object name is its tag, which quests use (`"talk": "elder"`) |
 | `item` | `item`, `count` | Items on the floor |
-| `portal` | `area`, `spawn` | Stepping here travels to that area |
+| `portal` | `area`, `spawn` | Stepping here travels to that area (a house door, stairs); other actors never step onto portals, so nobody blocks a doorway |
 | `trigger` | `do` (JSON effects), optional `if` (JSON condition), `repeat` | Effects when stepped on |
 
 Map properties: `name` (shown in the top bar) and `lit` (false for dark areas, seen only around the player).

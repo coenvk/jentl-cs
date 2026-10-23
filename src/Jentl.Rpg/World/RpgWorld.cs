@@ -336,7 +336,8 @@ public sealed partial class RpgWorld
 
             switch (actor.Brain.Decide(actor, this))
             {
-                case MoveAction move when Area.CanEnter(actor.Position.Step(move.Direction)):
+                // Doors and stairs are for the player: an actor standing on one would block it.
+                case MoveAction move when Area.CanEnter(actor.Position.Step(move.Direction)) && Area.PortalAt(actor.Position.Step(move.Direction)) is null:
                     Move(actor, actor.Position.Step(move.Direction));
                     break;
                 case AttackAction attack when attack.Target.IsAlive && Pathfinder.Distance(actor.Position, attack.Target.Position) == 1:
