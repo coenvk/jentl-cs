@@ -8,7 +8,8 @@ namespace Jentl.Core.Scenes;
 /// One screen of the game (menu, level, pause overlay, ...). Scenes live on a <see cref="SceneManager"/>;
 /// only the top scene is updated.
 /// </summary>
-public abstract class Scene
+/// <remarks>A scene is disposed when it is removed from the stack, and is not pushed again after that.</remarks>
+public abstract class Scene : IDisposable
 {
     private SceneManager? _manager;
 
@@ -40,6 +41,16 @@ public abstract class Scene
 
     /// <summary>Called when the scene on top of this one is popped.</summary>
     protected internal virtual void OnUncovered()
+    {
+    }
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
     {
     }
 

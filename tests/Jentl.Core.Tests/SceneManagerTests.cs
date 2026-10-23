@@ -63,7 +63,20 @@ public class SceneManagerTests
         _scenes.Pop();
         Update();
 
-        _log.Should().Equal("B.exit", "A.uncovered", "A.update");
+        _log.Should().Equal("B.exit", "B.disposed", "A.uncovered", "A.update");
+    }
+
+    [Fact]
+    public void Pop_DisposesTheRemovedScene()
+    {
+        _scenes.Push(Scene("A"));
+        Update();
+        _log.Clear();
+
+        _scenes.Pop();
+        Update();
+
+        _log.Should().Equal("A.exit", "A.disposed");
     }
 
     [Fact]
@@ -77,7 +90,7 @@ public class SceneManagerTests
         _scenes.Replace(Scene("C"));
         Update();
 
-        _log.Should().Equal("B.exit", "C.enter", "C.update");
+        _log.Should().Equal("B.exit", "B.disposed", "C.enter", "C.update");
         _scenes.Count.Should().Be(2);
     }
 
@@ -92,7 +105,7 @@ public class SceneManagerTests
         _scenes.Reset(Scene("C"));
         Update();
 
-        _log.Should().Equal("B.exit", "A.exit", "C.enter", "C.update");
+        _log.Should().Equal("B.exit", "B.disposed", "A.exit", "A.disposed", "C.enter", "C.update");
         _scenes.Count.Should().Be(1);
     }
 
@@ -108,7 +121,7 @@ public class SceneManagerTests
         _scenes.Reset([b, c]);
         Update();
 
-        _log.Should().Equal("A.exit", "B.enter", "B.covered", "C.enter", "C.update");
+        _log.Should().Equal("A.exit", "A.disposed", "B.enter", "B.covered", "C.enter", "C.update");
         _scenes.VisibleScenes().Should().Equal(c);
     }
 
@@ -254,6 +267,12 @@ public class SceneManagerTests
         protected internal override void OnCovered() => log.Add($"{name}.covered");
 
         protected internal override void OnUncovered() => log.Add($"{name}.uncovered");
+
+        protected override void Dispose(bool disposing)
+        {
+            log.Add($"{name}.disposed");
+            base.Dispose(disposing);
+        }
 
         public override string ToString() => name;
     }

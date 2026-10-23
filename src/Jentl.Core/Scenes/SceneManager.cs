@@ -157,6 +157,7 @@ public sealed class SceneManager
         _scenes.RemoveAt(_scenes.Count - 1);
         top.OnExit();
         top.Attach(null);
+        top.Dispose();
         if (uncover)
         {
             Top?.OnUncovered();
