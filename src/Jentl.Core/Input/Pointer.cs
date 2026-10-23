@@ -38,6 +38,9 @@ public sealed class GestureTracker
     /// <summary>Pressed down this frame.</summary>
     public bool Pressed { get; private set; }
 
+    /// <summary>Where the current or last press started.</summary>
+    public Vector2 PressedAt => _pressedAt;
+
     public void Update(PointerState cursor)
     {
         Tap = null;
