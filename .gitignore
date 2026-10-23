@@ -365,3 +365,7 @@ artifacts
 
 # Packaged builds
 dist/
+
+# Mirrored game files for the web dev server (source: src/Sokoban.Desktop/Assets, levels/)
+src/Sokoban.Web/wwwroot/Assets/
+src/Sokoban.Web/wwwroot/Levels/
