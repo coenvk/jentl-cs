@@ -97,6 +97,22 @@ public class SceneManagerTests
     }
 
     [Fact]
+    public void Reset_WithSeveralScenes_PushesThemBottomFirst()
+    {
+        var b = Scene("B");
+        var c = Scene("C");
+        _scenes.Push(Scene("A"));
+        Update();
+        _log.Clear();
+
+        _scenes.Reset([b, c]);
+        Update();
+
+        _log.Should().Equal("A.exit", "B.enter", "B.covered", "C.enter", "C.update");
+        _scenes.VisibleScenes().Should().Equal(c);
+    }
+
+    [Fact]
     public void ChangeRequestedDuringUpdate_IsAppliedAfterThatUpdate()
     {
         var b = Scene("B");

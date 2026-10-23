@@ -2,6 +2,7 @@
   <PropertyGroup>
     <!-- Game -->
     <MonoGameVersion>3.8.4.1</MonoGameVersion>
+    <FontStashSharpVersion>1.6.2</FontStashSharpVersion>
     <!-- Testing -->
     <MicrosoftNetTestSdkVersion>17.14.1</MicrosoftNetTestSdkVersion>
     <XUnitVersion>2.9.3</XUnitVersion>

@@ -51,6 +51,18 @@ public sealed class SceneManager
     public void Reset(Scene scene, Transition? transition = null)
     {
         ArgumentNullException.ThrowIfNull(scene);
+        Reset([scene], transition);
+    }
+
+    /// <summary>Clears the stack and pushes <paramref name="scenes"/>, bottom first, as one change.</summary>
+    public void Reset(IReadOnlyList<Scene> scenes, Transition? transition = null)
+    {
+        ArgumentNullException.ThrowIfNull(scenes);
+        if (scenes.Count == 0)
+        {
+            throw new ArgumentException("Reset needs at least one scene.", nameof(scenes));
+        }
+
         _pending.Enqueue((
             () =>
             {
@@ -59,7 +71,10 @@ public sealed class SceneManager
                     PopNow(uncover: false);
                 }
 
-                PushNow(scene);
+                foreach (var scene in scenes)
+                {
+                    PushNow(scene);
+                }
             },
             transition));
     }

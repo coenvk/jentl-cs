@@ -2,6 +2,7 @@
 using Jentl.Core.Scenes;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 
 namespace Jentl.Core;
 
@@ -45,10 +46,13 @@ public abstract class JentlGame : Game
 
     protected override void LoadContent() => _batch = new SpriteBatch(GraphicsDevice);
 
+    /// <summary>The keyboard state for this frame. Override to feed scripted input.</summary>
+    protected virtual KeyboardState ReadKeyboard() => Keyboard.GetState();
+
     protected override void Update(GameTime gameTime)
     {
         ArgumentNullException.ThrowIfNull(gameTime);
-        Input.Update();
+        Input.Update(ReadKeyboard());
         Scenes.Update(gameTime.ElapsedGameTime, Input);
         if (Scenes.IsEmpty)
         {
