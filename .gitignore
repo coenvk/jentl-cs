@@ -362,3 +362,6 @@ artifacts
 
 # Claude Code
 .claude/
+
+# Packaged builds
+dist/
