@@ -22,20 +22,29 @@ public readonly record struct Card
     public const int Queen = 12;
     public const int King = 13;
 
-    public Card(int rank, Suit suit)
+    /// <param name="copy">Which copy of this card, for games played with several decks (0 for the first).</param>
+    public Card(int rank, Suit suit, int copy = 0)
     {
         if (rank is < Ace or > King)
         {
             throw new ArgumentOutOfRangeException(nameof(rank), rank, "Rank must be 1 (ace) to 13 (king).");
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegative(copy);
         Rank = rank;
         Suit = suit;
+        Copy = copy;
     }
 
     public int Rank { get; }
 
     public Suit Suit { get; }
+
+    /// <summary>
+    /// Tells identical cards from different decks apart, so every card on a table is unique (the screen
+    /// tracks cards by identity to animate them). Rules should compare <see cref="Rank"/> and <see cref="Suit"/>.
+    /// </summary>
+    public int Copy { get; }
 
     public CardColor Color => Suit is Suit.Hearts or Suit.Diamonds ? CardColor.Red : CardColor.Black;
 
@@ -80,8 +89,28 @@ public readonly record struct Card
 public static class Deck
 {
     /// <summary>The 52 cards of a standard deck, ordered by suit then rank.</summary>
-    public static IReadOnlyList<Card> Standard52() =>
-        Enum.GetValues<Suit>().SelectMany(suit => Enumerable.Range(Card.Ace, Card.King).Select(rank => new Card(rank, suit))).ToArray();
+    /// <param name="copy">Marks the deck's cards as this copy, when several decks are combined.</param>
+    public static IReadOnlyList<Card> Standard52(int copy = 0) =>
+        Enum.GetValues<Suit>().SelectMany(suit => Enumerable.Range(Card.Ace, Card.King).Select(rank => new Card(rank, suit, copy))).ToArray();
+
+    /// <summary>
+    /// One suit run ace to king for each entry of <paramref name="suits"/>, each a distinct copy:
+    /// e.g. eight times spades for one-suit Spider.
+    /// </summary>
+    public static IReadOnlyList<Card> Suits(IEnumerable<Suit> suits)
+    {
+        ArgumentNullException.ThrowIfNull(suits);
+        var copies = new Dictionary<Suit, int>();
+        var cards = new List<Card>();
+        foreach (var suit in suits)
+        {
+            var copy = copies.GetValueOrDefault(suit);
+            copies[suit] = copy + 1;
+            cards.AddRange(Enumerable.Range(Card.Ace, Card.King).Select(rank => new Card(rank, suit, copy)));
+        }
+
+        return cards;
+    }
 
     /// <summary>
     /// A Fisher-Yates shuffle driven by <paramref name="random"/>, so a seeded generator gives the same

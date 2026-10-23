@@ -37,6 +37,26 @@ public class CardKitTests
     }
 
     [Fact]
+    public void Copies_MakeCardsFromSeveralDecksDistinct()
+    {
+        var twoDecks = Deck.Standard52(copy: 0).Concat(Deck.Standard52(copy: 1)).ToArray();
+
+        twoDecks.Should().HaveCount(104).And.OnlyHaveUniqueItems();
+        new Card(1, Suit.Spades, copy: 1).Should().NotBe(new Card(1, Suit.Spades));
+        new Card(1, Suit.Spades, copy: 1).ToString().Should().Be("AS", "the copy does not show");
+    }
+
+    [Fact]
+    public void Suits_BuildsOneRunPerEntry_WithDistinctCopies()
+    {
+        var spider = Deck.Suits(Enumerable.Repeat(Suit.Spades, 8));
+
+        spider.Should().HaveCount(104).And.OnlyHaveUniqueItems();
+        spider.Should().OnlyContain(c => c.Suit == Suit.Spades);
+        spider.Select(c => c.Copy).Distinct().Should().HaveCount(8);
+    }
+
+    [Fact]
     public void Card_RejectsBadRanks()
     {
         var act = () => new Card(14, Suit.Hearts);

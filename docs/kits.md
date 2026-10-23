@@ -7,7 +7,7 @@ desktop and in the browser.
 | Kit | Core | Screen layer | Games built on it |
 |---|---|---|---|
 | Puzzle | `Jentl.Puzzle` | `Jentl.Core.Puzzle.GridView` | Sokoban (`SokobanRules`), and Lights Out and a push puzzle in the tests |
-| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`) and FreeCell (`src/FreeCell`) |
+| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`), FreeCell (`src/FreeCell`) and Spider (`src/Spider`) |
 
 Both cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
@@ -105,6 +105,8 @@ sealed class TurnOver : ICardRules
 ```
 
 - `turn.Move(from, index, to)` moves the card at `index` and every card on top of it (a run), keeping their order.
+- Games with several decks give each card a `Copy` number (`Deck.Standard52(copy: 1)`, or `Deck.Suits(...)` for
+  Spider-style one-suit decks), so every card on the table is unique; rules compare `Rank` and `Suit`.
 - `Deck.Shuffled` with a seeded `Random` always gives the same deal, which makes deal numbers and tests easy.
 - `CardGame.PlayAutoMove()` plays the rules' `AutoMove` (for example, finishing a solitaire whose outcome is
   settled); call it once per animation step.
@@ -132,7 +134,7 @@ view.Draw(batch, cardRenderer, input.Cursor.Position);
 
 In this app, `CardGameScene` (in `Sokoban.Desktop/Scenes`) provides everything card game screens share: the top bar,
 New deal / Undo / Hint / Menu buttons, keys, hint messages, the timer, automatic moves (paused after an undo, so an
-undone move is not immediately replayed), and the win and pause screens. A new game then only supplies its deal and
+undone move is not immediately replayed), a message when the rules refuse a move (`DescribeRejected`), and the win and pause screens. A new game then only supplies its deal and
 where its piles go; `FreeCellScene` is about 60 lines:
 
 ```csharp
