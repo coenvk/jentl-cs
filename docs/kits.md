@@ -1,6 +1,6 @@
 # Jentl game kits
 
-Jentl has three kits for building new games quickly. Each has a framework-free core (rules, state, undo, files; plain
+Jentl has three kits for building new games quickly, and a multiplayer layer for games with several players. Each has a framework-free core (rules, state, undo, files; plain
 C#, easy to unit test) and a thin screen layer in `Jentl.Core` (drawing, layout, input, animation) that runs on
 desktop and in the browser.
 
@@ -263,3 +263,29 @@ number scales, fog of war in dark areas (unseen cells black, remembered ones dim
 and floating damage numbers. `CellAt` maps taps to cells for tap-to-walk. In this app `AdventureScene` adds the top
 bar, the message log, the buttons and the dialogue, bag and journal overlays; `src/Mossbrook` has the game's own code
 (starting a game, generating the cellar floors, the victory effect) in about 150 lines.
+
+## Multiplayer: humans and bots at one table
+
+`Jentl.Multiplayer` (framework-free) runs turn-based games for several players on one device:
+
+| Type | What it does |
+|---|---|
+| `Player` | A seat at the table: a name, and whether a human or a bot plays it |
+| `TurnOrder` | Whose turn it is, clockwise or not, with skips (`Advance(2)`) and reversals |
+| `ITurnBasedGame<TMove>` | The game: whose turn it is, the legal moves for a seat, and applying a move. Moves are plain values, so they can be shown, logged or one day sent over a network |
+| `IBot<TGame, TMove>` | A computer player: picks one of the legal moves |
+| `Match<TGame, TMove>` | Runs it all: bots move by themselves after `BotDelay` (so people can follow), humans through `Play`, and with several humans at the device it hides hands (`Viewer`) and waits for `ConfirmHandover` whenever the turn reaches a different person |
+
+```csharp
+var game = new UnoGame(players: 4, seed: 42);
+var match = new Match<UnoGame, UnoMove>(game, players, seat => new SmartUnoBot());
+
+// Each frame:
+if (match.AwaitingHandover) ShowPassTheDevice(match.Current.Name);   // then match.ConfirmHandover()
+else if (match.Update(elapsed) is { } botMove) Animate(botMove);
+else if (match.IsHumansTurn && tapped is { } move) match.Play(move);
+```
+
+Online play would slot in as another kind of seat controller; the game only ever sees seats and moves. Uno
+(`src/Uno`) is the example: `UnoGame` implements the rules, `RandomUnoBot` and `SmartUnoBot` the opponents, and
+`UnoMatch` adds up rounds to 500 points.
