@@ -28,12 +28,13 @@ public sealed class CardRenderer(CardArt art, ITextDrawer text)
         var size = bounds.Height * 0.2f;
         var pad = bounds.Width * 0.07f;
 
-        // Top-left corner: rank above a small suit.
+        // Top-left corner: rank with a small suit beside it, so both stay visible when cards fan over each other.
         var label = card.Card.RankLabel;
-        text.Draw(batch, label, new Vector2(bounds.X + pad, bounds.Y + pad * 0.6f), size, ink);
-        var labelHeight = text.Measure(label, size).Y;
-        var small = (int)(size * 0.75f);
-        var smallAt = new Rectangle((int)(bounds.X + pad), (int)(bounds.Y + pad * 0.6f + labelHeight), small, small);
+        var labelAt = new Vector2(bounds.X + pad, bounds.Y + pad * 0.6f);
+        text.Draw(batch, label, labelAt, size, ink);
+        var labelSize = text.Measure(label, size);
+        var small = (int)(size * 0.7f);
+        var smallAt = new Rectangle((int)(labelAt.X + labelSize.X + pad * 0.3f), (int)(labelAt.Y + (labelSize.Y - small) / 2), small, small);
         batch.Draw(Art.SuitSymbol(card.Card.Suit), smallAt, ink);
 
         // A large suit in the lower middle, clear of the corner so small cards stay readable.

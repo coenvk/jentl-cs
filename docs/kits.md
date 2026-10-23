@@ -7,7 +7,7 @@ desktop and in the browser.
 | Kit | Core | Screen layer | Games built on it |
 |---|---|---|---|
 | Puzzle | `Jentl.Puzzle` | `Jentl.Core.Puzzle.GridView` | Sokoban (`SokobanRules`), and Lights Out and a push puzzle in the tests |
-| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike solitaire (`src/Klondike`) |
+| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`) and FreeCell (`src/FreeCell`) |
 
 Both cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
@@ -126,5 +126,31 @@ view.Draw(batch, cardRenderer, input.Cursor.Position);
 ```
 
 `CardArt` draws card faces, backs and suits in code, so no card images are needed; `CardRenderer` takes an
-`ITextDrawer` for the rank text, so the kit works with any font. `Sokoban.Desktop/Scenes/SolitaireScene.cs` is a
-complete game screen in about 250 lines.
+`ITextDrawer` for the rank text, so the kit works with any font.
+
+### A game screen in the app
+
+In this app, `CardGameScene` (in `Sokoban.Desktop/Scenes`) provides everything card game screens share: the top bar,
+New deal / Undo / Hint / Menu buttons, keys, hint messages, the timer, automatic moves (paused after an undo, so an
+undone move is not immediately replayed), and the win and pause screens. A new game then only supplies its deal and
+where its piles go; `FreeCellScene` is about 60 lines:
+
+```csharp
+internal sealed class FreeCellScene : CardGameScene
+{
+    public FreeCellScene(GameContext context, int? deal = null)
+        : this(context, PickDeal(context, deal, 32_000)) { }
+
+    private FreeCellScene(GameContext context, int deal)
+        : base(context, "FreeCell", deal, new CardGame(FreeCellRules.Deal(deal), new FreeCellRules()), FreeCellRules.FoundationTag) { }
+
+    protected override void LayOut(Rectangle area)
+    {
+        var (card, gap, x) = Columns(area, columns: 8, cardsHigh: 3.8f);
+        View.Clear();
+        // free cells and foundations along the top, cascades fanned below ...
+    }
+
+    protected override CardGameScene CreateNewDeal() => new FreeCellScene(Context);
+}
+```
