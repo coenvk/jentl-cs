@@ -23,4 +23,9 @@
     <PackageReference Include="nkast.Xna.Framework.Game" Version="$(KniVersion)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Jentl.Puzzle\Jentl.Puzzle.csproj" />
+    <ProjectReference Include="..\Jentl.Cards\Jentl.Cards.csproj" />
+  </ItemGroup>
+
 </Project>
