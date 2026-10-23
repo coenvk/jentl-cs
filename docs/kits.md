@@ -1,6 +1,6 @@
 # Jentl game kits
 
-Jentl has two kits for building new games quickly. Each has a framework-free core (rules, state, undo, files; plain
+Jentl has three kits for building new games quickly. Each has a framework-free core (rules, state, undo, files; plain
 C#, easy to unit test) and a thin screen layer in `Jentl.Core` (drawing, layout, input, animation) that runs on
 desktop and in the browser.
 
@@ -8,8 +8,9 @@ desktop and in the browser.
 |---|---|---|---|
 | Puzzle | `Jentl.Puzzle` | `Jentl.Core.Puzzle.GridView` | Sokoban (`SokobanRules`), and Lights Out and a push puzzle in the tests |
 | Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`), FreeCell (`src/FreeCell`), Pyramid (`src/Pyramid`), Spider (`src/Spider`) and TriPeaks (`src/TriPeaks`) |
+| RPG | `Jentl.Rpg` | `Jentl.Core.Rpg.MapView` | Mossbrook (`src/Mossbrook`), a village and a dungeon |
 
-Both cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
+The puzzle and card cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
 
 - rejected inputs leave no trace (any changes are rolled back),
@@ -161,3 +162,95 @@ internal sealed class FreeCellScene : CardGameScene
     protected override CardGameScene CreateNewDeal() => new FreeCellScene(Context);
 }
 ```
+
+## RPG kit: a turn-based RPG or roguelike
+
+`Jentl.Rpg` has the parts most tile-based RPGs and roguelikes need, each usable on its own:
+
+| Part | What it does |
+|---|---|
+| `Maps.TmxReader` | Reads [Tiled](https://www.mapeditor.org) maps (`.tmx`) and tilesets (`.tsx`): CSV, XML or base64 (zlib/gzip) layers, groups, object layers, custom properties, embedded or external tilesets |
+| `Maps.TileMap` | Layers and tilesets; tile properties drive the rules: `solid` blocks movement, `opaque` blocks sight, `name` lets code find a tile |
+| `Maps.FieldOfView`, `Maps.Pathfinder` | Shadowcasting field of view and line of sight; A* paths on the grid |
+| `Maps.DungeonGenerator` | Seeded rooms-and-corridors floors, always connected, with an entrance and an exit |
+| `Items` | An item catalogue from JSON, a slot-based `Inventory` that stacks, and `Equipment` with attack and defense bonuses |
+| `Quests` | Quests from JSON with ordered steps (collect, kill, talk, reach, or any condition) and rewards |
+| `Dialogue` | Conversation graphs from JSON: lines, choices shown only when their condition holds, and routes that open a conversation differently depending on the story so far |
+| `Scripting` | The small JSON language dialogue, quests and items share: conditions (`{"has": "glowcap", "count": 3}`) and effects (`{"give": "potion"}`, `{"startQuest": "q"}`); unknown effect names reach the game as custom effects |
+| `World.RpgWorld` | The turn engine: the player acts, then every actor's brain (`still`, `wander`, `hunter`, or your own) takes a turn; bump to attack or talk, walk over items to pick them up, portals between areas, triggers, loot, experience and levels |
+| `ContentValidator` | Finds broken references in content (unknown dialogue nodes, items, quests, actor kinds); run it in a unit test |
+
+Unlike the puzzle and card kits there is no undo: an RPG turn is final. Every command returns a `TurnResult` listing
+what happened (moves, hits, deaths, pickups), which the screen animates.
+
+### Content
+
+A game's content is four JSON files plus maps. Items and actors:
+
+```json
+{ "items": [ { "id": "potion", "name": "Healing potion", "sprite": "potion", "stack": 5, "use": [ { "heal": 10 } ] },
+             { "id": "sword", "name": "Short sword", "sprite": "sword", "slot": "weapon", "attack": 2 } ] }
+
+{ "actors": [ { "id": "rat", "name": "cellar rat", "sprite": "rat", "faction": "hostile", "hp": 4, "attack": 2,
+                "brain": "hunter", "xp": 3, "drops": [ { "item": "coins", "chance": 0.4, "count": 2 } ] },
+              { "id": "elder", "name": "Elder Maren", "sprite": "elder", "faction": "friendly", "dialogue": "elder" } ] }
+```
+
+A quest, completed in person from a dialogue:
+
+```json
+{ "quests": [ { "id": "glowcaps", "title": "Glowcaps for Wren",
+  "objectives": [ { "text": "Gather three glowcaps", "collect": "glowcap", "count": 3 },
+                  { "text": "Bring them to Wren", "talk": "herbalist" } ],
+  "rewards": [ { "give": "potion", "count": 2 } ] } ] }
+```
+
+A dialogue whose opening depends on that quest:
+
+```json
+{ "dialogues": [ { "id": "herbalist", "speaker": "Wren", "nodes": {
+  "start": { "goto": [ { "if": { "quest": "glowcaps", "is": "ready" }, "node": "return" },
+                       { "if": { "quest": "glowcaps", "is": "active" }, "node": "waiting" },
+                       { "node": "hello" } ] },
+  "hello": { "text": "Bring me three glowcaps?",
+             "choices": [ { "text": "I'll look.", "do": [ { "startQuest": "glowcaps" } ] }, { "text": "No." } ] },
+  "waiting": { "text": "Found any yet?" },
+  "return": { "text": "Perfect!", "do": [ { "take": "glowcap", "count": 3 }, { "completeQuest": "glowcaps" } ] } } } ] }
+```
+
+Maps come from Tiled. Give tiles `name`, `solid` and `opaque` properties in the tileset, draw tile layers, and place
+objects in an object layer by class (Tiled's "type"); `RpgWorld.LoadArea` turns them into the area:
+
+| Class | Properties | Becomes |
+|---|---|---|
+| `spawn` | (its name) | An arrival point, e.g. `start` |
+| `actor` | `kind` (else the object name), optional `dialogue`, `brain`, `name` | An actor; the object name is its tag, which quests use (`"talk": "elder"`) |
+| `item` | `item`, `count` | Items on the floor |
+| `portal` | `area`, `spawn` | Stepping here travels to that area |
+| `trigger` | `do` (JSON effects), optional `if` (JSON condition), `repeat` | Effects when stepped on |
+
+Map properties: `name` (shown in the top bar) and `lit` (false for dark areas, seen only around the player).
+
+### Putting it together
+
+```csharp
+var content = RpgContent.FromJson(read("items.json"), read("actors.json"), read("quests.json"), read("dialogue.json"));
+var world = new RpgWorld(content, (w, id) => id == "village"
+    ? w.LoadArea(id, TmxReader.ReadMap(read("village.tmx"), read))
+    : BuildDungeonFloor(w, id),                       // DungeonGenerator, then w.Spawn(...) and w.Place(...)
+    seed: 42);
+world.Enter("village");
+
+var turn = world.Step(GridDirection.Up);              // or Wait(), Use("potion"), Equip("sword")
+mapView.Show(turn.Events);                            // glide, flash, damage numbers
+if (turn.TalkTo is { } npc)
+{
+    var talk = world.Talk(npc);                       // talk.Current.Text, talk.Choices, talk.Choose(i)
+}
+```
+
+On screen, `MapView` draws an area around a camera that follows the player: tile layers with point sampling at whole-
+number scales, fog of war in dark areas (unseen cells black, remembered ones dimmed), items, actors with health bars,
+and floating damage numbers. `CellAt` maps taps to cells for tap-to-walk. In this app `AdventureScene` adds the top
+bar, the message log, the buttons and the dialogue, bag and journal overlays; `src/Mossbrook` has the game's own code
+(starting a game, generating the cellar floors, the victory effect) in about 150 lines.

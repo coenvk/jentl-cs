@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Jentl.Puzzle\Jentl.Puzzle.csproj" />
     <ProjectReference Include="..\Jentl.Cards\Jentl.Cards.csproj" />
+    <ProjectReference Include="..\Jentl.Rpg\Jentl.Rpg.csproj" />
   </ItemGroup>
 
 </Project>
