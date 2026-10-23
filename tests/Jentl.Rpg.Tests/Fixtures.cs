@@ -29,6 +29,7 @@ internal static class Fixtures
           { "id": "player", "name": "Hero", "faction": "player", "hp": 20, "attack": 2 },
           { "id": "rat", "name": "Rat", "faction": "hostile", "hp": 3, "attack": 1, "brain": "hunter", "xp": 10,
             "drops": [ { "item": "coins", "chance": 1, "count": 2 } ] },
+          { "id": "spider", "name": "Spider", "faction": "hostile", "hp": 9, "attack": 1, "sight": 6, "brain": "skittish" },
           { "id": "dummy", "name": "Dummy", "faction": "hostile", "hp": 50, "attack": 0, "brain": "still" },
           { "id": "elder", "name": "Elder", "faction": "friendly", "dialogue": "elder" },
         ] }
@@ -84,7 +85,7 @@ internal static class Fixtures
         return new TileMap(width, rows.Length, 16, 16, [new MapTileset(1, Tiles)], [layer]);
     }
 
-    /// <summary>A world with one area built from <paramref name="rows"/>; '@' is the player's start, 'r' a rat, 'd' a dummy, 'e' the elder, '$' coins.</summary>
+    /// <summary>A world with one area built from <paramref name="rows"/>; '@' is the player's start, 'r' a rat, 'd' a dummy, 'e' the elder, 's' a spider, '$' coins.</summary>
     public static RpgWorld World(params string[] rows)
     {
         var world = new RpgWorld(Content(), (w, id) =>
@@ -102,6 +103,9 @@ internal static class Fixtures
                             break;
                         case 'r':
                             w.Spawn(area, "rat", cell);
+                            break;
+                        case 's':
+                            w.Spawn(area, "spider", cell);
                             break;
                         case 'd':
                             w.Spawn(area, "dummy", cell);

@@ -29,6 +29,7 @@ public static class Brains
         ["still"] = () => new StillBrain(),
         ["wander"] = () => new WanderBrain(),
         ["hunter"] = () => new HunterBrain(),
+        ["skittish"] = () => new SkittishBrain(),
     };
 
     public static void Register(string name, Func<IBrain> factory)

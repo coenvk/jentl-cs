@@ -12,6 +12,8 @@
   <ItemGroup>
     <!-- Cell and GridDirection. -->
     <ProjectReference Include="..\Jentl.Puzzle\Jentl.Puzzle.csproj" />
+    <!-- State machines for brains. -->
+    <ProjectReference Include="..\Fluffy\Fluffy.csproj" />
   </ItemGroup>
 
 </Project>

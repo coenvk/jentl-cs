@@ -177,8 +177,10 @@ internal sealed class FreeCellScene : CardGameScene
 | `Quests` | Quests from JSON with ordered steps (collect, kill, talk, reach, or any condition) and rewards |
 | `Dialogue` | Conversation graphs from JSON: lines, choices shown only when their condition holds, and routes that open a conversation differently depending on the story so far |
 | `Scripting` | The small JSON language dialogue, quests and items share: conditions (`{"has": "glowcap", "count": 3}`) and effects (`{"give": "potion"}`, `{"startQuest": "q"}`); unknown effect names reach the game as custom effects |
-| `World.RpgWorld` | The turn engine: the player acts, then every actor's brain (`still`, `wander`, `hunter`, or your own) takes a turn; bump to attack or talk, walk over items to pick them up, portals between areas, triggers, loot, experience and levels |
+| `World.RpgWorld` | The turn engine: the player acts, then every actor's brain (`still`, `wander`, `hunter`, `skittish`, or your own) takes a turn; bump to attack or talk, walk over items to pick them up, portals between areas, triggers, loot, experience and levels |
 | `ContentValidator` | Finds broken references in content (unknown dialogue nodes, items, quests, actor kinds); run it in a unit test |
+
+Brains with more than a couple of moods are easiest to write as a state machine with Fluffy (`docs/fluffy.md`): `SkittishBrain`, used by the cave spiders, hunts, flees when hurt and rests to heal.
 
 Unlike the puzzle and card kits there is no undo: an RPG turn is final. Every command returns a `TurnResult` listing
 what happened (moves, hits, deaths, pickups), which the screen animates.

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Fluffy: a small finite state machine engine. Framework-free, no dependencies. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Fluffy.Tests" />
+  </ItemGroup>
+
+</Project>

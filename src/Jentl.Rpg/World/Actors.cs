@@ -25,7 +25,7 @@ public sealed record Drop(string Item, double Chance, int Count);
 ///     "defense": 0, "sight": 6, "brain": "hunter", "xp": 2, "drops": [ { "item": "coins", "chance": 0.5 } ] },
 ///   { "id": "elder", "name": "Elder Maren", "sprite": "elder", "faction": "friendly", "dialogue": "elder" } ] }
 /// </code>
-/// <c>brain</c> names a behaviour registered with <see cref="Brains"/> (still, wander or hunter by default).
+/// <c>brain</c> names a behaviour registered with <see cref="Brains"/> (still, wander, hunter or skittish by default).
 /// </summary>
 public sealed record ActorDefinition(
     string Id,
