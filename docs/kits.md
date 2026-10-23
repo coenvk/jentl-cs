@@ -7,7 +7,7 @@ desktop and in the browser.
 | Kit | Core | Screen layer | Games built on it |
 |---|---|---|---|
 | Puzzle | `Jentl.Puzzle` | `Jentl.Core.Puzzle.GridView` | Sokoban (`SokobanRules`), and Lights Out and a push puzzle in the tests |
-| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`), FreeCell (`src/FreeCell`), Pyramid (`src/Pyramid`) and Spider (`src/Spider`) |
+| Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike (`src/Klondike`), FreeCell (`src/FreeCell`), Pyramid (`src/Pyramid`), Spider (`src/Spider`) and TriPeaks (`src/TriPeaks`) |
 
 Both cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
