@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
+    <!-- Game -->
+    <MonoGameVersion>3.8.4.1</MonoGameVersion>
     <!-- Testing -->
     <MicrosoftNetTestSdkVersion>17.14.1</MicrosoftNetTestSdkVersion>
     <XUnitVersion>2.9.3</XUnitVersion>
