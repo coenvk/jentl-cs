@@ -1,4 +1,5 @@
 ﻿using Jentl.Core.Input;
+using Jentl.Core.Timing;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -15,6 +16,12 @@ public abstract class Scene : IDisposable
 
     /// <summary>When true, the scene below is drawn first (e.g. a pause menu over the level).</summary>
     public virtual bool IsOverlay => false;
+
+    /// <summary>
+    /// Timers and coroutines for this scene. They run only while the scene is on top (a pause menu over it
+    /// stops its clock) and are cancelled when it is removed.
+    /// </summary>
+    public Scheduler Timers { get; } = new();
 
     /// <summary>The manager this scene is on. Only available between <see cref="OnEnter"/> and <see cref="OnExit"/>.</summary>
     protected SceneManager Scenes => _manager ?? throw new InvalidOperationException("Scene is not on a scene manager.");
@@ -46,6 +53,7 @@ public abstract class Scene : IDisposable
 
     public void Dispose()
     {
+        Timers.Clear();
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }

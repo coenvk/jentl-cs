@@ -424,3 +424,39 @@ into the window, and the pointer (mouse, touch, gamepad cursor) arrives in virtu
 as fits and letterboxes, `PixelPerfect` keeps to whole-number scales for crisp pixel art, and `Expand` fills the
 window by showing more of the world instead of bars. `JentlGame.ScreenBounds` is the area to lay out in either
 way. The app can try it: `--virtual 640x400:expand`.
+
+## Timers and coroutines
+
+`Jentl.Core.Timing.Scheduler` runs timers and coroutines. Every scene has one (`Timers`) that runs only while the
+scene is on top, so a pause menu stops its clock, and that is cancelled when the scene goes. The `SceneManager` has
+one more that always runs, even through transitions:
+
+```csharp
+Timers.After(TimeSpan.FromSeconds(2), () => _message = null);
+var blink = Timers.Every(TimeSpan.FromMilliseconds(400), () => _cursorOn = !_cursorOn);
+blink.Cancel();
+```
+
+A coroutine is an iterator method that yields what it waits for, so a sequence reads top to bottom instead of
+being spread over flags and countdowns in `Update`:
+
+```csharp
+Timers.Start(Ending());
+
+IEnumerable<Wait?> Ending()
+{
+    yield return Wait.Seconds(0.35);
+    Celebration.Sparkle(Scenes, padlock, ParticleEffects.Rise);
+    yield return Wait.Until(() => !view.IsAnimating);
+    yield return Wait.For(Fanfare());         // another routine, run in line
+    Scenes.Push(new EndScene());
+}
+```
+
+The waits are `Wait.Seconds`/`Wait.For(TimeSpan)`, `Wait.NextFrame` (or `yield return null`), `Wait.Frames(n)`,
+`Wait.Until`/`Wait.While` a condition, and `Wait.For` a `Tween`, a started `Coroutine` or a nested routine. A
+coroutine runs at once up to its first wait. Time left over when a wait ends carries into the next one, so a run of
+waits (or `Every`) stays exact however the frames fall, and a long frame catches up. `Coroutine.Cancel` stops one
+(its `finally` blocks run, even when it cancels itself), `IsPaused` holds it, and `Scheduler.TimeScale` slows
+time down for slow motion. The code lock's win (sparks, then the end panel) and the second confetti wave are
+coroutine timers.

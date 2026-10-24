@@ -236,6 +236,53 @@ public class SceneManagerTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Fact]
+    public void SceneTimers_RunOnlyWhileTheSceneIsOnTop()
+    {
+        var a = Scene("A");
+        _scenes.Push(a);
+        Update();
+        a.Timers.After(Frame * 2, () => _log.Add("A.timer"));
+
+        _scenes.Push(Scene("B", overlay: true));
+        Update(Frame * 10);
+        _log.Should().NotContain("A.timer");
+
+        _scenes.Pop();
+        Update();
+        Update();
+        _log.Should().Contain("A.timer");
+    }
+
+    [Fact]
+    public void SceneTimers_AreCancelledWhenTheSceneGoes()
+    {
+        var a = Scene("A");
+        _scenes.Push(a);
+        Update();
+        var timer = a.Timers.After(Frame, () => _log.Add("A.timer"));
+
+        _scenes.Pop();
+        Update();
+
+        timer.IsDone.Should().BeTrue();
+        _log.Should().NotContain("A.timer");
+    }
+
+    [Fact]
+    public void ManagerTimers_RunThroughTransitions()
+    {
+        _scenes.Push(Scene("A"));
+        Update();
+        _scenes.Timers.After(Frame, () => _log.Add("global"));
+
+        _scenes.Replace(Scene("B"), new TestTransition(TimeSpan.FromSeconds(1)));
+        Update();
+
+        _scenes.IsTransitioning.Should().BeTrue();
+        _log.Should().Contain("global");
+    }
+
     private void Update() => Update(Frame);
 
     private void Update(TimeSpan elapsed) => _scenes.Update(elapsed, _input);

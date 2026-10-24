@@ -1,5 +1,6 @@
 ﻿using Jentl.Core.Graphics;
 using Jentl.Core.Input;
+using Jentl.Core.Timing;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -19,6 +20,9 @@ public sealed class SceneManager
 
     /// <summary>Particles drawn above every scene (confetti over a win panel); in screen pixels.</summary>
     public ParticleSystem Effects { get; } = new();
+
+    /// <summary>Timers and coroutines that run whatever scene is showing, even during transitions.</summary>
+    public Scheduler Timers { get; } = new();
 
     /// <summary>The area scenes were last drawn into, e.g. to aim effects at the screen's edges.</summary>
     public Rectangle Viewport { get; private set; }
@@ -89,6 +93,7 @@ public sealed class SceneManager
     public void Update(TimeSpan elapsed, InputState input)
     {
         Effects.Update(elapsed);
+        Timers.Update(elapsed);
         ApplyPending();
         if (_transition is { } transition)
         {
@@ -97,9 +102,10 @@ public sealed class SceneManager
                 _transition = null;
             }
         }
-        else
+        else if (Top is { } top)
         {
-            Top?.Update(elapsed, input);
+            top.Timers.Update(elapsed);
+            top.Update(elapsed, input);
         }
 
         ApplyPending();
