@@ -2,7 +2,7 @@
 
 Jentl is a small C# game engine on [MonoGame](https://monogame.net) (desktop) and [KNI](https://github.com/kniEngine/kni)
 (the browser, through Blazor WebAssembly): one code base, both platforms. It grew out of an old Java engine of the same
-name, and powers the games in [sokoban-cs](https://github.com/coenvk/sokoban-cs).
+name, and powers the games in [games-cs](https://github.com/coenvk/games-cs).
 
 The game logic kits are framework-free (plain C#, easy to unit test, usable in tools and servers); the screen layer
 draws them.

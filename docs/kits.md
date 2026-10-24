@@ -1,7 +1,7 @@
 # Jentl game kits
 
-Examples name the games built on Jentl; their code (paths such as `src/Sokoban.Desktop`, `src/Bricks`) lives in
-[sokoban-cs](https://github.com/coenvk/sokoban-cs).
+Examples name the games built on Jentl; their code (paths such as `apps/Sokoban`, `src/Bricks`) lives in
+[games-cs](https://github.com/coenvk/games-cs).
 
 Jentl has three kits for building new games quickly, and a multiplayer layer for games with several players. Each has a framework-free core (rules, state, undo, files; plain
 C#, easy to unit test) and a thin screen layer in `Jentl.Core` (drawing, layout, input, animation) that runs on
