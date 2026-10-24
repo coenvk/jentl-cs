@@ -112,6 +112,33 @@ public sealed class Camera2D
         Clamp();
     }
 
+    /// <summary>
+    /// Follows something that travels, turning the view so it heads up the screen: the rotation eases towards
+    /// <paramref name="heading"/> (the short way round) at <paramref name="rate"/>, and <paramref name="target"/> is
+    /// kept at <paramref name="screenAnchor"/>, a fraction of the viewport ((0.5, 0.5), the middle, by default; lower
+    /// shows more of what lies ahead). Ignores <see cref="Bounds"/>.
+    /// </summary>
+    /// <param name="target">Where the follower is, in world units.</param>
+    /// <param name="heading">Its direction of travel in radians (0 along +X, π/2 down the screen).</param>
+    /// <param name="elapsed">Time since the last call.</param>
+    /// <param name="rate">How quickly the view turns; higher keeps closer.</param>
+    /// <param name="screenAnchor">Where on the viewport the target stays.</param>
+    public void FollowHeading(Vector2 target, float heading, TimeSpan elapsed, float rate = 6, Vector2 screenAnchor = default)
+    {
+        if (screenAnchor == default)
+        {
+            screenAnchor = new Vector2(0.5f, 0.5f);
+        }
+
+        var turn = MathHelper.WrapAngle(heading + MathHelper.PiOver2 - Rotation);
+        Rotation += turn * (1 - MathF.Exp(-rate * (float)elapsed.TotalSeconds));
+
+        // The world offset that lands on the anchor once rotated and scaled by the transform.
+        var fromCentre = (screenAnchor - new Vector2(0.5f, 0.5f)) * new Vector2(Viewport.Width, Viewport.Height) / Zoom;
+        var (sin, cos) = MathF.SinCos(Rotation);
+        Position = target - new Vector2((fromCentre.X * cos) - (fromCentre.Y * sin), (fromCentre.X * sin) + (fromCentre.Y * cos));
+    }
+
     /// <summary>Shakes the view up to <paramref name="strength"/> screen pixels, dying away over <paramref name="duration"/>.</summary>
     public void Shake(float strength, TimeSpan duration)
     {
