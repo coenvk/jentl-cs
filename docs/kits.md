@@ -9,6 +9,7 @@ desktop and in the browser.
 | Puzzle | `Jentl.Puzzle` | `Jentl.Core.Puzzle.GridView` | Sokoban (`SokobanRules`), and Lights Out and a push puzzle in the tests |
 | Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike, Easthaven, Forty Thieves, FreeCell, Golf, Pyramid, Spider, TriPeaks and Yukon (each in `src/<Name>`) |
 | RPG | `Jentl.Rpg` | `Jentl.Core.Rpg.MapView` | Mossbrook (`src/Mossbrook`), a village and a dungeon |
+| ECS and physics | `Jentl.Ecs`, `Jentl.Physics` | `Jentl.Core.Diagnostics.PhysicsDebug` | Bricks (`src/Bricks`), a brick breaker |
 
 The puzzle and card cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
@@ -519,3 +520,53 @@ Everything above uses only render targets and blend states, so it runs on deskto
 compiling shaders. Custom shaders need compiling first, for each platform: MonoGame's `mgfxc` for the desktop
 (needs Wine on macOS and Linux) and KNI's content pipeline for the browser. A loaded `Effect` then goes in a
 `ShaderPass`, with `Prepare` setting its parameters.
+
+## ECS and physics
+
+Two more framework-free cores, for games of many moving things rather than turns.
+
+**`Jentl.Ecs`** is an entity component system. An `Entity` is an id with a generation (so a stale handle never
+reaches the entity that reuses its id); what it *is* lives in its components, plain structs or classes stored per type
+in sparse sets: packed for fast loops, with constant-time lookup and removal. Systems run the rules over queries:
+
+```csharp
+var world = new World();
+var ball = world.Spawn().With(new Position(10, 20)).With(new Velocity(100, 0)).Entity;
+
+world.ForEach((Entity e, ref Position p, ref Velocity v) => { p.X += v.X * dt; p.Y += v.Y * dt; });
+foreach (var e in world.Query<Brick, Physical>()) { ... }
+
+world.Get<Position>(ball).X = 0;         // components by reference
+world.SetResource(physics);              // one shared value per type
+world.Emit(new BrickHit(...));           // events, taken with world.Drain<BrickHit>()
+```
+
+Destroying or changing entities inside a query is safe: each entity is checked again just before its turn. A
+`SystemGroup` runs systems (classes or lambdas) in order and can switch them off by name.
+
+**`Jentl.Physics`** is 2D rigid-body physics on `System.Numerics`: circles and axis-aligned boxes that don't rotate,
+which covers most arcade games. Bodies are static (walls), dynamic (moved by gravity, forces and collisions) or
+kinematic (moved by their velocity and never pushed: platforms, paddles). Each has mass, restitution (bounciness;
+the higher of two counts), friction (the geometric mean), gravity scale, damping, collision layers and masks, and can be
+a sensor that reports overlaps without colliding.
+
+```csharp
+var physics = new PhysicsWorld { Gravity = new Vector2(0, 500) };
+physics.Add(new Body(new Box(400, 20), new Vector2(0, 100), BodyType.Static));
+var crate = physics.Add(new Body(new Box(20, 20), Vector2.Zero) { Restitution = 0.3f });
+physics.ContactBegan += contact => { ... };      // and ContactEnded
+physics.Update(elapsed);                         // whole fixed steps (120 a second)
+physics.Raycast(origin, direction, 500);         // also QueryArea and QueryPoint
+```
+
+`Update` runs whole fixed steps, so the simulation is the same at any frame rate (`Alpha` tells how far into the next
+step it is, to draw in between). Each step applies gravity and forces, finds pairs by sweep and prune (sorted along x,
+so only neighbours are tested), settles contacts with impulses over a few iterations, moves everything and nudges
+overlaps apart. Slow impacts don't bounce, so resting things stay put.
+
+**Bricks** puts them together: paddle, balls, bricks, power-ups and walls are entities, each with a `Physical`
+component holding its body (whose `UserData` points back to the entity). Systems in order steer the kinematic
+paddle, carry balls stuck to it, step the physics, apply the rules to the contacts (break bricks, catch power-ups,
+angle the ball off the paddle), keep balls at speed and move on when a wall is cleared, emitting events the screen
+turns into sounds and sparks. Balls float (gravity scale 0) while power-ups fall. `PhysicsDebug.Draw` outlines
+every body and contact for a scene's `DrawDebug`.

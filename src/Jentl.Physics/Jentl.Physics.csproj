@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 2D rigid-body physics on System.Numerics; framework-free like the other kits. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Physics.Tests" />
+  </ItemGroup>
+
+</Project>

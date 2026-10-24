@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Entity component system; framework-free, so it runs in tests, tools and any front end. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Ecs.Tests" />
+  </ItemGroup>
+
+</Project>
