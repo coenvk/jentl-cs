@@ -19,6 +19,7 @@ draws them.
 | `Jentl.Ecs` | An entity component system |
 | `Jentl.Physics` | 2D rigid-body physics |
 | `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations |
+| `Jentl.Tracks` | Tracks and roads: paths built from straights and arcs, with position, heading and curvature along them |
 | `Jentl.Assets` | PNG reading and writing, texture atlases, asset checks |
 | `Jentl.Fluffy` | Fluffy, a finite state machine engine |
 | `Jentl.Assets.Tool` | The `jentl-assets` command line: pack atlases, check assets |

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's tracks: paths built from straights and arcs, with positions, headings and curvature along them. Framework-free.</Description>
+  </PropertyGroup>
+
+  <!-- On System.Numerics, framework-free like the other kits. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Tracks.Tests" />
+  </ItemGroup>
+
+</Project>
