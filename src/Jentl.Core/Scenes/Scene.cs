@@ -31,6 +31,14 @@ public abstract class Scene : IDisposable
     /// <summary>Draws into an already begun sprite batch.</summary>
     public abstract void Draw(SpriteBatch batch, Rectangle viewport);
 
+    /// <summary>
+    /// Draws offscreen pictures the scene needs this frame (a light map, a minimap) before anything goes on screen,
+    /// with the sprite batch not begun. Called for every visible scene, before <see cref="Draw"/>.
+    /// </summary>
+    public virtual void DrawLayers(SpriteBatch batch, Rectangle viewport)
+    {
+    }
+
     /// <summary>Lines the debug overlay shows while this scene is on top: the level, a seed, what the AI is thinking.</summary>
     public virtual IEnumerable<string> DebugInfo => [];
 

@@ -18,6 +18,17 @@ public static class SpriteBatchExtensions
         batch.Draw(Pixel(batch.GraphicsDevice), rectangle, color);
     }
 
+    /// <summary>
+    /// Ends the batch and begins it again, with the engine's usual state (non-premultiplied blending, linear
+    /// sampling) unless told otherwise: for switching blend mode in the middle of drawing.
+    /// </summary>
+    public static void Restart(this SpriteBatch batch, BlendState? blend = null, SamplerState? sampler = null)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        batch.End();
+        batch.Begin(blendState: blend ?? BlendState.NonPremultiplied, samplerState: sampler ?? SamplerState.LinearClamp);
+    }
+
     /// <summary>The outline of a rectangle, <paramref name="thickness"/> pixels wide on the inside of its edges.</summary>
     public static void StrokeRectangle(this SpriteBatch batch, Rectangle rectangle, Color color, int thickness = 1)
     {
@@ -69,7 +80,7 @@ public static class SpriteBatchExtensions
         batch.Draw(dot, center, null, color, 0, new Vector2(Size / 2f), radius * 2 / Size, SpriteEffects.None, 0);
     }
 
-    private static Texture2D Pixel(GraphicsDevice device) => Pixels.GetValue(device, static d =>
+    internal static Texture2D Pixel(GraphicsDevice device) => Pixels.GetValue(device, static d =>
     {
         var texture = new Texture2D(d, 1, 1);
         texture.SetData([Color.White]);

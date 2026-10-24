@@ -485,3 +485,37 @@ ready-made ones: `TableView.DrawDebug` outlines every pile and the card under th
 marks portals, unfired triggers and the cell under the pointer. For values that aren't tied to a scene there are
 watches and a log: `Debug.Watch("Seed", () => seed)` is read every time the panel draws, and `Debug.Log("Saved")`
 adds a line that fades after a few seconds. `JentlGame.DebugInfo` can be overridden to add game-wide lines.
+
+## Render targets, lighting and post effects
+
+`RenderLayer` is an offscreen picture: `Render(batch, size, clear, draw)` switches to its target (made and resized
+as needed, keeping its contents), draws, and switches back. Scenes draw their layers in `Scene.DrawLayers`, which
+runs for every visible scene before anything goes on screen, then use them as textures in `Draw`. `BlendModes` adds
+`Multiply`, `Add`, `Subtract` and `Screen` to the built-in blend states.
+
+`LightMap` is 2D lighting built on that. Render the lights over an `Ambient` colour, then lay the map over the
+area: unlit parts sink into the ambient, lit ones keep (and take on) the light's colour.
+
+```csharp
+public override void DrawLayers(SpriteBatch batch, Rectangle viewport) =>
+    _lights.Render(batch, area, [new Light(player, radius: 200, Color.Wheat), new Light(torch, 120, Color.Orange)]);
+
+// Draw: draw the area, then
+_lights.Apply(batch);
+```
+
+`MapView.Lights` gives the RPG kit's lights: one carried by the player (`CarriedLight`, in tiles) and one per tile
+with a `light` property (radius in tiles, `light_color` as `#rrggbb`), all flickering gently. Mossbrook's cellar
+uses them: torches glow orange, glowcaps teal, and the player's lantern lights the way.
+
+Whole-screen effects go in `SceneManager.Post.Effects` and run in order over the finished frame (the game draws
+offscreen only while one is active): `Bloom` (bright parts bleed light; `Threshold`, `Intensity`), `Vignette`,
+`Scanlines`, `Pixelate`, and `ShaderPass` for a compiled shader. `Post.Flash(color, duration)` washes the screen
+and fades out (the adventure flashes red when the player is hit). The app's Options has a "Retro screen" switch
+(bloom, scanlines and a vignette). A custom effect overrides `PostEffect.Apply` and draws with `PostContext.Draw`
+and `Fill`.
+
+Everything above uses only render targets and blend states, so it runs on desktop and in the browser without
+compiling shaders. Custom shaders need compiling first, for each platform: MonoGame's `mgfxc` for the desktop
+(needs Wine on macOS and Linux) and KNI's content pipeline for the browser. A loaded `Effect` then goes in a
+`ShaderPass`, with `Prepare` setting its parameters.

@@ -25,6 +25,9 @@ public sealed class SceneManager
     /// <summary>Timers and coroutines that run whatever scene is showing, even during transitions.</summary>
     public Scheduler Timers { get; } = new();
 
+    /// <summary>Whole-screen post effects (bloom, vignette, scanlines, shaders) and screen flashes.</summary>
+    public PostProcessor Post { get; } = new();
+
     /// <summary>The debug panel (F3), and whether scenes draw their debug shapes.</summary>
     public DebugOverlay Debug { get; } = new();
 
@@ -100,6 +103,7 @@ public sealed class SceneManager
     public void Update(TimeSpan elapsed, InputState input)
     {
         Effects.Update(elapsed);
+        Post.Update(elapsed);
         Timers.Update(elapsed);
         ApplyPending();
         if (_transition is { } transition)
@@ -116,6 +120,15 @@ public sealed class SceneManager
         }
 
         ApplyPending();
+    }
+
+    /// <summary>Lets every visible scene draw its offscreen layers. Call with the batch not begun, before <see cref="Draw"/>.</summary>
+    public void DrawLayers(SpriteBatch batch, Rectangle viewport)
+    {
+        foreach (var scene in VisibleScenes())
+        {
+            scene.DrawLayers(batch, viewport);
+        }
     }
 
     public void Draw(SpriteBatch batch, Rectangle viewport)

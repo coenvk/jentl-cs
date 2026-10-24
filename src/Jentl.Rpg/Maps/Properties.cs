@@ -28,5 +28,10 @@ public sealed class Properties
             ? parsed
             : fallback;
 
+    public float GetFloat(string name, float fallback = 0) =>
+        _values.TryGetValue(name, out var value) && float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : fallback;
+
     public override string ToString() => string.Join(", ", _values.Select(p => $"{p.Key}={p.Value}"));
 }

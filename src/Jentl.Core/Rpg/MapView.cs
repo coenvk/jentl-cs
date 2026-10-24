@@ -34,6 +34,7 @@ public sealed class MapView
     private int _unit = 16;
     private Vector2 _origin;
     private int _focus = -1;
+    private readonly Dictionary<int, (float Radius, Color Color)?> _tileLights = [];
 
     /// <param name="textures">The texture of a tileset's image.</param>
     /// <param name="text">Draws the floating damage numbers.</param>
@@ -56,6 +57,11 @@ public sealed class MapView
     /// focus is hit. Shake it yourself for other jolts.
     /// </summary>
     public Camera2D Camera { get; } = new() { RoundToPixels = true };
+
+    /// <summary>How far, in tiles, the light carried by the focus actor reaches in <see cref="Lights"/>; 0 for none.</summary>
+    public float CarriedLight { get; set; } = 5.5f;
+
+    public Color CarriedLightColor { get; set; } = new(255, 220, 170);
 
     /// <summary>A cell's size on screen as of the last <see cref="Draw"/>.</summary>
     public int TileSize { get; private set; }
@@ -167,11 +173,15 @@ public sealed class MapView
     public Cell? CellAt(Vector2 screen) =>
         TileSize == 0 ? null : new Cell((int)MathF.Floor((screen.X - _origin.X) / TileSize), (int)MathF.Floor((screen.Y - _origin.Y) / TileSize));
 
-    /// <summary>Draws <paramref name="area"/> into <paramref name="bounds"/>, centred on <paramref name="focus"/>.</summary>
-    public void Draw(SpriteBatch batch, Rectangle bounds, Area area, Actor focus)
+    /// <summary>
+    /// Works out the tile scale and camera for drawing <paramref name="area"/> into <paramref name="bounds"/> around
+    /// <paramref name="focus"/>. <see cref="Draw"/> does this itself; call it first to use the layout earlier in the
+    /// frame, e.g. for <see cref="Lights"/> in a scene's <c>DrawLayers</c>.
+    /// </summary>
+    public void Arrange(Rectangle bounds, Area area, Actor focus)
     {
-        ArgumentNullException.ThrowIfNull(batch);
         ArgumentNullException.ThrowIfNull(area);
+        ArgumentNullException.ThrowIfNull(focus);
         var map = area.Map;
         var scale = Math.Max(MinimumScale, Math.Min(bounds.Width / (map.TileWidth * MinimumCells.X), bounds.Height / (map.TileHeight * MinimumCells.Y)));
         TileSize = map.TileWidth * scale;
@@ -181,6 +191,58 @@ public sealed class MapView
         Camera.Bounds = new Rectangle(0, 0, map.Width * map.TileWidth, map.Height * map.TileHeight);
         Camera.LookAt((PositionOf(focus) + new Vector2(0.5f)) * map.TileWidth);
         _origin = Camera.WorldToScreen(Vector2.Zero);
+    }
+
+    /// <summary>
+    /// The lights in view, in screen pixels as of the last <see cref="Arrange"/>: one carried by
+    /// <paramref name="focus"/> (<see cref="CarriedLight"/>), and one for every tile with a <c>light</c> property
+    /// (its radius in tiles, with <c>light_color</c> as <c>#rrggbb</c>). They flicker gently.
+    /// </summary>
+    public IEnumerable<Light> Lights(Area area, Actor focus)
+    {
+        ArgumentNullException.ThrowIfNull(area);
+        ArgumentNullException.ThrowIfNull(focus);
+        if (TileSize == 0)
+        {
+            yield break;
+        }
+
+        var map = area.Map;
+        var centre = new Vector2(TileSize / 2f);
+        var seconds = (float)_time.TotalSeconds;
+        if (CarriedLight > 0)
+        {
+            yield return new Light(_origin + PositionOf(focus) * TileSize + centre, CarriedLight * TileSize, CarriedLightColor, 0.95f + 0.05f * MathF.Sin(seconds * 7));
+        }
+
+        // Lights just outside the view still shine into it.
+        const int Reach = 6;
+        var first = CellAt(Camera.Viewport.Location.ToVector2())!.Value;
+        var last = CellAt(new Vector2(Camera.Viewport.Right, Camera.Viewport.Bottom))!.Value;
+        for (var y = Math.Max(0, first.Y - Reach); y <= Math.Min(map.Height - 1, last.Y + Reach); y++)
+        {
+            for (var x = Math.Max(0, first.X - Reach); x <= Math.Min(map.Width - 1, last.X + Reach); x++)
+            {
+                foreach (var layer in map.Layers)
+                {
+                    if (layer.Visible && layer[new Cell(x, y)] is var gid and not 0 && TileLight(map, gid) is { } light)
+                    {
+                        // Each light flickers to its own rhythm.
+                        var phase = (x * 7 + y * 13) % 10;
+                        var flicker = 0.88f + 0.12f * MathF.Sin(seconds * (5 + phase * 0.4f) + phase);
+                        yield return new Light(_origin + new Vector2(x, y) * TileSize + centre, light.Radius * TileSize, light.Color, flicker);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Draws <paramref name="area"/> into <paramref name="bounds"/>, centred on <paramref name="focus"/>.</summary>
+    public void Draw(SpriteBatch batch, Rectangle bounds, Area area, Actor focus)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        Arrange(bounds, area, focus);
+        var map = area.Map;
 
         var device = batch.GraphicsDevice;
         var scissor = device.ScissorRectangle;
@@ -311,6 +373,27 @@ public sealed class MapView
         var source = new Rectangle(column * tileset.TileWidth, row * tileset.TileHeight, tileset.TileWidth, tileset.TileHeight);
         batch.Draw(_textures(tileset), at, source, tint);
     }
+
+    /// <summary>The light a tile gives off, from its <c>light</c> and <c>light_color</c> properties; looked up once per tile.</summary>
+    private (float Radius, Color Color)? TileLight(TileMap map, int gid)
+    {
+        if (!_tileLights.TryGetValue(gid, out var light))
+        {
+            if (map.TilesetFor(gid) is { } set && set.Tileset.TileProperties(gid - set.FirstGid) is var properties && properties.GetFloat("light") is > 0 and var radius)
+            {
+                light = (radius, ParseColor(properties.GetString("light_color")) ?? Color.White);
+            }
+
+            _tileLights[gid] = light;
+        }
+
+        return light;
+    }
+
+    private static Color? ParseColor(string? hex) =>
+        hex is { Length: 7 } && hex[0] == '#' && int.TryParse(hex.AsSpan(1), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var rgb)
+            ? new Color((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff)
+            : null;
 
     /// <summary>The stride frame for a sprite, from its tile's <c>walk</c> property, if it has one.</summary>
     private static string? WalkFrame(TileMap map, string sprite)

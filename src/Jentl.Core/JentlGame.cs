@@ -156,9 +156,11 @@ public abstract class JentlGame : Game
     {
         var started = _clock.Elapsed;
         var window = GraphicsDevice.Viewport.Bounds;
-        if (VirtualScreen is { } screen)
+        VirtualScreen?.Fit(window);
+        Scenes.DrawLayers(_batch!, ScreenBounds);
+        if (VirtualScreen is not null || Scenes.Post.IsActive)
         {
-            DrawVirtual(screen, window);
+            DrawOffscreen(window);
         }
         else
         {
@@ -183,32 +185,36 @@ public abstract class JentlGame : Game
         base.Draw(gameTime);
     }
 
-    private void DrawVirtual(VirtualScreen screen, Rectangle window)
+    /// <summary>Draws the scenes into a target (at the virtual size, or the window's), post-processes it and puts it in the window.</summary>
+    private void DrawOffscreen(Rectangle window)
     {
-        screen.Fit(window);
-        if (_target is null || _target.Width != screen.Size.X || _target.Height != screen.Size.Y)
+        var bounds = ScreenBounds;
+        if (_target is null || _target.Width != bounds.Width || _target.Height != bounds.Height)
         {
             _target?.Dispose();
-            _target = new RenderTarget2D(GraphicsDevice, screen.Size.X, screen.Size.Y);
+            _target = RenderLayer.Create(GraphicsDevice, bounds.Size);
         }
 
         GraphicsDevice.SetRenderTarget(_target);
         GraphicsDevice.Clear(ClearColor);
         Begin(SamplerState.LinearClamp);
-        Scenes.Draw(_batch!, screen.Bounds);
+        Scenes.Draw(_batch!, bounds);
         _batch!.End();
+        var image = Scenes.Post.IsActive ? Scenes.Post.Apply(_batch, _target) : _target;
         GraphicsDevice.SetRenderTarget(null);
 
         // Whole-number scaling keeps pixels square and sharp; any other scale is smoothed. Copied opaque: blending
         // inside the target leaves its alpha below one in places.
-        GraphicsDevice.Clear(screen.BarColor);
-        var sampler = screen.Scale == MathF.Floor(screen.Scale) ? SamplerState.PointClamp : SamplerState.LinearClamp;
+        var destination = VirtualScreen?.Destination ?? window;
+        var scale = VirtualScreen?.Scale ?? 1;
+        GraphicsDevice.Clear(VirtualScreen?.BarColor ?? ClearColor);
+        var sampler = scale == MathF.Floor(scale) ? SamplerState.PointClamp : SamplerState.LinearClamp;
         _batch.Begin(blendState: BlendState.Opaque, samplerState: sampler);
-        _batch.Draw(_target, screen.Destination, Color.White);
+        _batch.Draw(image, destination, Color.White);
         _batch.End();
     }
 
-    /// <summary>The game'"'"'s lines on the debug panel: the window, virtual screen and input. Override to add more.</summary>
+    /// <summary>The game's lines on the debug panel: the window, virtual screen and input. Override to add more.</summary>
     protected virtual IEnumerable<string> DebugInfo
     {
         get
@@ -239,6 +245,7 @@ public abstract class JentlGame : Game
         {
             _batch?.Dispose();
             _target?.Dispose();
+            Scenes.Post.Dispose();
             Graphics.Dispose();
         }
 

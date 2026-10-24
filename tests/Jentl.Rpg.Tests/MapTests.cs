@@ -219,4 +219,11 @@ public class MapTests
     [InlineData("a/b", "../../../c.png", "../c.png")]
     public void Combine_ResolvesRelativePaths(string folder, string path, string expected) =>
         TmxReader.Combine(folder, path).Should().Be(expected);
+
+    [Theory]
+    [InlineData("4.5", 4.5f)]
+    [InlineData("2", 2f)]
+    [InlineData("bright", 1f)]
+    public void Properties_ReadFloats_WithAFallback(string text, float expected) =>
+        new Properties(new Dictionary<string, string> { ["light"] = text }).GetFloat("light", fallback: 1).Should().Be(expected);
 }
