@@ -9,17 +9,54 @@ public static class SpriteBatchExtensions
     // One white pixel per device, stretched and tinted to draw solid rectangles.
     private static readonly ConditionalWeakTable<GraphicsDevice, Texture2D> Pixels = new();
 
+    // A soft round dot per device, for particles and other round things.
+    private static readonly ConditionalWeakTable<GraphicsDevice, Texture2D> Dots = new();
+
     public static void FillRectangle(this SpriteBatch batch, Rectangle rectangle, Color color)
     {
         ArgumentNullException.ThrowIfNull(batch);
-        var pixel = Pixels.GetValue(batch.GraphicsDevice, static device =>
+        batch.Draw(Pixel(batch.GraphicsDevice), rectangle, color);
+    }
+
+    /// <summary>A rectangle of <paramref name="size"/> centred on <paramref name="center"/>, turned by <paramref name="rotation"/> radians.</summary>
+    public static void FillRotated(this SpriteBatch batch, Vector2 center, Vector2 size, float rotation, Color color)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        batch.Draw(Pixel(batch.GraphicsDevice), center, null, color, rotation, new Vector2(0.5f), size, SpriteEffects.None, 0);
+    }
+
+    /// <summary>A round dot with soft edges, <paramref name="radius"/> pixels from centre to edge.</summary>
+    public static void FillCircle(this SpriteBatch batch, Vector2 center, float radius, Color color)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        const int Size = 32;
+        var dot = Dots.GetValue(batch.GraphicsDevice, static device =>
         {
-            var texture = new Texture2D(device, 1, 1);
-            texture.SetData([Color.White]);
+            var pixels = new Color[Size * Size];
+            for (var y = 0; y < Size; y++)
+            {
+                for (var x = 0; x < Size; x++)
+                {
+                    var dx = (x + 0.5f) / Size * 2 - 1;
+                    var dy = (y + 0.5f) / Size * 2 - 1;
+                    var edge = Math.Clamp((1 - MathF.Sqrt(dx * dx + dy * dy)) * Size / 2, 0, 1);
+                    pixels[y * Size + x] = new Color(Color.White, edge);
+                }
+            }
+
+            var texture = new Texture2D(device, Size, Size);
+            texture.SetData(pixels);
             return texture;
         });
-        batch.Draw(pixel, rectangle, color);
+        batch.Draw(dot, center, null, color, 0, new Vector2(Size / 2f), radius * 2 / Size, SpriteEffects.None, 0);
     }
+
+    private static Texture2D Pixel(GraphicsDevice device) => Pixels.GetValue(device, static d =>
+    {
+        var texture = new Texture2D(d, 1, 1);
+        texture.SetData([Color.White]);
+        return texture;
+    });
 
     /// <summary>An upward- or downward-pointing triangle filling <paramref name="area"/>, drawn as a stack of one-pixel lines.</summary>
     public static void FillTriangle(this SpriteBatch batch, Rectangle area, bool pointsUp, Color color)

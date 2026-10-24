@@ -1,4 +1,5 @@
-﻿using Jentl.Core.Input;
+﻿using Jentl.Core.Graphics;
+using Jentl.Core.Input;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -15,6 +16,12 @@ public sealed class SceneManager
     private readonly List<Scene> _scenes = [];
     private readonly Queue<(Action Apply, Transition? Transition)> _pending = new();
     private ActiveTransition? _transition;
+
+    /// <summary>Particles drawn above every scene (confetti over a win panel); in screen pixels.</summary>
+    public ParticleSystem Effects { get; } = new();
+
+    /// <summary>The area scenes were last drawn into, e.g. to aim effects at the screen's edges.</summary>
+    public Rectangle Viewport { get; private set; }
 
     public Scene? Top => _scenes.Count > 0 ? _scenes[^1] : null;
 
@@ -81,6 +88,7 @@ public sealed class SceneManager
 
     public void Update(TimeSpan elapsed, InputState input)
     {
+        Effects.Update(elapsed);
         ApplyPending();
         if (_transition is { } transition)
         {
@@ -99,11 +107,13 @@ public sealed class SceneManager
 
     public void Draw(SpriteBatch batch, Rectangle viewport)
     {
+        Viewport = viewport;
         foreach (var scene in VisibleScenes())
         {
             scene.Draw(batch, viewport);
         }
 
+        Effects.Draw(batch);
         _transition?.Draw(batch, viewport);
     }
 

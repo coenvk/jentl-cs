@@ -104,6 +104,29 @@ public class MapTests
     }
 
     [Fact]
+    public void ReadTileset_ReadsTileAnimations()
+    {
+        const string tsx = """
+            <tileset name="t" tilewidth="16" tileheight="16" tilecount="4" columns="2">
+             <image source="t.png" width="32" height="32"/>
+             <tile id="0">
+              <animation>
+               <frame tileid="0" duration="180"/>
+               <frame tileid="3" duration="140"/>
+              </animation>
+             </tile>
+            </tileset>
+            """;
+        var tileset = TmxReader.ReadTileset(tsx);
+
+        tileset.Animation(0).Should().Equal(new TileFrame(0, 180), new TileFrame(3, 140));
+        tileset.Frame(0, TimeSpan.FromMilliseconds(100)).Should().Be(0);
+        tileset.Frame(0, TimeSpan.FromMilliseconds(200)).Should().Be(3);
+        tileset.Frame(0, TimeSpan.FromMilliseconds(330)).Should().Be(0, "it loops");
+        tileset.Frame(1, TimeSpan.FromSeconds(9)).Should().Be(1, "tiles without an animation stay put");
+    }
+
+    [Fact]
     public void ReadMap_RejectsInfiniteMaps()
     {
         var act = () => TmxReader.ReadMap("""<map orientation="orthogonal" width="2" height="2" tilewidth="16" tileheight="16" infinite="1"/>""", _ => "");

@@ -345,3 +345,25 @@ the new track in while the old one fades out, and asking for the track already p
 screen can simply name its music in `OnEnter`. Effects and music each have a switch and a volume; call `Update`
 every frame for the fades. In a browser, music that could not start yet (pages may only make sound after the
 first touch) is retried until it plays.
+
+## Particles and animation
+
+`Jentl.Core.Graphics` has a pooled `ParticleSystem` and ready-made `ParticleEffects`: `Confetti` (tumbling paper
+flakes), `Sparkles`, `Rise` (sparks drifting up), `Hit`, `Smoke` and `Dust`. An effect is a record (count, speed,
+life, size from start to end, colours, direction and spread, gravity, drag, spin), so new ones are a `with` away.
+Every `SceneManager` has an `Effects` system drawn above all scenes, for effects that should show over a win panel:
+
+```csharp
+scenes.Effects.EmitArea(new Rectangle(0, -10, scenes.Viewport.Width, 8), ParticleEffects.Confetti);
+scenes.Effects.Emit(cardCentre, ParticleEffects.Sparkles);
+```
+
+`Animation` is a list of frames with durations played as a loop, once, or ping-pong; `FrameAt(time)` says which
+frame shows, so many sprites can share one animation. `Animator` keeps the clock for a sprite that switches between
+animations, and `SpriteSheet` cuts a texture into numbered frames.
+
+The RPG kit reads Tiled's tile animations (`<animation>` frames in a tileset), and `MapView` plays them: Mossbrook's
+water ripples, torches flicker and glowcaps pulse. A character tile with a `walk` property names its stride frame,
+shown while the character moves between cells; standing still, characters bob gently. `MapView.Burst(cell, effect)`
+puts particles on the map, moving with the camera: hits spark, the defeated vanish in smoke, pickups sparkle and
+level-ups rise.

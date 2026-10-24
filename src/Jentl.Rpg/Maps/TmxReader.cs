@@ -74,6 +74,11 @@ public static class TmxReader
     {
         var image = element.Element("image") ?? throw new FormatException("Only tilesets cut from a single image are supported.");
         var tiles = element.Elements("tile").ToDictionary(t => Int(t, "id"), ReadProperties);
+        var animations = element.Elements("tile")
+            .Where(t => t.Element("animation") is not null)
+            .ToDictionary(
+                t => Int(t, "id"),
+                t => (IReadOnlyList<TileFrame>)[.. t.Element("animation")!.Elements("frame").Select(f => new TileFrame(Int(f, "tileid"), Int(f, "duration")))]);
         var tileWidth = Int(element, "tilewidth");
         var columns = Int(element, "columns", 0);
         if (columns == 0)
@@ -88,7 +93,8 @@ public static class TmxReader
             columns,
             Int(element, "tilecount", 0),
             Combine(folder, (string?)image.Attribute("source") ?? throw new FormatException("A tileset image has no source.")),
-            tiles);
+            tiles,
+            animations);
     }
 
     private static void ReadLayers(XElement parent, int width, int height, int tileWidth, int tileHeight, List<TileLayer> layers, List<ObjectLayer> objectLayers)

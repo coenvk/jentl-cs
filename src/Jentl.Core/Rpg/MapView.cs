@@ -29,6 +29,9 @@ public sealed class MapView
     private readonly Dictionary<int, (Tween Tween, Vector2 Target)> _moves = [];
     private readonly Dictionary<int, TimeSpan> _flashes = [];
     private readonly List<FloatingText> _popups = [];
+    private readonly ParticleSystem _effects = new(600);
+    private TimeSpan _time;
+    private int _unit = 16;
     private Vector2 _origin;
 
     /// <param name="textures">The texture of a tileset's image.</param>
@@ -80,6 +83,10 @@ public sealed class MapView
                 case ActorAttacked attacked:
                     Flash(attacked.Target.Id);
                     FloatText(attacked.Target.Position, attacked.Damage.ToString(System.Globalization.CultureInfo.InvariantCulture), new Color(255, 96, 80));
+                    Burst(attacked.Target.Position, ParticleEffects.Hit);
+                    break;
+                case ActorDied died:
+                    Burst(died.Actor.Position, ParticleEffects.Smoke);
                     break;
                 case AreaEntered:
                     Stop();
@@ -88,16 +95,27 @@ public sealed class MapView
         }
     }
 
+    /// <summary>
+    /// Bursts particles from the middle of <paramref name="cell"/>. Effects are designed in screen pixels; on the
+    /// map they are drawn in the map's own pixels, scaled with the tiles, so <paramref name="size"/> shrinks them
+    /// to fit (0.4 suits sixteen-pixel tiles).
+    /// </summary>
+    public void Burst(Cell cell, ParticleEffect effect, float size = 0.4f) =>
+        _effects.Emit(new Vector2((cell.X + 0.5f) * _unit, (cell.Y + 0.5f) * _unit), effect, size);
+
     /// <summary>Drops every animation, e.g. when changing areas.</summary>
     public void Stop()
     {
         _moves.Clear();
         _flashes.Clear();
         _popups.Clear();
+        _effects.Clear();
     }
 
     public void Update(TimeSpan elapsed)
     {
+        _time += elapsed;
+        _effects.Update(elapsed);
         foreach (var (tween, _) in _moves.Values)
         {
             tween.Update(elapsed);
@@ -182,8 +200,16 @@ public sealed class MapView
 
         foreach (var actor in area.Actors.Where(a => a.IsAlive && (a == focus || area.IsVisible(a.Position))).OrderBy(a => a.Position.Y))
         {
+            // Walking shows the stride frame (a tile's "walk" property names it); standing still, a gentle bob.
             var at = Screen(PositionOf(actor));
-            DrawSprite(batch, map, actor.Sprite, at, _flashes.ContainsKey(actor.Id) ? new Color(255, 110, 100) : Color.White);
+            var moving = _moves.TryGetValue(actor.Id, out var move) && !move.Tween.IsDone;
+            var sprite = moving && WalkFrame(map, actor.Sprite) is { } walk ? walk : actor.Sprite;
+            if (!moving && Math.Sin(_time.TotalSeconds * MathF.Tau / 1.4 + actor.Id) > 0.55)
+            {
+                at.Y -= TileSize / map.TileHeight;
+            }
+
+            DrawSprite(batch, map, sprite, at, _flashes.ContainsKey(actor.Id) ? new Color(255, 110, 100) : Color.White);
             if (actor.Faction == Faction.Hostile && actor.Hp < actor.MaxHp)
             {
                 var bar = new Rectangle(at.X + TileSize / 8, at.Y - TileSize / 10, TileSize * 3 / 4, Math.Max(2, TileSize / 12));
@@ -191,6 +217,9 @@ public sealed class MapView
                 batch.FillRectangle(bar with { Width = bar.Width * actor.Hp / actor.MaxHp }, new Color(220, 70, 60));
             }
         }
+
+        _unit = map.TileWidth;
+        _effects.Draw(batch, _origin, TileSize / (float)map.TileWidth);
 
         foreach (var popup in _popups)
         {
@@ -229,10 +258,25 @@ public sealed class MapView
             return;
         }
 
+        // Animated tiles (water, torches) show whichever frame their animation is at.
         var tileset = set.Tileset;
-        var (column, row) = tileset.Location(gid - set.FirstGid);
+        var (column, row) = tileset.Location(tileset.Frame(gid - set.FirstGid, _time));
         var source = new Rectangle(column * tileset.TileWidth, row * tileset.TileHeight, tileset.TileWidth, tileset.TileHeight);
         batch.Draw(_textures(tileset), at, source, tint);
+    }
+
+    /// <summary>The stride frame for a sprite, from its tile's <c>walk</c> property, if it has one.</summary>
+    private static string? WalkFrame(TileMap map, string sprite)
+    {
+        foreach (var set in map.Tilesets)
+        {
+            if (set.Tileset.TryFind(sprite, out var id))
+            {
+                return set.Tileset.TileProperties(id).GetString("walk");
+            }
+        }
+
+        return null;
     }
 
     private Rectangle Screen(Vector2 grid) =>
