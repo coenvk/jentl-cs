@@ -3,6 +3,7 @@
     <Project Path="src/Fluffy/Fluffy.csproj" />
     <Project Path="src/Jentl.Assets/Jentl.Assets.csproj" />
     <Project Path="src/Jentl.Cards/Jentl.Cards.csproj" />
+    <Project Path="src/Jentl.Collect/Jentl.Collect.csproj" />
     <Project Path="src/Jentl.Core.Kni/Jentl.Core.Kni.csproj" />
     <Project Path="src/Jentl.Core/Jentl.Core.csproj" />
     <Project Path="src/Jentl.Ecs/Jentl.Ecs.csproj" />
@@ -16,6 +17,7 @@
     <Project Path="tests/Fluffy.Tests/Fluffy.Tests.csproj" />
     <Project Path="tests/Jentl.Assets.Tests/Jentl.Assets.Tests.csproj" />
     <Project Path="tests/Jentl.Cards.Tests/Jentl.Cards.Tests.csproj" />
+    <Project Path="tests/Jentl.Collect.Tests/Jentl.Collect.Tests.csproj" />
     <Project Path="tests/Jentl.Core.Tests/Jentl.Core.Tests.csproj" />
     <Project Path="tests/Jentl.Ecs.Tests/Jentl.Ecs.Tests.csproj" />
     <Project Path="tests/Jentl.Multiplayer.Tests/Jentl.Multiplayer.Tests.csproj" />

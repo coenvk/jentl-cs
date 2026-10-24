@@ -18,6 +18,7 @@ draws them.
 | `Jentl.Net` | Online play: a JSON protocol, an authoritative room server and a WebSocket client |
 | `Jentl.Ecs` | An entity component system |
 | `Jentl.Physics` | 2D rigid-body physics |
+| `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations |
 | `Jentl.Assets` | PNG reading and writing, texture atlases, asset checks |
 | `Jentl.Fluffy` | Fluffy, a finite state machine engine |
 | `Jentl.Assets.Tool` | The `jentl-assets` command line: pack atlases, check assets |

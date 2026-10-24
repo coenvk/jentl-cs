@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's collecting kit: weighted draws, recharging counters and date rotations. Framework-free.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Collect.Tests" />
+  </ItemGroup>
+
+</Project>
