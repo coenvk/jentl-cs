@@ -680,7 +680,7 @@ Paddock (a car collecting game) is built on these.
 | `Jentl.Assets.PixelCanvas` | Pixel art drawn in code: rectangles, lines, ellipses, outlines, mirroring; `ToImage()` for `AtlasBuilder`, `ToPng()` for a file |
 | `Jentl.Core.Tracks.RoadPainter` | Paints a `TrackPath` as a road from above (verge, surface, kerbs in corners tighter than 60 units, a dashed centre line) into pixels, and `ToTexture` puts them on the GPU |
 | `RoadPainter.PaintMap` | A small overview map of a path, and where a world position lands on it (for a mini-map) |
-| `Jentl.Core.Graphics.Weather`, `ParticleEffects.Spray`, `ParticleEffects.Kickup` | Rain or snow over the view, drawn from the clock alone; water spray and grit for behind wheels |
+| `Jentl.Core.Graphics.Weather`, `ParticleEffects.Spray`, `ParticleEffects.Kickup` | Rain (slanted by gusting wind, with splashes) or drifting snow over the view, drawn from the clock alone; water spray and grit for behind wheels |
 | `Camera2D.FollowHeading` | Follows a car and turns the view with it, so the road runs up the screen; the car stays at a chosen spot on the screen (lower shows more road ahead) |
 
 ```csharp
