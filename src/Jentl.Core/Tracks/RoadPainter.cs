@@ -67,18 +67,20 @@ public static class RoadPainter
         bool InCorner(double d) => Math.Abs(path.CurvatureAt(d)) > 1 / KerbRadius;
 
         // Verge, then the road with kerbs where it bends, then the inside of the road over the kerbs' inner half.
-        for (var i = 0; i <= steps; i++)
+        // Discs overlap a lot, so a stamp every few units (a quarter of the road's half-width) covers the band.
+        var stride = Math.Max(1, (int)(half / 4));
+        for (var i = 0; i <= steps; i += stride)
         {
             Disc(path.At(i).Position, half + style.VergeWidth, style.Verge);
         }
 
-        for (var i = 0; i <= steps; i++)
+        for (var i = 0; i <= steps; i += stride)
         {
             var kerb = (i / Math.Max(1, style.KerbLength)) % 2 == 0 ? style.EdgeA : style.EdgeB;
             Disc(path.At(i).Position, half, InCorner(i) ? kerb : style.Surface);
         }
 
-        for (var i = 0; i <= steps; i++)
+        for (var i = 0; i <= steps; i += stride)
         {
             if (InCorner(i))
             {
