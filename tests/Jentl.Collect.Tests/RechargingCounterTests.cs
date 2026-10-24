@@ -57,4 +57,28 @@ public class RechargingCounterTests
     [Fact]
     public void Count_NeverExceedsMax_EvenFromABadState() =>
         Tickets.Count(new RechargeState(9, T0), T0).Should().Be(5);
+
+    [Fact]
+    public void ClockSetBack_SpendThenRestore_GrantsNoExtraTickets()
+    {
+        var s = Tickets.Full(T0);
+        for (var i = 0; i < 5; i++)
+        {
+            Tickets.TrySpend(ref s, T0.AddHours(-5)).Should().BeTrue();
+        }
+
+        Tickets.Count(s, T0).Should().Be(0);
+        Tickets.Count(s, T0.AddMinutes(30)).Should().Be(1);
+    }
+
+    [Fact]
+    public void Current_IsTheStateBroughtUpToDate()
+    {
+        var s = new RechargeState(1, T0);
+
+        var current = Tickets.Current(s, T0.AddMinutes(70));
+
+        current.Should().Be(new RechargeState(3, T0.AddMinutes(60)));
+        Tickets.Current(s, T0.AddHours(-2)).Should().Be(s);
+    }
 }

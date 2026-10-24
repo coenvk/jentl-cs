@@ -13,12 +13,12 @@ public sealed record RechargingCounter(int Max, TimeSpan Interval)
     public RechargeState Full(DateTimeOffset now) => new(Max, now);
 
     /// <summary>The count at <paramref name="now"/>. A clock set back before the state's time gives nothing back.</summary>
-    public int Count(RechargeState state, DateTimeOffset now) => Normalize(state, now).Count;
+    public int Count(RechargeState state, DateTimeOffset now) => Current(state, now).Count;
 
     /// <summary>How long until the next one comes back, or null when full.</summary>
     public TimeSpan? NextIn(RechargeState state, DateTimeOffset now)
     {
-        var current = Normalize(state, now);
+        var current = Current(state, now);
         if (current.Count >= Max)
         {
             return null;
@@ -31,7 +31,7 @@ public sealed record RechargingCounter(int Max, TimeSpan Interval)
     /// <summary>Takes one if there is one; returns whether it did.</summary>
     public bool TrySpend(ref RechargeState state, DateTimeOffset now)
     {
-        var current = Normalize(state, now);
+        var current = Current(state, now);
         if (current.Count <= 0)
         {
             state = current;
@@ -39,12 +39,16 @@ public sealed record RechargingCounter(int Max, TimeSpan Interval)
         }
 
         // From full the clock starts now; otherwise the progress towards the next one is kept.
-        state = current.Count >= Max ? new RechargeState(Max - 1, now) : current with { Count = current.Count - 1 };
+        // A clock set back never moves the time back, or restoring it would hand out tickets.
+        state = current.Count >= Max ? new RechargeState(Max - 1, now > current.Since ? now : current.Since) : current with { Count = current.Count - 1 };
         return true;
     }
 
-    // Folds whole elapsed intervals into the count, moving Since forward by those intervals only.
-    private RechargeState Normalize(RechargeState state, DateTimeOffset now)
+    /// <summary>
+    /// The state as of <paramref name="now"/>: whole elapsed intervals folded into the count, its time moved forward by
+    /// those intervals only (never back), so it can be saved without losing progress towards the next one.
+    /// </summary>
+    public RechargeState Current(RechargeState state, DateTimeOffset now)
     {
         var count = Math.Clamp(state.Count, 0, Max);
         if (count >= Max || now <= state.Since)
