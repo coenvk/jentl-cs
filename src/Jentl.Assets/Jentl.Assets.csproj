@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Asset tooling: PNG reading and writing, texture atlases and asset checks; framework-free, for tools, tests and the engine. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Assets.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+  </ItemGroup>
+
+</Project>

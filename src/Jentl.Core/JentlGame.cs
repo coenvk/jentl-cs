@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using Jentl.Core.Content;
 using Jentl.Core.Graphics;
 using Jentl.Core.Input;
 using Jentl.Core.Scenes;
@@ -23,6 +24,7 @@ public abstract class JentlGame : Game
     private PointerState _lastPointer;
     private PointerState _realPointer;
     private RenderTarget2D? _target;
+    private AssetStore? _assets;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private TimeSpan _lastDraw;
     private TimeSpan _updateTime;
@@ -70,7 +72,14 @@ public abstract class JentlGame : Game
         texture.SaveAsPng(file, width, height);
     }
 
-    protected override void LoadContent() => _batch = new SpriteBatch(GraphicsDevice);
+    /// <summary>The game's assets: loaded once, and reloaded as they change when <see cref="AssetStore.Watch"/> is on.</summary>
+    public AssetStore Assets => _assets ?? throw new InvalidOperationException("Assets are available from LoadContent on.");
+
+    protected override void LoadContent()
+    {
+        _batch = new SpriteBatch(GraphicsDevice);
+        _assets = new AssetStore(GraphicsDevice);
+    }
 
     /// <summary>The keyboard state for this frame. Override to feed scripted input.</summary>
     protected virtual KeyboardState ReadKeyboard() => Keyboard.GetState();
@@ -140,6 +149,7 @@ public abstract class JentlGame : Game
         }
 
         Input.Update(keyboard, cursor, pad);
+        _assets?.Update();
         Scenes.Debug.Update(gameTime.ElapsedGameTime, Input);
         var started = _clock.Elapsed;
         Scenes.Update(gameTime.ElapsedGameTime, Input);
@@ -244,6 +254,7 @@ public abstract class JentlGame : Game
         if (disposing)
         {
             _batch?.Dispose();
+            _assets?.Dispose();
             _target?.Dispose();
             Scenes.Post.Dispose();
             Graphics.Dispose();

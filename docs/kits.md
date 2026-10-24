@@ -630,3 +630,34 @@ and checks each language file has them all, keeps their placeholders, and holds 
 can't slip through untranslated. Whole sentences are translated, never pieced together, so word order and verb forms
 can change ("You play" and "Ruby plays" are separate texts). Adding a language means adding its file and a line in
 `Tr.Languages`. The adventure's story (dialogue, quests, items) lives in its content files and stays in English.
+
+## Asset tooling
+
+`Jentl.Assets` (framework-free) and the `tools/Assets` command line look after the files a game ships.
+
+**Atlases.** Many small sprites are better as one texture: one file for a browser to download instead of dozens,
+and one texture for the GPU to switch to. The tool packs a folder of PNGs into an image and a description:
+
+```bash
+dotnet run --project tools/Assets -- atlas src/Sokoban.Desktop/Art/sprites src/Sokoban.Desktop/Assets/sprites.atlas.json
+```
+
+Sprites are named by their path in the folder without the extension (`crates/crate3`), placed on shelves in the
+smallest sheet that fits, and padded with their edge pixels repeated, so scaling never bleeds a neighbour in. The
+description records the source folder and a fingerprint of it. The game loads it with `Assets.Atlas(path)` and draws
+`atlas["crates/crate3"]`, a `Sprite` (a texture and a source rectangle; `batch.Draw(sprite, rect, color)`). Sokoban's
+46 tile sprites live in `Art/sprites` (not shipped) and ship as one 512x512 `Assets/sprites.png`.
+
+**Checks.** `dotnet run --project tools/Assets -- check src/Sokoban.Desktop/Assets` makes sure every image decodes,
+every JSON file parses, every atlas fits its image and is up to date with its sprites, and Tiled maps and tilesets
+load with every tile known and every image present (`MapCheck` in the RPG kit). A test runs the same check over the
+game's assets, so a broken file or a forgotten atlas rebuild fails the build. `AssetCheck.Checks` takes more checks
+by file extension.
+
+**The asset store and hot reload.** `JentlGame.Assets` loads textures, atlases and text by path, once each, and
+disposes them with the game. Started with `--watch src/Sokoban.Desktop` (desktop), it watches the game's source
+folder: files there are read in preference to the built copies, and edits show up while the game runs. Textures and
+atlases are refreshed in place (so sprites already handed out stay valid); editing a sprite in `Art/sprites` repacks
+its atlas in memory, as the tool would; other files are re-read the next time they're asked for. `Assets.Changed`
+names each reloaded file for whatever the game must redo itself: the app reloads its language file this way. Run the
+`atlas` command afterwards to keep the edit (the check reminds you).
