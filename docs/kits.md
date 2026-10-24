@@ -288,4 +288,5 @@ else if (match.IsHumansTurn && tapped is { } move) match.Play(move);
 
 Online play would slot in as another kind of seat controller; the game only ever sees seats and moves. Uno
 (`src/Uno`) is the example: `UnoGame` implements the rules, `RandomUnoBot` and `SmartUnoBot` the opponents, and
-`UnoMatch` adds up rounds to 500 points.
+`UnoMatch` adds up rounds to 500 points. Texas Hold'em (`src/Poker`) is the second: `HoldemHand` is one
+hand (blinds, betting rounds, side pots), `HoldemTable` the sit-and-go around it, and `PokerBot` the opponents.
