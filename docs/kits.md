@@ -287,7 +287,7 @@ else if (match.Update(elapsed) is { } botMove) Animate(botMove);
 else if (match.IsHumansTurn && tapped is { } move) match.Play(move);
 ```
 
-Online play would slot in as another kind of seat controller; the game only ever sees seats and moves. Uno
+Online play is in the next section; the game only ever sees seats and moves. Uno
 (`src/Uno`) is the example: `UnoGame` implements the rules, `RandomUnoBot` and `SmartUnoBot` the opponents, and
 `UnoMatch` adds up rounds to 500 points. Texas Hold'em (`src/Poker`) is the second: `HoldemHand` is one
 hand (blinds, betting rounds, side pots), `HoldemTable` the sit-and-go around it, and `PokerBot` the opponents.
@@ -570,3 +570,33 @@ paddle, carry balls stuck to it, step the physics, apply the rules to the contac
 angle the ball off the paddle), keep balls at speed and move on when a wall is cleared, emitting events the screen
 turns into sounds and sparks. Balls float (gravity scale 0) while power-ups fall. `PhysicsDebug.Draw` outlines
 every body and contact for a scene's `DrawDebug`.
+
+## Online multiplayer
+
+`Jentl.Net` (framework-free) plays turn-based games over the internet through a room server. Players connect with
+a WebSocket, one of them creates a room and shares its four-digit code, the others join with it, and the host
+starts: bots take the seats nobody joined (and the seat of anyone who leaves mid-game). The server is
+authoritative: it holds the game, checks every action against the rules, and sends each seat only what that seat may
+see, so a modified client still can't peek at other hands.
+
+| Piece | What it does |
+|---|---|
+| `Protocol` | JSON messages, one per WebSocket text frame: `CreateRoom`, `JoinRoom`, `StartGame`, `PlayerAction` and `LeaveRoom` up; `RoomJoined`, `LobbyChanged`, `GameStarted`, `GameState`, `ServerError` and `RoomClosed` down. Game moves and states travel as the game's own JSON inside `PlayerAction` and `GameState` |
+| `IRoomGame` | A game the server can host: `Start` with the seats, `Act` for a seat's action (returning why not, if it isn't allowed), `Update` for bots, `Replace` a leaver with a bot, and `StateFor(seat, since)`: that seat's view and the events since the last state |
+| `RoomServer` | Rooms, codes, the lobby, starting, passing actions in and states out (only when the game's `Version` changes), bots for leavers, closing empty rooms. Thread-safe; knows nothing about any particular game |
+| `SocketConnection` | Serves one player's WebSocket for the room server, with a size limit on messages |
+| `NetClient` | The device's side: connects (desktop and browser alike), sends in the background, and queues what arrives for the game loop to take with `TryReceive` once per frame |
+
+`src/Jentl.Server` is the server itself, a small ASP.NET Core app: WebSockets on `/play`, a status line on `/`, and
+a ticker that lets bots move ten times a second. Run it with `dotnet run --project src/Jentl.Server` (it listens on
+port 5080), or build the container with `docker build -f src/Jentl.Server/Dockerfile -t jentl-server .` from the
+repository root. Hosting it publicly means putting it behind TLS (browsers on an `https` page may only open `wss://`
+connections), for example behind a reverse proxy.
+
+Uno is the first game online. `UnoView` is a round as one seat sees it (its own hand, everyone else's card count,
+its legal moves); the local table and the server both hand the screen one, so the same screen plays local and
+online games through `IUnoTable`. `UnoRoomGame` is the server side. A new game needs its own `IRoomGame` and a line
+in the server's game list.
+
+There are no accounts: players are "Player 1" to "Player 4" by seat, and a dropped connection can't rejoin its seat
+(a bot carries on for it).

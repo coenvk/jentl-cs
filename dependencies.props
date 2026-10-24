@@ -7,6 +7,8 @@
     <StbImageSharpVersion>2.30.16</StbImageSharpVersion>
     <KniVersion>4.3.9001</KniVersion>
     <BlazorVersion>10.0.2</BlazorVersion>
+    <!-- Game server (ASP.NET Core) -->
+    <AspNetCoreVersion>10.0.2</AspNetCoreVersion>
     <!-- Testing -->
     <MicrosoftNetTestSdkVersion>17.14.1</MicrosoftNetTestSdkVersion>
     <XUnitVersion>2.9.3</XUnitVersion>

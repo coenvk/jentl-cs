@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Online play: the message protocol, the room server and a WebSocket client; framework-free. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Net.Tests" />
+  </ItemGroup>
+
+</Project>
