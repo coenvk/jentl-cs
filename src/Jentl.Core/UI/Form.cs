@@ -35,7 +35,7 @@ public abstract class FormRow(string label)
 /// <summary>A switch: tap, confirm, or left/right to turn it on or off.</summary>
 public sealed class ToggleRow(string label, Func<bool> get, Action<bool> set) : FormRow(label)
 {
-    internal override string Value => get() ? "On" : "Off";
+    internal override string Value => get() ? UiText.On : UiText.Off;
 
     public bool IsOn => get();
 
@@ -104,6 +104,16 @@ public sealed class SliderRow(string label, Func<float> get, Action<float> set, 
         var width = control.Width * 3 / 5;
         return new Rectangle(control.Right - width, control.Center.Y - 4, width, 8);
     }
+}
+
+/// <summary>One of a few choices (a language, a difficulty): left/right, confirm or a tap step through them.</summary>
+public sealed class ChoiceRow(string label, IReadOnlyList<string> choices, Func<int> get, Action<int> set) : FormRow(label)
+{
+    internal override string Value => choices[Math.Clamp(get(), 0, choices.Count - 1)];
+
+    internal override void Activate() => Adjust(1);
+
+    internal override void Adjust(int direction) => set(((get() + direction) % choices.Count + choices.Count) % choices.Count);
 }
 
 /// <summary>A row that does something when chosen, like a menu item: "Back", "Reset progress".</summary>

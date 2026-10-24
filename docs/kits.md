@@ -600,3 +600,33 @@ in the server's game list.
 
 There are no accounts: players are "Player 1" to "Player 4" by seat, and a dropped connection can't rejoin its seat
 (a bot carries on for it).
+
+## Localization
+
+`Jentl.Core.Localization.Localizer` translates gettext style: the English text is the key, so code reads naturally
+and anything untranslated simply shows in English. A language is a JSON object from English text to translation
+(keys starting with `//` are notes for translators):
+
+```json
+{ "Select level": "Kies level", "{0} wins the round!": "{0} wint de ronde!", "{0} move": "{0} stap", "{0} moves": "{0} stappen" }
+```
+
+```csharp
+var nl = Localizer.Load("nl", json);
+nl["Select level"];                              // "Kies level"
+nl.Format("{0} wins the round!", "Ruby");        // "Ruby wint de ronde!"
+nl.Plural(count, "{0} move", "{0} moves");       // "1 stap", "3 stappen"
+nl.Format("Score {0:N0}", 1234567);              // "Score 1.234.567": numbers the language's way
+Localizer.Pick(CultureInfo.CurrentUICulture, ["en", "nl"]);   // "nl" for nl-BE, "en" when nothing fits
+```
+
+`Missing` collects texts that were asked for but have no translation. The engine's own widgets say little; what
+they do say (`UiText.On`, `UiText.Off`) can be set, and `ChoiceRow` offers a pick-one row for forms (a language,
+a difficulty).
+
+The app writes `T("...")`, `T("{0} wins", name)` and `N(count, "{0} move", "{0} moves")` (`Sokoban.Desktop.UI.Tr`),
+with translations in `src/Sokoban.Desktop/Assets/lang/<language>.json`. A test scans the source for every such text
+and checks each language file has them all, keeps their placeholders, and holds nothing unused, so a new text
+can't slip through untranslated. Whole sentences are translated, never pieced together, so word order and verb forms
+can change ("You play" and "Ruby plays" are separate texts). Adding a language means adding its file and a line in
+`Tr.Languages`. The adventure's story (dialogue, quests, items) lives in its content files and stays in English.

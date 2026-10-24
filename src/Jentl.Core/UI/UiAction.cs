@@ -38,6 +38,14 @@ public static class UiKeys
         });
 }
 
+/// <summary>The few words the widgets say themselves; a game sets them to translate them.</summary>
+public static class UiText
+{
+    public static string On { get; set; } = "On";
+
+    public static string Off { get; set; } = "Off";
+}
+
 /// <summary>Sounds the widgets play through a <see cref="Audio.SoundPlayer"/>, by name.</summary>
 public static class UiSounds
 {
