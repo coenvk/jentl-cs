@@ -318,3 +318,30 @@ var form = new Form(sounds,
 // Update:  form.Update(input, UiKeys.Default, elapsed);
 // Draw:    OverlayPanel.Draw(batch, viewport, fonts, "Options", [], form);
 ```
+
+## Audio
+
+`Jentl.Core.Audio` plays sound effects and music, and can make both in code.
+
+`Synth` renders tunes written as text: each voice is a line of steps where a note ("C4", "F#3", "Bb2") starts a
+note, "-" holds it, "." rests and "x" strikes a drum. An `Instrument` is a waveform (square, pulse, triangle,
+sine, saw or noise) with an attack/decay/sustain/release envelope, vibrato and a pitch slide (a sine sliding down
+two octaves is a kick drum). Loops wrap their last notes' tails round to the start so they repeat without a click,
+and the same tune always renders the same samples.
+
+```csharp
+var lead = new Instrument(Wave.Pulse, Volume: 0.16f, Vibrato: 0.08f);
+var bass = new Instrument(Wave.Triangle, Volume: 0.45f);
+var tune = new Tune(100,
+    new Voice(lead, "E5 - G5 - C6 - B5 A5 | G5 - E5 - D5 - C5 -"),
+    new Voice(bass, "C3 - - - G2 - - - | A2 - - - E2 - - -"));
+
+sounds.AddMusic("menu", () => Synth.Render(tune, loop: true));       // rendered on first play
+sounds.Add("blip", Synth.Render(new Tune(900, new Voice(lead, "E6 B6"))));
+```
+
+`SoundPlayer` plays effects by name (recorded `.wav` files or rendered ones) and loops music: `PlayMusic` fades
+the new track in while the old one fades out, and asking for the track already playing does nothing, so every
+screen can simply name its music in `OnEnter`. Effects and music each have a switch and a volume; call `Update`
+every frame for the fades. In a browser, music that could not start yet (pages may only make sound after the
+first touch) is retried until it plays.
