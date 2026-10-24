@@ -1,4 +1,6 @@
-﻿using Jentl.Core.Graphics;
+﻿using System.Diagnostics;
+using System.Globalization;
+using Jentl.Core.Graphics;
 using Jentl.Core.Input;
 using Jentl.Core.Scenes;
 using Microsoft.Xna.Framework;
@@ -21,6 +23,9 @@ public abstract class JentlGame : Game
     private PointerState _lastPointer;
     private PointerState _realPointer;
     private RenderTarget2D? _target;
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private TimeSpan _lastDraw;
+    private TimeSpan _updateTime;
 
     protected JentlGame(int width, int height)
     {
@@ -135,7 +140,10 @@ public abstract class JentlGame : Game
         }
 
         Input.Update(keyboard, cursor, pad);
+        Scenes.Debug.Update(gameTime.ElapsedGameTime, Input);
+        var started = _clock.Elapsed;
         Scenes.Update(gameTime.ElapsedGameTime, Input);
+        _updateTime += _clock.Elapsed - started;
         if (Scenes.IsEmpty)
         {
             Exit();
@@ -146,6 +154,7 @@ public abstract class JentlGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        var started = _clock.Elapsed;
         var window = GraphicsDevice.Viewport.Bounds;
         if (VirtualScreen is { } screen)
         {
@@ -156,9 +165,20 @@ public abstract class JentlGame : Game
             GraphicsDevice.Clear(ClearColor);
             Begin(SamplerState.LinearClamp);
             Scenes.Draw(_batch!, window);
-            PadCursor.Draw(_batch!, window);
             _batch!.End();
         }
+
+        var drawTime = _clock.Elapsed - started;
+
+        // Above everything, in window pixels: the gamepad cursor and the debug panel.
+        Begin(SamplerState.LinearClamp);
+        PadCursor.Draw(_batch!, window);
+        Scenes.Debug.Draw(_batch!, window, Scenes, Scenes.Debug.IsVisible ? DebugInfo : null);
+        _batch!.End();
+
+        Scenes.Debug.Stats.Record(started - _lastDraw, _updateTime, drawTime);
+        _lastDraw = started;
+        _updateTime = TimeSpan.Zero;
 
         base.Draw(gameTime);
     }
@@ -186,9 +206,28 @@ public abstract class JentlGame : Game
         _batch.Begin(blendState: BlendState.Opaque, samplerState: sampler);
         _batch.Draw(_target, screen.Destination, Color.White);
         _batch.End();
-        Begin(SamplerState.LinearClamp);
-        PadCursor.Draw(_batch, window);
-        _batch.End();
+    }
+
+    /// <summary>The game'"'"'s lines on the debug panel: the window, virtual screen and input. Override to add more.</summary>
+    protected virtual IEnumerable<string> DebugInfo
+    {
+        get
+        {
+            var c = CultureInfo.InvariantCulture;
+            var window = GraphicsDevice.Viewport.Bounds;
+            yield return VirtualScreen is { } screen
+                ? string.Format(c, "Window {0}x{1}  virtual {2}x{3} {4} x{5:0.00}", window.Width, window.Height, screen.Size.X, screen.Size.Y, screen.Mode, screen.Scale)
+                : string.Format(c, "Window {0}x{1}", window.Width, window.Height);
+            var cursor = Input.Cursor;
+            yield return string.Format(
+                c,
+                "Pointer {0:0},{1:0}{2}{3}  Pad {4}",
+                cursor.Position.X,
+                cursor.Position.Y,
+                cursor.IsDown ? " down" : "",
+                PadCursor.IsActive ? " (pad cursor)" : "",
+                Input.Pad.IsConnected ? "connected" : "none");
+        }
     }
 
     // Textures loaded from PNG files are not premultiplied, so blend accordingly.

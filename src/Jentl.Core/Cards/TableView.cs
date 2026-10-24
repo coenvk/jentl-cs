@@ -80,6 +80,21 @@ public sealed class TableView
         return pile.IsEmpty ? bounds : Rectangle.Union(bounds, CardBounds(pile, pile.Count - 1));
     }
 
+    /// <summary>Debug shapes: every pile's area outlined, and the card or outline under <paramref name="cursor"/> filled.</summary>
+    public void DrawDebug(SpriteBatch batch, Vector2 cursor)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        foreach (var spot in _spots)
+        {
+            batch.StrokeRectangle(PileBounds(spot.Pile), new Color(80, 220, 255), 2);
+        }
+
+        if (HitTest(cursor) is { } hit)
+        {
+            batch.FillRectangle(hit.Index < 0 ? PileBounds(hit.Pile) : CardBounds(hit.Pile, hit.Index), new Color(80, 220, 255) * 0.3f);
+        }
+    }
+
     /// <summary>The topmost card under <paramref name="point"/> (index -1 for an empty pile's outline), or null.</summary>
     public (Pile Pile, int Index)? HitTest(Vector2 point)
     {

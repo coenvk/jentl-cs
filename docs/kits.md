@@ -460,3 +460,28 @@ waits (or `Every`) stays exact however the frames fall, and a long frame catches
 (its `finally` blocks run, even when it cancels itself), `IsPaused` holds it, and `Scheduler.TimeScale` slows
 time down for slow motion. The code lock's win (sparks, then the end panel) and the second confetti wave are
 coroutine timers.
+
+## Debug overlay
+
+F3 (or the game's own switch; the app has one in Options) shows `SceneManager.Debug`, a panel over everything:
+frame rate with average, worst, update and draw times, a graph of the last two seconds of frames (marks at 60
+and 30 frames a second), memory and garbage collections, the window and virtual screen, the pointer and gamepad,
+the scene stack, and the particle and timer counts. Give it an `ITextDrawer` (`Debug.Text`) for the text; without
+one only the graph shows.
+
+Scenes add their own lines and shapes, shown only while the panel is up:
+
+```csharp
+public override IEnumerable<string> DebugInfo => [$"Level {level}", $"Enemies {enemies.Count}"];
+
+public override void DrawDebug(SpriteBatch batch, Rectangle viewport)
+{
+    foreach (var enemy in enemies) batch.StrokeRectangle(enemy.Bounds, Color.Red, 2);
+}
+```
+
+`DrawDebug` draws in the scene's own coordinates (inside the virtual screen when there is one). The kits have
+ready-made ones: `TableView.DrawDebug` outlines every pile and the card under the pointer, and `MapView.DrawDebug`
+marks portals, unfired triggers and the cell under the pointer. For values that aren't tied to a scene there are
+watches and a log: `Debug.Watch("Seed", () => seed)` is read every time the panel draws, and `Debug.Log("Saved")`
+adds a line that fades after a few seconds. `JentlGame.DebugInfo` can be overridden to add game-wide lines.

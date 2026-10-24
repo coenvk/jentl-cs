@@ -255,6 +255,35 @@ public sealed class MapView
         batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
     }
 
+    /// <summary>
+    /// Debug shapes over the last drawn map: portals blue, triggers (unfired) magenta, and the cell under
+    /// <paramref name="cursor"/> white. Call after <see cref="Draw"/>.
+    /// </summary>
+    public void DrawDebug(SpriteBatch batch, Area area, Vector2? cursor)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        ArgumentNullException.ThrowIfNull(area);
+        if (TileSize == 0)
+        {
+            return;
+        }
+
+        foreach (var portal in area.Portals)
+        {
+            batch.StrokeRectangle(Screen(new Vector2(portal.Cell.X, portal.Cell.Y)), new Color(80, 160, 255), 2);
+        }
+
+        foreach (var trigger in area.Triggers.Where(t => t.Repeat || !t.HasFired))
+        {
+            batch.StrokeRectangle(Screen(new Vector2(trigger.Cell.X, trigger.Cell.Y)), new Color(230, 90, 230), 2);
+        }
+
+        if (cursor is { } at && CellAt(at) is { } cell && area.Map.Contains(cell))
+        {
+            batch.StrokeRectangle(Screen(new Vector2(cell.X, cell.Y)), Color.White, 2);
+        }
+    }
+
     /// <summary>Draws the tile named <paramref name="name"/> (a sprite, an item icon) at a screen rectangle; skipped if the map has none.</summary>
     public void DrawSprite(SpriteBatch batch, TileMap map, string name, Rectangle at, Color tint)
     {

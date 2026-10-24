@@ -31,6 +31,14 @@ public abstract class Scene : IDisposable
     /// <summary>Draws into an already begun sprite batch.</summary>
     public abstract void Draw(SpriteBatch batch, Rectangle viewport);
 
+    /// <summary>Lines the debug overlay shows while this scene is on top: the level, a seed, what the AI is thinking.</summary>
+    public virtual IEnumerable<string> DebugInfo => [];
+
+    /// <summary>Draws debug shapes over the scene (hit areas, paths) while the debug overlay shows, in the scene's own coordinates.</summary>
+    public virtual void DrawDebug(SpriteBatch batch, Rectangle viewport)
+    {
+    }
+
     /// <summary>Called when the scene is put on the stack.</summary>
     protected internal virtual void OnEnter()
     {

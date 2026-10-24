@@ -1,4 +1,5 @@
-﻿using Jentl.Core.Graphics;
+﻿using Jentl.Core.Diagnostics;
+using Jentl.Core.Graphics;
 using Jentl.Core.Input;
 using Jentl.Core.Timing;
 using Microsoft.Xna.Framework;
@@ -23,6 +24,12 @@ public sealed class SceneManager
 
     /// <summary>Timers and coroutines that run whatever scene is showing, even during transitions.</summary>
     public Scheduler Timers { get; } = new();
+
+    /// <summary>The debug panel (F3), and whether scenes draw their debug shapes.</summary>
+    public DebugOverlay Debug { get; } = new();
+
+    /// <summary>Every scene on the stack, bottom first.</summary>
+    public IReadOnlyList<Scene> Stack => _scenes;
 
     /// <summary>The area scenes were last drawn into, e.g. to aim effects at the screen's edges.</summary>
     public Rectangle Viewport { get; private set; }
@@ -117,6 +124,10 @@ public sealed class SceneManager
         foreach (var scene in VisibleScenes())
         {
             scene.Draw(batch, viewport);
+            if (Debug.IsVisible)
+            {
+                scene.DrawDebug(batch, viewport);
+            }
         }
 
         Effects.Draw(batch);

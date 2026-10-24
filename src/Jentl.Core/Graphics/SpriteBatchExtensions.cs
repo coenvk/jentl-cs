@@ -18,6 +18,24 @@ public static class SpriteBatchExtensions
         batch.Draw(Pixel(batch.GraphicsDevice), rectangle, color);
     }
 
+    /// <summary>The outline of a rectangle, <paramref name="thickness"/> pixels wide on the inside of its edges.</summary>
+    public static void StrokeRectangle(this SpriteBatch batch, Rectangle rectangle, Color color, int thickness = 1)
+    {
+        var t = Math.Min(thickness, Math.Min(rectangle.Width, rectangle.Height) / 2 + 1);
+        batch.FillRectangle(rectangle with { Height = t }, color);
+        batch.FillRectangle(new Rectangle(rectangle.X, rectangle.Bottom - t, rectangle.Width, t), color);
+        batch.FillRectangle(new Rectangle(rectangle.X, rectangle.Y + t, t, rectangle.Height - 2 * t), color);
+        batch.FillRectangle(new Rectangle(rectangle.Right - t, rectangle.Y + t, t, rectangle.Height - 2 * t), color);
+    }
+
+    /// <summary>A straight line from <paramref name="from"/> to <paramref name="to"/>.</summary>
+    public static void DrawLine(this SpriteBatch batch, Vector2 from, Vector2 to, Color color, float thickness = 1)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        var along = to - from;
+        batch.Draw(Pixel(batch.GraphicsDevice), from, null, color, MathF.Atan2(along.Y, along.X), new Vector2(0, 0.5f), new Vector2(along.Length(), thickness), SpriteEffects.None, 0);
+    }
+
     /// <summary>A rectangle of <paramref name="size"/> centred on <paramref name="center"/>, turned by <paramref name="rotation"/> radians.</summary>
     public static void FillRotated(this SpriteBatch batch, Vector2 center, Vector2 size, float rotation, Color color)
     {
