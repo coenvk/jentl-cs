@@ -13,6 +13,7 @@ desktop and in the browser.
 | Cards | `Jentl.Cards` | `Jentl.Core.Cards` (`CardArt`, `CardRenderer`, `TableView`) | Klondike, Easthaven, Forty Thieves, FreeCell, Golf, Pyramid, Spider, TriPeaks and Yukon (each in `src/<Name>`) |
 | RPG | `Jentl.Rpg` | `Jentl.Core.Rpg.MapView` | Mossbrook (`src/Mossbrook`), a village and a dungeon |
 | ECS and physics | `Jentl.Ecs`, `Jentl.Physics` | `Jentl.Core.Diagnostics.PhysicsDebug` | Bricks (`src/Bricks`), a brick breaker |
+| Collecting and tracks | `Jentl.Collect`, `Jentl.Tracks` | `Jentl.Core.Tracks.RoadPainter`, `Camera2D.FollowHeading` | Paddock (`src/Paddock`), a car collecting and racing game |
 
 The puzzle and card cores work the same way: **rules change the state through a turn builder, and the engine records every change**.
 That gives you, for free:
@@ -664,3 +665,26 @@ atlases are refreshed in place (so sprites already handed out stay valid); editi
 its atlas in memory, as the tool would; other files are re-read the next time they're asked for. `Assets.Changed`
 names each reloaded file for whatever the game must redo itself: the app reloads its language file this way. Run the
 `atlas` command afterwards to keep the edit (the check reminds you).
+
+## Collecting and tracks: a collecting game with races
+
+Paddock (a car collecting game) is built on these.
+
+| Part | What it does |
+|---|---|
+| `Jentl.Collect.WeightedTable<T>` | Draws items in proportion to their weights (pack contents, loot); `Chance(item)` for showing the odds. The same `Random` seed draws the same items |
+| `Jentl.Collect.RechargingCounter` | Tickets, energy or lives that come back one per interval on the wall clock, also while the game is closed. Save its `RechargeState` (a count and a time); `Count`, `NextIn` and `TrySpend` work it out at any moment. Setting the clock back gives nothing back |
+| `Jentl.Collect.Rotation` | Equal periods from an epoch, for things on a calendar (this week's events): `PeriodAt(time)` and `Pick(items, time, offset)` give every device the same answer without a server |
+| `Jentl.Tracks.TrackPath` | A path built from `Straight` and `Arc` pieces (positive degrees turn left on a screen whose y points down): `At(distance)` gives position and heading, `CurvatureAt` the bend, `Polyline` points for drawing. A path whose end meets its start is a circuit and wraps |
+| `Jentl.Assets.PixelCanvas` | Pixel art drawn in code: rectangles, lines, ellipses, outlines, mirroring; `ToImage()` for `AtlasBuilder`, `ToPng()` for a file |
+| `Jentl.Core.Tracks.RoadPainter` | Paints a `TrackPath` as a road from above (verge, surface, kerbs in corners tighter than 60 units, a dashed centre line) into pixels, and `ToTexture` puts them on the GPU |
+| `Camera2D.FollowHeading` | Follows a car and turns the view with it, so the road runs up the screen; the car stays at a chosen spot on the screen (lower shows more road ahead) |
+
+```csharp
+var tickets = new RechargingCounter(Max: 5, Interval: TimeSpan.FromMinutes(30));
+var state = tickets.Full(DateTimeOffset.UtcNow);            // keep this in the save file
+if (tickets.TrySpend(ref state, DateTimeOffset.UtcNow)) { /* race */ }
+
+var oval = TrackPath.Build([new Straight(200), new Arc(40, 180), new Straight(200), new Arc(40, 180)]);
+var pose = oval.At(distance);                               // where a car is, and which way it points
+```
