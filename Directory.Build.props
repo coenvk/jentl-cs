@@ -13,5 +13,19 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
+
+  <!-- Packages: one per library in src/, all versioned together (CI sets Version from the release tag). -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <PackageProjectUrl>https://github.com/coenvk/jentl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/coenvk/jentl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>jentl;game-engine;monogame;kni</PackageTags>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts/packages</PackageOutputPath>
+    <GenerateDocumentationFile Condition="'$(IsPackable)' == 'true'">true</GenerateDocumentationFile>
+    <!-- Public members (or some of their parameters) without XML comments are fine; the docs folder carries the guide. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+  </PropertyGroup>
+
   <Import Project="$(MSBuildThisFileDirectory)dependencies.props" />
 </Project>

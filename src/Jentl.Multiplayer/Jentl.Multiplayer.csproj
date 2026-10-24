@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's turn-based multiplayer: seats, turn order, humans and bots at one table. Framework-free.</Description>
+  </PropertyGroup>
+
   <!--
     Turn-based multiplayer for Jentl games: players (human or bot), turn order, bots, and a match runner
     that paces bot turns and hands the device over between people. Framework-free.

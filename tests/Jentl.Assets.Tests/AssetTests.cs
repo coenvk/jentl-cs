@@ -1,6 +1,4 @@
-﻿using Jentl.Rpg.Maps;
-
-namespace Jentl.Assets.Tests;
+﻿namespace Jentl.Assets.Tests;
 
 public sealed class AssetTests : IDisposable
 {
@@ -153,17 +151,6 @@ public sealed class AssetTests : IDisposable
         check.Run().Should().ContainSingle().Which.Should().Be(new AssetProblem("level.lvl", "not a level"));
     }
 
-    /// <summary>The game's own assets, as shipped: everything loads, maps and tilesets included, and the sprite atlas is current.</summary>
-    [Fact]
-    public void TheGamesAssets_PassTheCheck()
-    {
-        var check = new AssetCheck(Path.Combine(RepositoryRoot(), "src", "Sokoban.Desktop", "Assets"));
-        check.Checks[".tmx"] = MapCheck.Map;
-        check.Checks[".tsx"] = MapCheck.Tileset;
-
-        check.Run().Should().BeEmpty("rebuild a stale atlas with: dotnet run --project tools/Assets -- atlas src/Sokoban.Desktop/Art/sprites src/Sokoban.Desktop/Assets/sprites.atlas.json");
-    }
-
     private static Image Solid(int width, int height, (byte R, byte G, byte B, byte A) color)
     {
         var image = new Image(width, height);
@@ -196,17 +183,4 @@ public sealed class AssetTests : IDisposable
 
     private static bool Overlap(AtlasRegion a, AtlasRegion b) =>
         a.X < b.X + b.Width && b.X < a.X + a.Width && a.Y < b.Y + b.Height && b.Y < a.Y + a.Height;
-
-    private static string RepositoryRoot()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "Sokoban.slnx")))
-            {
-                return dir.FullName;
-            }
-        }
-
-        throw new DirectoryNotFoundException("The repository root was not found.");
-    }
 }

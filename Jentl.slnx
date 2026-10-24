@@ -1,0 +1,30 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Fluffy/Fluffy.csproj" />
+    <Project Path="src/Jentl.Assets/Jentl.Assets.csproj" />
+    <Project Path="src/Jentl.Cards/Jentl.Cards.csproj" />
+    <Project Path="src/Jentl.Core.Kni/Jentl.Core.Kni.csproj" />
+    <Project Path="src/Jentl.Core/Jentl.Core.csproj" />
+    <Project Path="src/Jentl.Ecs/Jentl.Ecs.csproj" />
+    <Project Path="src/Jentl.Multiplayer/Jentl.Multiplayer.csproj" />
+    <Project Path="src/Jentl.Net/Jentl.Net.csproj" />
+    <Project Path="src/Jentl.Physics/Jentl.Physics.csproj" />
+    <Project Path="src/Jentl.Puzzle/Jentl.Puzzle.csproj" />
+    <Project Path="src/Jentl.Rpg/Jentl.Rpg.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Fluffy.Tests/Fluffy.Tests.csproj" />
+    <Project Path="tests/Jentl.Assets.Tests/Jentl.Assets.Tests.csproj" />
+    <Project Path="tests/Jentl.Cards.Tests/Jentl.Cards.Tests.csproj" />
+    <Project Path="tests/Jentl.Core.Tests/Jentl.Core.Tests.csproj" />
+    <Project Path="tests/Jentl.Ecs.Tests/Jentl.Ecs.Tests.csproj" />
+    <Project Path="tests/Jentl.Multiplayer.Tests/Jentl.Multiplayer.Tests.csproj" />
+    <Project Path="tests/Jentl.Net.Tests/Jentl.Net.Tests.csproj" />
+    <Project Path="tests/Jentl.Physics.Tests/Jentl.Physics.Tests.csproj" />
+    <Project Path="tests/Jentl.Puzzle.Tests/Jentl.Puzzle.Tests.csproj" />
+    <Project Path="tests/Jentl.Rpg.Tests/Jentl.Rpg.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Assets/Assets.csproj" />
+  </Folder>
+</Solution>

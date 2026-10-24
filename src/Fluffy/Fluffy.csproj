@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Fluffy, Jentl's finite state machine engine: hierarchical states, timers, guards and Mermaid diagrams. Framework-free.</Description>
+    <PackageId>Jentl.Fluffy</PackageId>
+  </PropertyGroup>
+
   <!-- Fluffy: a small finite state machine engine. Framework-free, no dependencies. -->
 
   <ItemGroup>

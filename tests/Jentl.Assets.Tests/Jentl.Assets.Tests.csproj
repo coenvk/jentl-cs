@@ -4,7 +4,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Jentl.Assets\Jentl.Assets.csproj" />
-    <ProjectReference Include="..\..\src\Jentl.Rpg\Jentl.Rpg.csproj" />
   </ItemGroup>
 
 </Project>

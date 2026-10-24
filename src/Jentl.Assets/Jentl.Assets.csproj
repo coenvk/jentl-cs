@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's asset tooling: PNG reading and writing, texture atlases and asset checks. Framework-free.</Description>
+  </PropertyGroup>
+
   <!-- Asset tooling: PNG reading and writing, texture atlases and asset checks; framework-free, for tools, tests and the engine. -->
 
   <ItemGroup>

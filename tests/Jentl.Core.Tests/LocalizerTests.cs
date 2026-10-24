@@ -1,10 +1,9 @@
 ﻿using System.Globalization;
-using System.Text.RegularExpressions;
 using Jentl.Core.Localization;
 
 namespace Jentl.Core.Tests;
 
-public partial class LocalizerTests
+public class LocalizerTests
 {
     private const string Dutch = """
         {
@@ -80,83 +79,56 @@ public partial class LocalizerTests
         act.Should().Throw<System.Text.Json.JsonException>();
     }
 
-    /// <summary>
-    /// The app's language files against its source: every text the code asks for (<c>T("...")</c>, and both forms
-    /// of <c>N(count, "...", "...")</c>) has a translation, every translation is still used, and translations keep
-    /// the same placeholders.
-    /// </summary>
     [Fact]
-    public void TheAppsTranslations_AreCompleteAndCurrent()
+    public void TheCheck_FindsTheTextsInTheCode()
     {
-        var root = RepositoryRoot();
-        var app = Path.Combine(root, "src", "Sokoban.Desktop");
-        var used = SourceTexts(app);
-        used.Should().Contain(["Select level", "{0} move", "{0} moves"], "the scan finds the texts");
-
-        // Looked up from data rather than written in the code: the level packs' names and title prefix.
-        string[] indirect = ["Classic", "Ice", "Level"];
-        foreach (var file in Directory.GetFiles(Path.Combine(app, "Assets", "lang"), "*.json"))
+        var folder = Directory.CreateTempSubdirectory("jentl-tr-").FullName;
+        try
         {
-            var language = Path.GetFileNameWithoutExtension(file);
-            var texts = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file))!
-                .Where(t => !t.Key.StartsWith("//", StringComparison.Ordinal))
-                .ToDictionary(t => t.Key, t => t.Value);
-            Localizer.Load(language, File.ReadAllText(file)).Count.Should().Be(texts.Count, $"{language} has no empty translations");
+            File.WriteAllText(Path.Combine(folder, "Menu.cs"), """
+                var a = T("Play");
+                var b = T("{0} wins", name);
+                // T("Commented out")
+                var c = N(count, "{0} move", "{0} moves");
+                """);
 
-            used.Except(texts.Keys).Should().BeEmpty($"every text needs a translation in {language}.json");
-            texts.Keys.Except(used).Except(indirect).Should().BeEmpty($"{language}.json should not keep texts the game no longer uses");
-            foreach (var (english, translated) in texts)
-            {
-                Placeholders(translated).Should().BeEquivalentTo(Placeholders(english), $"\"{translated}\" ({language}) must keep the placeholders of \"{english}\"");
-            }
+            TranslationCheck.SourceTexts(folder).Should().BeEquivalentTo(["Play", "{0} wins", "{0} move", "{0} moves"]);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
         }
     }
 
-    private static HashSet<string> SourceTexts(string folder)
+    [Fact]
+    public void TheCheck_ReportsMissingUnusedEmptyAndBrokenTranslations()
     {
-        var texts = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var file in Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
+        var folder = Directory.CreateTempSubdirectory("jentl-tr-").FullName;
+        try
         {
-            var code = string.Join('\n', File.ReadLines(file).Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
-            foreach (Match match in TextCall().Matches(code))
-            {
-                texts.Add(match.Groups[1].Value);
-            }
+            File.WriteAllText(Path.Combine(folder, "nl.json"), """
+                {
+                  "// note": "skipped",
+                  "Play": "Spelen",
+                  "{0} wins": "wint",
+                  "Old": "Oud",
+                  "Classic": "Klassiek",
+                  "Quit": ""
+                }
+                """);
+            HashSet<string> used = ["Play", "{0} wins", "Quit", "Options"];
 
-            foreach (Match match in PluralCall().Matches(code))
-            {
-                texts.Add(match.Groups[1].Value);
-                texts.Add(match.Groups[2].Value);
-            }
+            TranslationCheck.Problems(used, folder, indirect: ["Classic"]).Should().BeEquivalentTo(
+            [
+                "nl: no translation of \"Options\"",
+                "nl: \"Old\" is no longer used",
+                "nl: the translation of \"Quit\" is empty",
+                "nl: \"wint\" doesn't keep the placeholders of \"{0} wins\"",
+            ]);
         }
-
-        return texts;
-    }
-
-    private static string[] Placeholders(string text) =>
-        [.. Placeholder().Matches(text).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal)];
-
-    private static string RepositoryRoot()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        finally
         {
-            if (File.Exists(Path.Combine(dir.FullName, "Sokoban.slnx")))
-            {
-                return dir.FullName;
-            }
+            Directory.Delete(folder, recursive: true);
         }
-
-        throw new DirectoryNotFoundException("The repository root (with Sokoban.slnx) was not found.");
     }
-
-    [GeneratedRegex(@"\bT\(\s*""((?:[^""\\]|\\.)*)""")]
-    private static partial Regex TextCall();
-
-    [GeneratedRegex(@"\bN\(\s*[^,""]+?,\s*""((?:[^""\\]|\\.)*)"",\s*""((?:[^""\\]|\\.)*)""")]
-    private static partial Regex PluralCall();
-
-    [GeneratedRegex(@"\{(\d+)(?::[^}]*)?\}")]
-    private static partial Regex Placeholder();
 }

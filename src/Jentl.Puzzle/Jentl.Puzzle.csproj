@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's grid puzzle kit: boards, rules through recorded turns, undo and redo, level files. Framework-free.</Description>
+  </PropertyGroup>
+
   <!-- Framework-free: no MonoGame, so it runs in tests, tools, solvers and any front end. -->
 
   <ItemGroup>

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's 2D rigid-body physics: circles and boxes, fixed steps, contacts, sensors, layers, raycasts. Framework-free.</Description>
+  </PropertyGroup>
+
   <!-- 2D rigid-body physics on System.Numerics; framework-free like the other kits. -->
 
   <ItemGroup>

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's screen layer for MonoGame: scenes, input (keyboard, pointer, gamepad), UI widgets, audio and synth, particles, camera, render effects, timers, debug overlay, localization and assets.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
   </ItemGroup>

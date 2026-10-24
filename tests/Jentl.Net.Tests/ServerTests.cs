@@ -1,21 +1,40 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
-using Uno;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
 
 namespace Jentl.Net.Tests;
 
-/// <summary>The real server in memory, with real <see cref="NetClient"/>s talking to it over WebSockets.</summary>
-public sealed class ServerTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+/// <summary>A room server behind a real ASP.NET Core WebSocket endpoint (in memory), with real <see cref="NetClient"/>s.</summary>
+public sealed class ServerTests : IAsyncLifetime
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);
 
-    [Fact]
-    public async Task TheStatusPage_Answers()
+    private WebApplication? _app;
+
+    public async Task InitializeAsync()
     {
-        using var http = factory.CreateClient();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        _app = builder.Build();
+        var rooms = new RoomServer(new Dictionary<string, Func<IRoomGame>> { [CountingGame.Name] = () => new CountingGame() });
+        _app.UseWebSockets();
+        _app.Map("/play", async (HttpContext context) =>
+        {
+            using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            using var connection = new SocketConnection(socket, rooms);
+            await connection.RunAsync(context.RequestAborted);
+        });
+        await _app.StartAsync();
+    }
 
-        var text = await http.GetStringAsync(new Uri("/", UriKind.Relative));
-
-        text.Should().Contain("Jentl game server");
+    public async Task DisposeAsync()
+    {
+        if (_app is not null)
+        {
+            await _app.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -24,25 +43,19 @@ public sealed class ServerTests(WebApplicationFactory<Program> factory) : IClass
         using var host = Connect();
         using var guest = Connect();
 
-        host.Send(new CreateRoom(UnoOnline.Game, 2));
+        host.Send(new CreateRoom(CountingGame.Name, 2));
         var code = (await Next<RoomJoined>(host)).Code;
         guest.Send(new JoinRoom(code));
         (await Next<RoomJoined>(guest)).Seat.Should().Be(1);
 
         host.Send(new StartGame());
         await Next<GameStarted>(guest);
-        var hostState = UnoOnline.ReadState((await Next<GameState>(host)).State)!;
-        var guestState = UnoOnline.ReadState((await Next<GameState>(guest)).State)!;
-        hostState.View.Seat.Should().Be(0);
-        guestState.View.Seat.Should().Be(1);
-        hostState.Names.Should().Equal("Player 1", "Player 2");
+        CountingGame.Read(await Next<GameState>(host)).Seat.Should().Be(0);
+        CountingGame.Read(await Next<GameState>(guest)).Seat.Should().Be(1);
 
-        // Whoever's turn it is draws; the other hears about it.
-        var (mover, other) = hostState.View.CurrentSeat == 0 ? (host, guest) : (guest, host);
-        mover.Send(new PlayerAction(UnoOnline.Write(new UnoPlay(DrawCard.Instance))));
+        host.Send(new PlayerAction(JsonSerializer.SerializeToElement(3)));
 
-        var heard = UnoOnline.ReadState((await Next<GameState>(other)).State)!;
-        heard.Events.Should().Contain(e => e is CardsDrawn);
+        CountingGame.Read(await Next<GameState>(guest)).Total.Should().Be(3);
     }
 
     [Fact]
@@ -61,7 +74,7 @@ public sealed class ServerTests(WebApplicationFactory<Program> factory) : IClass
     }
 
     private NetClient Connect() => new(async cancel =>
-        await factory.Server.CreateWebSocketClient().ConnectAsync(new Uri("ws://localhost/play"), cancel));
+        await _app!.GetTestServer().CreateWebSocketClient().ConnectAsync(new Uri("ws://localhost/play"), cancel));
 
     /// <summary>Waits for the next message of a kind, skipping others.</summary>
     private static async Task<T> Next<T>(NetClient client)

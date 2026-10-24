@@ -1,6 +1,6 @@
 ﻿// Asset tooling for Jentl games.
 //
-// Usage:
+// Usage (installed as a .NET tool: dotnet jentl-assets ...):
 //   Assets atlas <sprite-folder> <output.atlas.json> [--padding <n>]
 //       Packs every PNG under the folder into one image (output.png next to the description). Sprites are named
 //       by their path in the folder without ".png" ("floors/floor1"). The description records the folder and a

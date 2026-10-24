@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's entity component system: generational entities, sparse-set components, queries, systems, events. Framework-free.</Description>
+  </PropertyGroup>
+
   <!-- Entity component system; framework-free, so it runs in tests, tools and any front end. -->
 
   <ItemGroup>

@@ -1,7 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The asset command line, shipped as a .NET tool: dotnet tool install Jentl.Assets.Tool, then dotnet jentl-assets. -->
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>jentl-assets</ToolCommandName>
+    <PackageId>Jentl.Assets.Tool</PackageId>
+    <Description>Jentl's asset command line: pack sprite folders into texture atlases, and check a game's assets (images, JSON, atlases, Tiled maps).</Description>
   </PropertyGroup>
 
   <ItemGroup>

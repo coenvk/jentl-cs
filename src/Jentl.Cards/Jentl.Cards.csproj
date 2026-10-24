@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's card game kit: cards, piles, tables, rules through recorded turns, undo and redo, hints. Framework-free.</Description>
+  </PropertyGroup>
+
   <!-- Framework-free: no MonoGame, so it runs in tests, tools, solvers and any front end. -->
 
   <ItemGroup>

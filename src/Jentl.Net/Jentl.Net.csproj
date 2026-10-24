@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's online play: JSON protocol, an authoritative room server and a WebSocket client. Framework-free.</Description>
+  </PropertyGroup>
+
   <!-- Online play: the message protocol, the room server and a WebSocket client; framework-free. -->
 
   <ItemGroup>

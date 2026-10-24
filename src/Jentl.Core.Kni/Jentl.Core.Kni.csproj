@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's screen layer built for KNI, for games in the browser (Blazor WebAssembly).</Description>
+  </PropertyGroup>
+
   <!-- The engine's sources compiled against KNI instead of MonoGame, for the browser build. -->
   <PropertyGroup>
     <RootNamespace>Jentl.Core</RootNamespace>

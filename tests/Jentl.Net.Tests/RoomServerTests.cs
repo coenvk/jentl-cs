@@ -1,22 +1,19 @@
 ﻿using System.Text.Json;
-using Uno;
 
 namespace Jentl.Net.Tests;
 
 public class RoomServerTests
 {
-    private static readonly JsonSerializerOptions CardJson = new(JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
-
-    private readonly RoomServer _server = new(new Dictionary<string, Func<IRoomGame>> { [UnoOnline.Game] = () => new UnoRoomGame() }, seed: 5);
+    private readonly RoomServer _server = new(new Dictionary<string, Func<IRoomGame>> { [CountingGame.Name] = () => new CountingGame() }, seed: 5);
 
     [Fact]
     public void Messages_RoundTripAsJson()
     {
-        var json = Protocol.Write(new CreateRoom("uno", 3));
+        var json = Protocol.Write(new CreateRoom("counting", 3));
 
         json.Should().Contain("\"type\":\"create\"");
-        Protocol.ReadClient(json).Should().Be(new CreateRoom("uno", 3));
-        Protocol.ReadServer(Protocol.Write(new RoomJoined("1234", "uno", 1, false))).Should().Be(new RoomJoined("1234", "uno", 1, false));
+        Protocol.ReadClient(json).Should().Be(new CreateRoom("counting", 3));
+        Protocol.ReadServer(Protocol.Write(new RoomJoined("1234", "counting", 1, false))).Should().Be(new RoomJoined("1234", "counting", 1, false));
         Protocol.ReadClient("{\"type\":\"nonsense\"}").Should().BeNull();
         Protocol.ReadClient("not json").Should().BeNull();
     }
@@ -26,7 +23,7 @@ public class RoomServerTests
     {
         var host = new FakeConnection();
 
-        _server.Received(host, Protocol.Write(new CreateRoom("uno", 3)));
+        _server.Received(host, Protocol.Write(new CreateRoom(CountingGame.Name, 3)));
 
         var joined = host.Single<RoomJoined>();
         joined.Code.Should().MatchRegex("^[0-9]{4}$");
@@ -44,14 +41,14 @@ public class RoomServerTests
 
         _server.Received(guest, Protocol.Write(new JoinRoom(code)));
 
-        guest.Single<RoomJoined>().Should().Be(new RoomJoined(code, "uno", 1, false));
+        guest.Single<RoomJoined>().Should().Be(new RoomJoined(code, CountingGame.Name, 1, false));
         host.Last<LobbyChanged>().Seats[1].Kind.Should().Be(SeatKind.Human);
     }
 
     [Theory]
     [InlineData("chess", 2, "doesn't host")]
-    [InlineData("uno", 1, "2 to 4")]
-    [InlineData("uno", 9, "2 to 4")]
+    [InlineData(CountingGame.Name, 1, "2 to 4")]
+    [InlineData(CountingGame.Name, 9, "2 to 4")]
     public void BadRooms_AreRefused(string game, int seats, string reason)
     {
         var player = new FakeConnection();
@@ -65,9 +62,9 @@ public class RoomServerTests
     [Fact]
     public void JoiningAMissingFullOrStartedRoom_IsRefused()
     {
-        var (host, code) = Host(2);
+        var (_, code) = Host(2);
         var stranger = new FakeConnection();
-        _server.Received(stranger, Protocol.Write(new JoinRoom("0000" == code ? "9999" : "0000")));
+        _server.Received(stranger, Protocol.Write(new JoinRoom(code == "0000" ? "9999" : "0000")));
         stranger.Last<ServerError>().Text.Should().Contain("no room");
 
         _server.Received(new FakeConnection(), Protocol.Write(new JoinRoom(code)));
@@ -93,28 +90,22 @@ public class RoomServerTests
 
         host.All<GameStarted>().Should().ContainSingle();
         host.Last<LobbyChanged>().Seats.Select(s => s.Kind).Should().Equal(SeatKind.Human, SeatKind.Human, SeatKind.Bot, SeatKind.Bot);
-        State(host).View.Seat.Should().Be(0);
-        State(guest).View.Seat.Should().Be(1);
+        State(host).Seat.Should().Be(0);
+        State(guest).Seat.Should().Be(1);
     }
 
     [Fact]
-    public void EachPlayer_SeesOnlyTheirOwnHand()
+    public void EachPlayer_IsSentOnlyTheirOwnSecrets()
     {
         var (host, code) = Host(2);
         var guest = Join(code);
         _server.Received(host, Protocol.Write(new StartGame()));
 
-        var mine = State(host).View;
-        var theirs = State(guest).View;
+        var mine = State(host).Secret;
+        var theirs = State(guest).Secret;
 
-        mine.Hand.Should().HaveCount(mine.HandCounts[0]);
-        theirs.Hand.Should().HaveCount(theirs.HandCounts[1]);
-        mine.Hand.Should().NotIntersectWith(theirs.Hand, "no card is in two hands, and nobody is sent another's");
-        var sentToHost = string.Concat(host.Raw);
-        foreach (var card in theirs.Hand)
-        {
-            sentToHost.Should().NotContain(Json(card), "the host is never sent a card from the guest's hand");
-        }
+        mine.Should().NotBe(theirs);
+        string.Concat(host.Raw).Should().NotContain(theirs.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -123,16 +114,14 @@ public class RoomServerTests
         var (host, code) = Host(2);
         var guest = Join(code);
         _server.Received(host, Protocol.Write(new StartGame()));
-        var view = State(host).View;
-        var (turn, waiting) = view.CurrentSeat == 0 ? (host, guest) : (guest, host);
 
-        _server.Received(waiting, Act(new UnoPlay(DrawCard.Instance)));
-        waiting.Last<ServerError>().Text.Should().Contain("not your turn");
+        _server.Received(guest, Act(2));
+        guest.Last<ServerError>().Text.Should().Contain("not your turn");
 
-        var move = State(turn).View.LegalMoves[0];
-        _server.Received(turn, Act(new UnoPlay(move)));
+        _server.Received(host, Act(2));
 
-        State(waiting).Events.Should().NotBeEmpty("everyone hears what was played");
+        State(guest).Total.Should().Be(2, "everyone hears what was played");
+        State(guest).Events.Should().Contain("0+2");
     }
 
     [Fact]
@@ -140,24 +129,10 @@ public class RoomServerTests
     {
         var (host, _) = Host(2);
         _server.Received(host, Protocol.Write(new StartGame()));
-        var view = State(host).View;
-        for (var i = 0; i < 10 && view.CurrentSeat != 0; i++)
-        {
-            _server.Update(TimeSpan.FromSeconds(1));
-            view = State(host).View;
-        }
 
-        view.CurrentSeat.Should().Be(0);
+        _server.Received(host, Act(7));
 
-        var unplayable = view.Hand.FirstOrDefault(c => !view.CanPlay(c));
-        if (unplayable == default)
-        {
-            return;
-        }
-
-        _server.Received(host, Act(new UnoPlay(new PlayCard(unplayable))));
-
-        host.Last<ServerError>().Text.Should().Contain("can't do that");
+        host.Last<ServerError>().Text.Should().Contain("1, 2 or 3");
     }
 
     [Fact]
@@ -165,28 +140,12 @@ public class RoomServerTests
     {
         var (host, _) = Host(2);
         _server.Received(host, Protocol.Write(new StartGame()));
+        _server.Received(host, Act(3));
 
-        // Keep drawing or playing on our turns; the bot must answer each time.
-        for (var i = 0; i < 20; i++)
-        {
-            var view = State(host).View;
-            if (view.IsOver)
-            {
-                break;
-            }
+        _server.Update(TimeSpan.FromSeconds(1));
 
-            if (view.CurrentSeat == 0)
-            {
-                _server.Received(host, Act(new UnoPlay(view.LegalMoves[0])));
-            }
-            else
-            {
-                _server.Update(TimeSpan.FromSeconds(1));
-            }
-        }
-
-        host.All<GameState>().Select(s => UnoOnline.ReadState(s.State)!).SelectMany(s => s.Events).OfType<CardPlayed>()
-            .Should().Contain(p => p.Seat == 1, "the bot in seat 1 played");
+        State(host).Total.Should().Be(4);
+        State(host).Turn.Should().Be(0, "the bot in seat 1 has played");
     }
 
     [Fact]
@@ -237,16 +196,14 @@ public class RoomServerTests
         player.All<ServerError>().Should().HaveCount(2);
     }
 
-    private static string Act(UnoAction action) => Protocol.Write(new PlayerAction(UnoOnline.Write(action)));
+    private static string Act(int amount) => Protocol.Write(new PlayerAction(JsonSerializer.SerializeToElement(amount)));
 
-    private static string Json(UnoCard card) => JsonSerializer.Serialize(card, CardJson);
-
-    private static UnoOnlineState State(FakeConnection player) => UnoOnline.ReadState(player.Last<GameState>().State)!;
+    private static CountingGame.State State(FakeConnection player) => CountingGame.Read(player.Last<GameState>());
 
     private (FakeConnection Host, string Code) Host(int seats)
     {
         var host = new FakeConnection();
-        _server.Received(host, Protocol.Write(new CreateRoom("uno", seats)));
+        _server.Received(host, Protocol.Write(new CreateRoom(CountingGame.Name, seats)));
         return (host, host.Single<RoomJoined>().Code);
     }
 
@@ -261,11 +218,11 @@ public class RoomServerTests
     {
         public List<string> Raw { get; } = [];
 
-        public bool Closed { get; private set; }
-
         public void Send(string message) => Raw.Add(message);
 
-        public void Close() => Closed = true;
+        public void Close()
+        {
+        }
 
         public IEnumerable<T> All<T>()
             where T : ServerMessage => Raw.Select(Protocol.ReadServer).OfType<T>();

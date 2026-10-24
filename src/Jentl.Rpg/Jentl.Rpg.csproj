@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Jentl's turn-based RPG kit: Tiled maps, field of view, actors and combat, items, quests, dialogue, saves. Framework-free.</Description>
+  </PropertyGroup>
+
   <!--
     Framework-free RPG and roguelike building blocks: Tiled maps, field of view, pathfinding, dungeon
     generation, a turn engine, inventory, quests and dialogue. No MonoGame, so it runs in tests and tools.
