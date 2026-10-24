@@ -20,4 +20,16 @@ public static class SpriteBatchExtensions
         });
         batch.Draw(pixel, rectangle, color);
     }
+
+    /// <summary>An upward- or downward-pointing triangle filling <paramref name="area"/>, drawn as a stack of one-pixel lines.</summary>
+    public static void FillTriangle(this SpriteBatch batch, Rectangle area, bool pointsUp, Color color)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        for (var y = 0; y < area.Height; y++)
+        {
+            var row = pointsUp ? y : area.Height - 1 - y;
+            var width = Math.Max(1, (row + 1) * area.Width / area.Height);
+            batch.FillRectangle(new Rectangle(area.Center.X - width / 2, area.Y + y, width, 1), color);
+        }
+    }
 }

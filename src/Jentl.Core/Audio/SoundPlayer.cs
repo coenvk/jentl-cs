@@ -22,7 +22,13 @@ public sealed class SoundPlayer : IDisposable
 
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Master volume, 0 to 1, applied to every sound.</summary>
+    public float Volume { get; set; } = 1f;
+
     /// <summary>Loads <c>&lt;directory&gt;/&lt;name&gt;.wav</c> for each name (16-bit PCM or float), relative to the game root.</summary>
+    /// <summary>A player with no sounds: every <see cref="Play"/> does nothing. For tests and games without audio.</summary>
+    public static SoundPlayer Silent() => new([], isAvailable: false);
+
     public static SoundPlayer Load(string directory, params string[] names)
     {
         var sounds = new Dictionary<string, SoundEffect>();
@@ -57,7 +63,7 @@ public sealed class SoundPlayer : IDisposable
 
         try
         {
-            sound.Play(volume, 0f, 0f);
+            sound.Play(Math.Clamp(volume * Volume, 0f, 1f), 0f, 0f);
         }
         catch (InstancePlayLimitException)
         {

@@ -290,3 +290,31 @@ Online play would slot in as another kind of seat controller; the game only ever
 (`src/Uno`) is the example: `UnoGame` implements the rules, `RandomUnoBot` and `SmartUnoBot` the opponents, and
 `UnoMatch` adds up rounds to 500 points. Texas Hold'em (`src/Poker`) is the second: `HoldemHand` is one
 hand (blinds, betting rounds, side pots), `HoldemTable` the sit-and-go around it, and `PokerBot` the opponents.
+
+## UI toolkit
+
+`Jentl.Core.UI` holds the widgets every screen in this repo is built from, so a new game gets them for free:
+
+| Type | What it is |
+|---|---|
+| `Fonts` | A TrueType font in the UI's sizes (title, heading, body, small), scaled to the screen: 1 at 1280x800, smaller on phones (by width when upright). `FontTextDrawer` hands it to kits that only know `ITextDrawer` |
+| `TextExtensions` | `DrawText` with alignment and an optional shadow, and `Wrap` to break text into lines that fit |
+| `Palette` | The colours widgets draw with; set them at start-up to restyle everything |
+| `Menu` | A vertical list of pill-shaped items: keys, taps, mouse hover. Taller than its space, it scrolls: the selection stays in view, arrows show there is more, and it can be dragged |
+| `ButtonBar` | A centred row of buttons that squeezes its gaps on narrow screens |
+| `Form` with `ToggleRow`, `SliderRow`, `ButtonRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider |
+| `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen |
+
+Widgets take an `ActionMap<UiAction>` for their keys (`UiKeys.Default` has arrows/WASD, Enter/Space and Escape) and
+play `UiSounds.Navigate` through a `SoundPlayer` (`SoundPlayer.Silent()` for none). Hit areas are wherever the widget
+was last drawn, so layout can change every frame:
+
+```csharp
+var form = new Form(sounds,
+    new ToggleRow("Sound", () => settings.Sound, on => settings.Sound = on),
+    new SliderRow("Volume", () => settings.Volume, v => sounds.Volume = settings.Volume = v),
+    new ButtonRow("Back", () => scenes.Pop()));
+
+// Update:  form.Update(input, UiKeys.Default, elapsed);
+// Draw:    OverlayPanel.Draw(batch, viewport, fonts, "Options", [], form);
+```

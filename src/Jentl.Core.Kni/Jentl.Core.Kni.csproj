@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <PackageReference Include="FontStashSharp.Kni" Version="$(FontStashSharpVersion)" />
   </ItemGroup>
 
   <ItemGroup>
