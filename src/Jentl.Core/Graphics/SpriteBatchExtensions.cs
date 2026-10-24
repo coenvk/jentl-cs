@@ -98,4 +98,39 @@ public static class SpriteBatchExtensions
             batch.FillRectangle(new Rectangle(area.Center.X - width / 2, area.Y + y, width, 1), color);
         }
     }
+
+    /// <summary>
+    /// Draws only inside <paramref name="area"/> until the returned scope is disposed: for scrolling lists and
+    /// panels. The batch is restarted with the engine's usual blending and <paramref name="sampler"/> (linear by
+    /// default; point keeps pixel art crisp), and restarted again as before when the scope ends.
+    /// </summary>
+    public static ClipScope Clip(this SpriteBatch batch, Rectangle area, SamplerState? sampler = null)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        var device = batch.GraphicsDevice;
+        var previous = device.ScissorRectangle;
+        batch.End();
+        device.ScissorRectangle = Rectangle.Intersect(area, device.Viewport.Bounds);
+        batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: sampler ?? SamplerState.LinearClamp, rasterizerState: ScissorOn);
+        return new ClipScope(batch, previous);
+    }
+
+    private static readonly RasterizerState ScissorOn = new() { ScissorTestEnable = true, CullMode = CullMode.None };
+}
+
+/// <summary>Ends a <see cref="SpriteBatchExtensions.Clip"/>: drawing is no longer clipped.</summary>
+public readonly struct ClipScope : IDisposable
+{
+    private readonly SpriteBatch _batch;
+    private readonly Rectangle _previous;
+
+    internal ClipScope(SpriteBatch batch, Rectangle previous) => (_batch, _previous) = (batch, previous);
+
+    /// <summary>Restarts the batch without clipping.</summary>
+    public void Dispose()
+    {
+        _batch.End();
+        _batch.GraphicsDevice.ScissorRectangle = _previous;
+        _batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
+    }
 }
