@@ -305,7 +305,8 @@ hand (blinds, betting rounds, side pots), `HoldemTable` the sit-and-go around it
 | `Form` with `ToggleRow`, `SliderRow`, `ButtonRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider |
 | `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen |
 
-Widgets take an `ActionMap<UiAction>` for their keys (`UiKeys.Default` has arrows/WASD, Enter/Space and Escape) and
+Widgets take an `ActionMap<UiAction>` for their keys and buttons (`UiKeys.Default` has arrows/WASD, Enter/Space and
+Escape, and the D-pad/left stick, A and B/Start) and
 play `UiSounds.Navigate` through a `SoundPlayer` (`SoundPlayer.Silent()` for none). Hit areas are wherever the widget
 was last drawn, so layout can change every frame:
 
@@ -367,3 +368,24 @@ water ripples, torches flicker and glowcaps pulse. A character tile with a `walk
 shown while the character moves between cells; standing still, characters bob gently. `MapView.Burst(cell, effect)`
 puts particles on the map, moving with the camera: hits spark, the defeated vanish in smoke, pickups sparkle and
 level-ups rise.
+
+## Gamepad
+
+`JentlGame` reads the first connected controller every frame next to the keyboard and pointer, and `InputState`
+answers `IsDown(Buttons)` and `WasPressed(Buttons)`. The thumbsticks and triggers count as buttons too
+(`Buttons.LeftThumbstickUp`, `Buttons.RightTrigger`...) once past their dead zone, so a stick can stand in for the
+D-pad. An `ActionMap` binds buttons beside keys, and `ActionRepeater` repeats held buttons like held keys:
+
+```csharp
+var map = new ActionMap<Move>(
+    new Dictionary<Move, Keys[]> { [Move.Up] = [Keys.Up, Keys.W], [Move.Jump] = [Keys.Space] },
+    new Dictionary<Move, Buttons[]> { [Move.Up] = [Buttons.DPadUp, Buttons.LeftThumbstickUp], [Move.Jump] = [Buttons.A] });
+
+if (map.WasPressed(input, Move.Jump)) { ... }
+```
+
+Screens made for the mouse or touch (dragging cards, tapping the map) work with `PadCursor`: the right stick moves an
+on-screen pointer (slowly at a slight tilt, for aiming) and the right trigger or a stick click presses it. While it is
+active it *is* the pointer, so taps, drags, hover and gestures need no extra code; it wakes up where the mouse was and
+steps aside the moment the mouse or a finger moves. `JentlGame.PadCursor` draws it above everything. Override
+`ReadGamePad` to feed scripted pad input.

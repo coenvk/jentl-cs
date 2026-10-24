@@ -18,6 +18,7 @@ public abstract class JentlGame : Game
     private SpriteBatch? _batch;
     private TimeSpan _lastTouch = TimeSpan.MinValue / 2;
     private PointerState _lastPointer;
+    private PointerState _realPointer;
 
     protected JentlGame(int width, int height)
     {
@@ -31,6 +32,9 @@ public abstract class JentlGame : Game
     public InputState Input { get; } = new();
 
     public SceneManager Scenes { get; } = new();
+
+    /// <summary>The gamepad's stand-in for the mouse: right stick to move, right trigger to press.</summary>
+    public PadCursor PadCursor { get; } = new();
 
     protected GraphicsDeviceManager Graphics { get; }
 
@@ -80,10 +84,37 @@ public abstract class JentlGame : Game
         return _lastPointer;
     }
 
+    /// <summary>The first connected gamepad's state, or the disconnected default. Override to feed scripted input.</summary>
+    protected virtual GamePadState ReadGamePad()
+    {
+        for (var player = PlayerIndex.One; player <= PlayerIndex.Four; player++)
+        {
+            var state = GamePad.GetState(player);
+            if (state.IsConnected)
+            {
+                return state;
+            }
+        }
+
+        return default;
+    }
+
     protected override void Update(GameTime gameTime)
     {
         ArgumentNullException.ThrowIfNull(gameTime);
-        Input.Update(ReadKeyboard(), ReadPointer(gameTime.TotalGameTime));
+        var keyboard = ReadKeyboard();
+        var pointer = ReadPointer(gameTime.TotalGameTime);
+        var pad = ReadGamePad();
+
+        // The mouse or a finger moving takes the pointer back from the gamepad cursor.
+        if (pointer.Position != _realPointer.Position || (pointer.IsDown && !_realPointer.IsDown))
+        {
+            PadCursor.Deactivate();
+        }
+
+        _realPointer = pointer;
+        PadCursor.Update(pad, gameTime.ElapsedGameTime, GraphicsDevice.Viewport.Bounds, pointer.Position);
+        Input.Update(keyboard, PadCursor.IsActive ? PadCursor.State : pointer, pad);
         Scenes.Update(gameTime.ElapsedGameTime, Input);
         if (Scenes.IsEmpty)
         {
@@ -100,6 +131,7 @@ public abstract class JentlGame : Game
         // Textures loaded from PNG files are not premultiplied, so blend accordingly.
         _batch!.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
         Scenes.Draw(_batch, GraphicsDevice.Viewport.Bounds);
+        PadCursor.Draw(_batch, GraphicsDevice.Viewport.Bounds);
         _batch.End();
 
         base.Draw(gameTime);
