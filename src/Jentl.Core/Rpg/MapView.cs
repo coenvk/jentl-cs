@@ -9,7 +9,7 @@ namespace Jentl.Core.Rpg;
 
 /// <summary>
 /// Screen side of the RPG kit: draws an <see cref="Area"/>'s tile layers, items and actors around a
-/// camera that follows the player, with fog of war in dark areas (unseen cells black, remembered ones
+/// <see cref="Camera2D"/> that follows the player, with fog of war in dark areas (unseen cells black, remembered ones
 /// dimmed). Steps glide from cell to cell, hits flash, and damage numbers float up.
 /// </summary>
 /// <remarks>
@@ -33,6 +33,7 @@ public sealed class MapView
     private TimeSpan _time;
     private int _unit = 16;
     private Vector2 _origin;
+    private int _focus = -1;
 
     /// <param name="textures">The texture of a tileset's image.</param>
     /// <param name="text">Draws the floating damage numbers.</param>
@@ -49,6 +50,12 @@ public sealed class MapView
 
     /// <summary>The smallest whole-number scale, even if fewer cells than <see cref="MinimumCells"/> then fit (phones).</summary>
     public int MinimumScale { get; set; } = 2;
+
+    /// <summary>
+    /// Follows the focus actor in map pixels, zoomed by the tile scale and kept inside the map; it shakes when the
+    /// focus is hit. Shake it yourself for other jolts.
+    /// </summary>
+    public Camera2D Camera { get; } = new() { RoundToPixels = true };
 
     /// <summary>A cell's size on screen as of the last <see cref="Draw"/>.</summary>
     public int TileSize { get; private set; }
@@ -82,6 +89,11 @@ public sealed class MapView
                     break;
                 case ActorAttacked attacked:
                     Flash(attacked.Target.Id);
+                    if (attacked.Target.Id == _focus)
+                    {
+                        Camera.Shake(TileSize * 0.15f, TimeSpan.FromMilliseconds(300));
+                    }
+
                     FloatText(attacked.Target.Position, attacked.Damage.ToString(System.Globalization.CultureInfo.InvariantCulture), new Color(255, 96, 80));
                     Burst(attacked.Target.Position, ParticleEffects.Hit);
                     break;
@@ -115,6 +127,7 @@ public sealed class MapView
     public void Update(TimeSpan elapsed)
     {
         _time += elapsed;
+        Camera.Update(elapsed);
         _effects.Update(elapsed);
         foreach (var (tween, _) in _moves.Values)
         {
@@ -162,7 +175,12 @@ public sealed class MapView
         var map = area.Map;
         var scale = Math.Max(MinimumScale, Math.Min(bounds.Width / (map.TileWidth * MinimumCells.X), bounds.Height / (map.TileHeight * MinimumCells.Y)));
         TileSize = map.TileWidth * scale;
-        _origin = Origin(bounds, map, PositionOf(focus));
+        _focus = focus.Id;
+        Camera.Viewport = bounds;
+        Camera.Zoom = scale;
+        Camera.Bounds = new Rectangle(0, 0, map.Width * map.TileWidth, map.Height * map.TileHeight);
+        Camera.LookAt((PositionOf(focus) + new Vector2(0.5f)) * map.TileWidth);
+        _origin = Camera.WorldToScreen(Vector2.Zero);
 
         var device = batch.GraphicsDevice;
         var scissor = device.ScissorRectangle;
@@ -281,29 +299,6 @@ public sealed class MapView
 
     private Rectangle Screen(Vector2 grid) =>
         new((int)MathF.Round(_origin.X + grid.X * TileSize), (int)MathF.Round(_origin.Y + grid.Y * TileSize), TileSize, TileSize);
-
-    /// <summary>
-    /// Centres the camera on <paramref name="focus"/> but keeps the map's edge at the edge of the view; a
-    /// map smaller than the view is centred instead.
-    /// </summary>
-    private Vector2 Origin(Rectangle bounds, TileMap map, Vector2 focus)
-    {
-        float Axis(int start, int length, int cells, float at)
-        {
-            var size = cells * TileSize;
-            if (size <= length)
-            {
-                return start + (length - size) / 2f;
-            }
-
-            var offset = length / 2f - (at + 0.5f) * TileSize;
-            return start + Math.Clamp(offset, length - size, 0);
-        }
-
-        return new Vector2(
-            MathF.Round(Axis(bounds.X, bounds.Width, map.Width, focus.X)),
-            MathF.Round(Axis(bounds.Y, bounds.Height, map.Height, focus.Y)));
-    }
 
     private sealed class FloatingText(Vector2 cell, string text, Color color)
     {

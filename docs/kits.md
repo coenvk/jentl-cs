@@ -389,3 +389,38 @@ on-screen pointer (slowly at a slight tilt, for aiming) and the right trigger or
 active it *is* the pointer, so taps, drags, hover and gestures need no extra code; it wakes up where the mouse was and
 steps aside the moment the mouse or a finger moves. `JentlGame.PadCursor` draws it above everything. Override
 `ReadGamePad` to feed scripted pad input.
+
+## Camera and resolution independence
+
+`Camera2D` decides which part of a world shows in a screen viewport: `Position` is the world point in the middle,
+`Zoom` the screen pixels per world unit, and `Rotation` turns the view. Draw with its `Transform` and turn clicks
+back into the world with `ScreenToWorld`:
+
+```csharp
+camera.Viewport = viewport;
+camera.Bounds = new Rectangle(0, 0, worldWidth, worldHeight);   // stop at the world's edges; centre a small world
+camera.Follow(player.Position, elapsed, rate: 8, deadZone: new Vector2(24, 16));
+camera.Update(elapsed);                                          // shakes
+batch.Begin(transformMatrix: camera.Transform, samplerState: SamplerState.PointClamp);
+
+if (input.Tap is { } tap) { var world = camera.ScreenToWorld(tap); ... }
+camera.Shake(strength: 6, TimeSpan.FromMilliseconds(250));       // a hit, an explosion
+```
+
+`Follow` eases towards its target (quick at first, settling gently), optionally only once the target leaves a dead
+zone; `LookAt` jumps. `RoundToPixels` snaps the view to whole screen pixels so scaled pixel art doesn't shimmer, and
+`VisibleArea` tells which part of the world to draw. The RPG kit's `MapView` uses one (`MapView.Camera`): it follows
+the player through the map, stops at its edges, and shakes when the player is hit.
+
+Jentl games normally lay themselves out for whatever window they get (scenes receive the viewport, and `Fonts`
+scale with it). A game designed for one resolution sets `JentlGame.VirtualScreen` instead:
+
+```csharp
+VirtualScreen = new VirtualScreen(320, 180, ScaleMode.PixelPerfect) { BarColor = Color.Black };
+```
+
+Scenes then draw into a render target of that size (their viewport is `VirtualScreen.Bounds`), which is scaled
+into the window, and the pointer (mouse, touch, gamepad cursor) arrives in virtual pixels. `Fit` scales as large
+as fits and letterboxes, `PixelPerfect` keeps to whole-number scales for crisp pixel art, and `Expand` fills the
+window by showing more of the world instead of bars. `JentlGame.ScreenBounds` is the area to lay out in either
+way. The app can try it: `--virtual 640x400:expand`.

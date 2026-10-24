@@ -1,4 +1,5 @@
-﻿using Jentl.Core.Input;
+﻿using Jentl.Core.Graphics;
+using Jentl.Core.Input;
 using Jentl.Core.Scenes;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -19,6 +20,7 @@ public abstract class JentlGame : Game
     private TimeSpan _lastTouch = TimeSpan.MinValue / 2;
     private PointerState _lastPointer;
     private PointerState _realPointer;
+    private RenderTarget2D? _target;
 
     protected JentlGame(int width, int height)
     {
@@ -35,6 +37,16 @@ public abstract class JentlGame : Game
 
     /// <summary>The gamepad's stand-in for the mouse: right stick to move, right trigger to press.</summary>
     public PadCursor PadCursor { get; } = new();
+
+    /// <summary>
+    /// A fixed design resolution to render at, scaled to the window; null (the default) lays scenes out in the
+    /// window itself. When set, scenes draw into a render target of <see cref="VirtualScreen.Size"/>, which is
+    /// then scaled into the window, and the pointer arrives in virtual pixels.
+    /// </summary>
+    public VirtualScreen? VirtualScreen { get; set; }
+
+    /// <summary>The area scenes lay themselves out in: the virtual screen, or else the window.</summary>
+    public Rectangle ScreenBounds => VirtualScreen?.Bounds ?? GraphicsDevice.Viewport.Bounds;
 
     protected GraphicsDeviceManager Graphics { get; }
 
@@ -113,8 +125,16 @@ public abstract class JentlGame : Game
         }
 
         _realPointer = pointer;
-        PadCursor.Update(pad, gameTime.ElapsedGameTime, GraphicsDevice.Viewport.Bounds, pointer.Position);
-        Input.Update(keyboard, PadCursor.IsActive ? PadCursor.State : pointer, pad);
+        var window = GraphicsDevice.Viewport.Bounds;
+        VirtualScreen?.Fit(window);
+        PadCursor.Update(pad, gameTime.ElapsedGameTime, VirtualScreen?.Destination ?? window, pointer.Position);
+        var cursor = PadCursor.IsActive ? PadCursor.State : pointer;
+        if (VirtualScreen is { } screen)
+        {
+            cursor = cursor with { Position = screen.ToVirtual(cursor.Position) };
+        }
+
+        Input.Update(keyboard, cursor, pad);
         Scenes.Update(gameTime.ElapsedGameTime, Input);
         if (Scenes.IsEmpty)
         {
@@ -126,22 +146,60 @@ public abstract class JentlGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(ClearColor);
-
-        // Textures loaded from PNG files are not premultiplied, so blend accordingly.
-        _batch!.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
-        Scenes.Draw(_batch, GraphicsDevice.Viewport.Bounds);
-        PadCursor.Draw(_batch, GraphicsDevice.Viewport.Bounds);
-        _batch.End();
+        var window = GraphicsDevice.Viewport.Bounds;
+        if (VirtualScreen is { } screen)
+        {
+            DrawVirtual(screen, window);
+        }
+        else
+        {
+            GraphicsDevice.Clear(ClearColor);
+            Begin(SamplerState.LinearClamp);
+            Scenes.Draw(_batch!, window);
+            PadCursor.Draw(_batch!, window);
+            _batch!.End();
+        }
 
         base.Draw(gameTime);
     }
+
+    private void DrawVirtual(VirtualScreen screen, Rectangle window)
+    {
+        screen.Fit(window);
+        if (_target is null || _target.Width != screen.Size.X || _target.Height != screen.Size.Y)
+        {
+            _target?.Dispose();
+            _target = new RenderTarget2D(GraphicsDevice, screen.Size.X, screen.Size.Y);
+        }
+
+        GraphicsDevice.SetRenderTarget(_target);
+        GraphicsDevice.Clear(ClearColor);
+        Begin(SamplerState.LinearClamp);
+        Scenes.Draw(_batch!, screen.Bounds);
+        _batch!.End();
+        GraphicsDevice.SetRenderTarget(null);
+
+        // Whole-number scaling keeps pixels square and sharp; any other scale is smoothed. Copied opaque: blending
+        // inside the target leaves its alpha below one in places.
+        GraphicsDevice.Clear(screen.BarColor);
+        var sampler = screen.Scale == MathF.Floor(screen.Scale) ? SamplerState.PointClamp : SamplerState.LinearClamp;
+        _batch.Begin(blendState: BlendState.Opaque, samplerState: sampler);
+        _batch.Draw(_target, screen.Destination, Color.White);
+        _batch.End();
+        Begin(SamplerState.LinearClamp);
+        PadCursor.Draw(_batch, window);
+        _batch.End();
+    }
+
+    // Textures loaded from PNG files are not premultiplied, so blend accordingly.
+    private void Begin(SamplerState sampler) => _batch!.Begin(blendState: BlendState.NonPremultiplied, samplerState: sampler);
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             _batch?.Dispose();
+            _target?.Dispose();
             Graphics.Dispose();
         }
 
