@@ -8,6 +8,9 @@
 /// <param name="Period">How long each period lasts.</param>
 public sealed record Rotation(DateTimeOffset Epoch, TimeSpan Period)
 {
+    /// <summary>How long each period lasts; more than zero.</summary>
+    public TimeSpan Period { get; } = Period > TimeSpan.Zero ? Period : throw new ArgumentOutOfRangeException(nameof(Period), "A rotation needs periods longer than zero.");
+
     /// <summary>The period <paramref name="time"/> falls in (negative before the epoch).</summary>
     public long PeriodAt(DateTimeOffset time)
     {
@@ -26,6 +29,11 @@ public sealed record Rotation(DateTimeOffset Epoch, TimeSpan Period)
     public T Pick<T>(IReadOnlyList<T> items, DateTimeOffset time, int offset = 0)
     {
         ArgumentNullException.ThrowIfNull(items);
+        if (items.Count == 0)
+        {
+            throw new ArgumentException("There is nothing to pick from.", nameof(items));
+        }
+
         var index = (PeriodAt(time) + offset) % items.Count;
         return items[(int)(index < 0 ? index + items.Count : index)];
     }

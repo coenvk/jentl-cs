@@ -47,3 +47,19 @@ public class CameraHeadingTests
         screen.Y.Should().BeApproximately(72, 0.01f);
     }
 }
+
+public class CameraAnchorTests
+{
+    [Fact]
+    public void FollowHeading_AnchorAtTheTopLeft_IsHonoured()
+    {
+        var camera = new Jentl.Core.Graphics.Camera2D { Viewport = new Microsoft.Xna.Framework.Rectangle(0, 0, 200, 100) };
+        var target = new Microsoft.Xna.Framework.Vector2(10, 20);
+
+        camera.FollowHeading(target, -MathF.PI / 2, TimeSpan.FromSeconds(1), screenAnchor: Microsoft.Xna.Framework.Vector2.Zero);
+
+        var screen = camera.WorldToScreen(target);
+        screen.X.Should().BeApproximately(0, 0.01f);
+        screen.Y.Should().BeApproximately(0, 0.01f);
+    }
+}

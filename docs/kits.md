@@ -674,10 +674,13 @@ Paddock (a car collecting game) is built on these.
 |---|---|
 | `Jentl.Collect.WeightedTable<T>` | Draws items in proportion to their weights (pack contents, loot); `Chance(item)` for showing the odds. The same `Random` seed draws the same items |
 | `Jentl.Collect.RechargingCounter` | Tickets, energy or lives that come back one per interval on the wall clock, also while the game is closed. Save its `RechargeState` (a count and a time); `Count`, `NextIn` and `TrySpend` work it out at any moment. Setting the clock back gives nothing back |
+| `Jentl.Collect.StableSeed` | A `Random` seed from text that is the same on every platform and run (FNV-1a), for seeding by an id |
 | `Jentl.Collect.Rotation` | Equal periods from an epoch, for things on a calendar (this week's events): `PeriodAt(time)` and `Pick(items, time, offset)` give every device the same answer without a server |
 | `Jentl.Tracks.TrackPath` | A path built from `Straight` and `Arc` pieces (positive degrees turn left on a screen whose y points down): `At(distance)` gives position and heading, `CurvatureAt` the bend, `Polyline` points for drawing. A path whose end meets its start is a circuit and wraps |
 | `Jentl.Assets.PixelCanvas` | Pixel art drawn in code: rectangles, lines, ellipses, outlines, mirroring; `ToImage()` for `AtlasBuilder`, `ToPng()` for a file |
 | `Jentl.Core.Tracks.RoadPainter` | Paints a `TrackPath` as a road from above (verge, surface, kerbs in corners tighter than 60 units, a dashed centre line) into pixels, and `ToTexture` puts them on the GPU |
+| `RoadPainter.PaintMap` | A small overview map of a path, and where a world position lands on it (for a mini-map) |
+| `Jentl.Core.Graphics.Weather`, `ParticleEffects.Spray`, `ParticleEffects.Kickup` | Rain or snow over the view, drawn from the clock alone; water spray and grit for behind wheels |
 | `Camera2D.FollowHeading` | Follows a car and turns the view with it, so the road runs up the screen; the car stays at a chosen spot on the screen (lower shows more road ahead) |
 
 ```csharp

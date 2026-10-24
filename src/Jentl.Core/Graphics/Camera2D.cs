@@ -123,18 +123,13 @@ public sealed class Camera2D
     /// <param name="elapsed">Time since the last call.</param>
     /// <param name="rate">How quickly the view turns; higher keeps closer.</param>
     /// <param name="screenAnchor">Where on the viewport the target stays.</param>
-    public void FollowHeading(Vector2 target, float heading, TimeSpan elapsed, float rate = 6, Vector2 screenAnchor = default)
+    public void FollowHeading(Vector2 target, float heading, TimeSpan elapsed, float rate = 6, Vector2? screenAnchor = null)
     {
-        if (screenAnchor == default)
-        {
-            screenAnchor = new Vector2(0.5f, 0.5f);
-        }
-
         var turn = MathHelper.WrapAngle(heading + MathHelper.PiOver2 - Rotation);
         Rotation += turn * (1 - MathF.Exp(-rate * (float)elapsed.TotalSeconds));
 
         // The world offset that lands on the anchor once rotated and scaled by the transform.
-        var fromCentre = (screenAnchor - new Vector2(0.5f, 0.5f)) * new Vector2(Viewport.Width, Viewport.Height) / Zoom;
+        var fromCentre = ((screenAnchor ?? new Vector2(0.5f, 0.5f)) - new Vector2(0.5f, 0.5f)) * new Vector2(Viewport.Width, Viewport.Height) / Zoom;
         var (sin, cos) = MathF.SinCos(Rotation);
         Position = target - new Vector2((fromCentre.X * cos) - (fromCentre.Y * sin), (fromCentre.X * sin) + (fromCentre.Y * cos));
     }

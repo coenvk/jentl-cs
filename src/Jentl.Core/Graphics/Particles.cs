@@ -107,6 +107,32 @@ public static class ParticleEffects
         Gravity: -30,
         Drag: 1.5f);
 
+    /// <summary>Water thrown up behind a wheel on a wet road; aim it backwards from the car.</summary>
+    public static ParticleEffect Spray { get; } = new(
+        Count: 3,
+        MinSpeed: 20,
+        MaxSpeed: 60,
+        MinLife: 0.25f,
+        MaxLife: 0.5f,
+        StartSize: 3,
+        EndSize: 6,
+        Colors: [new Color(200, 215, 235, 170), new Color(170, 190, 215, 140)],
+        Spread: MathF.PI / 3,
+        Drag: 3);
+
+    /// <summary>Grit or snow kicked up behind a wheel on a loose surface; tint it to the ground with a new colour list.</summary>
+    public static ParticleEffect Kickup { get; } = new(
+        Count: 2,
+        MinSpeed: 15,
+        MaxSpeed: 45,
+        MinLife: 0.3f,
+        MaxLife: 0.6f,
+        StartSize: 3,
+        EndSize: 5,
+        Colors: [new Color(170, 140, 100, 200), new Color(130, 105, 75, 180)],
+        Spread: MathF.PI / 2,
+        Drag: 2.5f);
+
     /// <summary>A few brown specks kicked up: a step, a thud.</summary>
     public static ParticleEffect Dust { get; } = new(
         Count: 8,

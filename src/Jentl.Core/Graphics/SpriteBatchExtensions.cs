@@ -99,38 +99,79 @@ public static class SpriteBatchExtensions
         }
     }
 
+
     /// <summary>
     /// Draws only inside <paramref name="area"/> until the returned scope is disposed: for scrolling lists and
     /// panels. The batch is restarted with the engine's usual blending and <paramref name="sampler"/> (linear by
-    /// default; point keeps pixel art crisp), and restarted again as before when the scope ends.
+    /// default; point keeps pixel art crisp). Clips nest: an inner clip stays inside the outer one, and ending it
+    /// brings the outer clip (and its sampler) back. Ending the outermost restarts the batch unclipped with the
+    /// engine's usual state; a transform matrix is not kept, so clip outside transformed drawing.
     /// </summary>
     public static ClipScope Clip(this SpriteBatch batch, Rectangle area, SamplerState? sampler = null)
     {
         ArgumentNullException.ThrowIfNull(batch);
         var device = batch.GraphicsDevice;
-        var previous = device.ScissorRectangle;
-        batch.End();
-        device.ScissorRectangle = Rectangle.Intersect(area, device.Viewport.Bounds);
-        batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: sampler ?? SamplerState.LinearClamp, rasterizerState: ScissorOn);
-        return new ClipScope(batch, previous);
+        var clips = Clips.GetOrCreateValue(batch);
+        var bounds = Rectangle.Intersect(area, clips.Count > 0 ? clips.Peek().Area : device.Viewport.Bounds);
+        if (clips.Count == 0)
+        {
+            Unclipped.AddOrUpdate(batch, new StrongBox<Rectangle>(device.ScissorRectangle));
+        }
+
+        clips.Push((bounds, sampler ?? SamplerState.LinearClamp));
+        BeginClipped(batch, clips.Peek());
+        return new ClipScope(batch);
     }
 
+    internal static void EndClip(SpriteBatch batch)
+    {
+        var clips = Clips.GetOrCreateValue(batch);
+        if (clips.Count == 0)
+        {
+            return;
+        }
+
+        clips.Pop();
+        if (clips.Count > 0)
+        {
+            BeginClipped(batch, clips.Peek());
+            return;
+        }
+
+        batch.End();
+        if (Unclipped.TryGetValue(batch, out var scissor))
+        {
+            batch.GraphicsDevice.ScissorRectangle = scissor.Value;
+        }
+
+        batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
+    }
+
+    private static void BeginClipped(SpriteBatch batch, (Rectangle Area, SamplerState Sampler) clip)
+    {
+        batch.End();
+        batch.GraphicsDevice.ScissorRectangle = clip.Area;
+        batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: clip.Sampler, rasterizerState: ScissorOn);
+    }
+
+    private static readonly ConditionalWeakTable<SpriteBatch, Stack<(Rectangle Area, SamplerState Sampler)>> Clips = new();
+    private static readonly ConditionalWeakTable<SpriteBatch, StrongBox<Rectangle>> Unclipped = new();
     private static readonly RasterizerState ScissorOn = new() { ScissorTestEnable = true, CullMode = CullMode.None };
 }
 
-/// <summary>Ends a <see cref="SpriteBatchExtensions.Clip"/>: drawing is no longer clipped.</summary>
+/// <summary>Ends a <see cref="SpriteBatchExtensions.Clip"/>: the outer clip, or none, applies again.</summary>
 public readonly struct ClipScope : IDisposable
 {
-    private readonly SpriteBatch _batch;
-    private readonly Rectangle _previous;
+    private readonly SpriteBatch? _batch;
 
-    internal ClipScope(SpriteBatch batch, Rectangle previous) => (_batch, _previous) = (batch, previous);
+    internal ClipScope(SpriteBatch batch) => _batch = batch;
 
-    /// <summary>Restarts the batch without clipping.</summary>
+    /// <summary>Restarts the batch with the outer clip, or unclipped.</summary>
     public void Dispose()
     {
-        _batch.End();
-        _batch.GraphicsDevice.ScissorRectangle = _previous;
-        _batch.Begin(blendState: BlendState.NonPremultiplied, samplerState: SamplerState.LinearClamp);
+        if (_batch is not null)
+        {
+            SpriteBatchExtensions.EndClip(_batch);
+        }
     }
 }

@@ -101,6 +101,40 @@ public static class RoadPainter
         return pixels;
     }
 
+    /// <summary>
+    /// A small map of the whole path, fitted into <paramref name="size"/> pixels (keeping its shape, with a little
+    /// margin): a three-pixel line on <paramref name="background"/>, and a way to place things (cars) on it.
+    /// </summary>
+    public static RoadMap PaintMap(TrackPath path, int size, Color background, Color line)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        const int margin = 6;
+        var (min, max) = path.Bounds;
+        var span = Vector2.Max(Vector2.One, new Vector2(max.X - min.X, max.Y - min.Y));
+        var scale = (size - (2 * margin)) / MathF.Max(span.X, span.Y);
+        var (width, height) = ((int)(span.X * scale) + (2 * margin), (int)(span.Y * scale) + (2 * margin));
+        var pixels = new Color[width * height];
+        Array.Fill(pixels, background);
+        Vector2 ToMap(Vector2 world) => (new Vector2(world.X - min.X, world.Y - min.Y) * scale) + new Vector2(margin);
+        foreach (var point in path.Polyline(Math.Max(1, 1 / scale)))
+        {
+            var p = ToMap(new Vector2(point.X, point.Y));
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    var (x, y) = ((int)p.X + dx, (int)p.Y + dy);
+                    if (x >= 0 && y >= 0 && x < width && y < height)
+                    {
+                        pixels[(y * width) + x] = line;
+                    }
+                }
+            }
+        }
+
+        return new RoadMap(pixels, new Point(width, height), ToMap);
+    }
+
     /// <summary>Puts painted pixels on the graphics card.</summary>
     public static Texture2D ToTexture(GraphicsDevice device, Color[] pixels, Rectangle worldBounds)
     {
@@ -109,3 +143,9 @@ public static class RoadPainter
         return texture;
     }
 }
+
+/// <summary>A painted overview of a track: its pixels, their size, and where a world position lands on it.</summary>
+/// <param name="Pixels">The map, row by row.</param>
+/// <param name="Size">Width and height in pixels.</param>
+/// <param name="ToMap">A world position on the map, in map pixels.</param>
+public sealed record RoadMap(Color[] Pixels, Point Size, Func<Vector2, Vector2> ToMap);

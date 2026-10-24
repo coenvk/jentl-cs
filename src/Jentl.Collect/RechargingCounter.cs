@@ -9,6 +9,12 @@
 /// <param name="Interval">How long one takes to come back.</param>
 public sealed record RechargingCounter(int Max, TimeSpan Interval)
 {
+    /// <summary>The most there can be; at least one.</summary>
+    public int Max { get; } = Max > 0 ? Max : throw new ArgumentOutOfRangeException(nameof(Max), "A counter needs room for at least one.");
+
+    /// <summary>How long one takes to come back; more than zero.</summary>
+    public TimeSpan Interval { get; } = Interval > TimeSpan.Zero ? Interval : throw new ArgumentOutOfRangeException(nameof(Interval), "A counter needs an interval longer than zero.");
+
     /// <summary>A full counter as of <paramref name="now"/>.</summary>
     public RechargeState Full(DateTimeOffset now) => new(Max, now);
 

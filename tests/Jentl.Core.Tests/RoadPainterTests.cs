@@ -52,3 +52,27 @@ public class RoadPainterTests
         bounds.Right.Should().BeGreaterThanOrEqualTo(240 + 30);
     }
 }
+
+public class RoadMapTests
+{
+    [Fact]
+    public void PaintMap_FitsThePath_AndDrawsItsLine()
+    {
+        var path = TrackPath.Build([new Straight(400), new Arc(50, 180), new Straight(400), new Arc(50, 180)]);
+
+        var map = RoadPainter.PaintMap(path, 120, Color.Black, Color.White);
+
+        map.Size.X.Should().BeLessThanOrEqualTo(120);
+        map.Size.Y.Should().BeLessThanOrEqualTo(120);
+        map.Pixels.Should().HaveCount(map.Size.X * map.Size.Y);
+        foreach (var point in path.Polyline(20))
+        {
+            var p = map.ToMap(new Vector2(point.X, point.Y));
+            var (x, y) = ((int)p.X, (int)p.Y);
+            x.Should().BeInRange(0, map.Size.X - 1);
+            map.Pixels[(y * map.Size.X) + x].Should().Be(Color.White);
+        }
+
+        map.Pixels[0].Should().Be(Color.Black);
+    }
+}
