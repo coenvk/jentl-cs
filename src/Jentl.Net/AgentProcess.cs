@@ -5,9 +5,6 @@ using System.Threading.Channels;
 
 namespace Jentl.Net;
 
-/// <summary>What to run for an agent: the program, its arguments (passed as they are, no shell) and where to run it.</summary>
-public sealed record AgentCommand(string FileName, IReadOnlyList<string> Arguments, string? WorkingDirectory = null);
-
 /// <summary>
 /// A bot running as its own process, in any language, that talks in lines: one line in on its stdin, one line out on its
 /// stdout, and whatever it writes to stderr kept for the log. Every wait has a time limit, so a silent or crashed agent
@@ -16,18 +13,27 @@ public sealed record AgentCommand(string FileName, IReadOnlyList<string> Argumen
 /// <remarks>
 /// Nothing here throws for an agent that misbehaves: a program that cannot start is an agent that has already exited,
 /// and <see cref="Problem"/> says what happened. Lines arrive on a queue; <see cref="AskAsync"/> empties it first so an
-/// answer that came late is never mistaken for the answer to the next question.
+/// answer that came late is never mistaken for the answer to the next question. An agent that floods its output costs
+/// no more than <see cref="MaxLines"/> lines of at most <see cref="MaxLineLength"/> characters: older lines are dropped,
+/// and a longer line is cut.
 /// </remarks>
 public sealed class AgentProcess : IDisposable
 {
     /// <summary>How many of the last lines on stderr are kept.</summary>
     public const int ErrorLines = 50;
 
+    /// <summary>How many lines from stdout wait to be read at most; when more come, the oldest are dropped.</summary>
+    public const int MaxLines = 1024;
+
+    /// <summary>The most characters of one line that are kept, on stdout and stderr (1 MiB); the rest of a longer line is skipped.</summary>
+    public const int MaxLineLength = 1 << 20;
+
     private static readonly TimeSpan Settle = TimeSpan.FromSeconds(2);
 
     private readonly Process? _process;
     private readonly string? _startProblem;
-    private readonly Channel<string> _lines = Channel.CreateUnbounded<string>();
+    private readonly Channel<string> _lines = Channel.CreateBounded<string>(
+        new BoundedChannelOptions(MaxLines) { FullMode = BoundedChannelFullMode.DropOldest });
     private readonly Queue<string> _errors = new();
     private readonly Task _finished = Task.CompletedTask;
     private volatile bool _timedOut;
@@ -256,10 +262,7 @@ public sealed class AgentProcess : IDisposable
     {
         try
         {
-            while (await _process!.StandardOutput.ReadLineAsync().ConfigureAwait(false) is { } line)
-            {
-                _lines.Writer.TryWrite(line);
-            }
+            await ReadLinesAsync(_process!.StandardOutput, line => _lines.Writer.TryWrite(line)).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
         {
@@ -275,7 +278,7 @@ public sealed class AgentProcess : IDisposable
     {
         try
         {
-            while (await _process!.StandardError.ReadLineAsync().ConfigureAwait(false) is { } line)
+            await ReadLinesAsync(_process!.StandardError, line =>
             {
                 lock (_errors)
                 {
@@ -285,11 +288,58 @@ public sealed class AgentProcess : IDisposable
                         _errors.Dequeue();
                     }
                 }
-            }
+            }).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
         {
             // The pipe broke: same as the end of the output.
+        }
+    }
+
+    /// <summary>
+    /// Reads <paramref name="reader"/> to its end line by line, as <see cref="TextReader.ReadLine"/> splits them (at
+    /// "\n", "\r" or "\r\n"), handing each to <paramref name="take"/> cut to <see cref="MaxLineLength"/> characters, so
+    /// that a line without an end never fills the memory.
+    /// </summary>
+    private static async Task ReadLinesAsync(StreamReader reader, Action<string> take)
+    {
+        var buffer = new char[4096];
+        var line = new StringBuilder();
+        var open = false;
+        var afterReturn = false;
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory()).ConfigureAwait(false)) > 0)
+        {
+            for (var i = 0; i < read; i++)
+            {
+                var c = buffer[i];
+                if (c == '\n' && afterReturn)
+                {
+                    afterReturn = false;
+                    continue;
+                }
+
+                afterReturn = c == '\r';
+                if (c is '\n' or '\r')
+                {
+                    take(line.ToString());
+                    line.Clear();
+                    open = false;
+                }
+                else
+                {
+                    open = true;
+                    if (line.Length < MaxLineLength)
+                    {
+                        line.Append(c);
+                    }
+                }
+            }
+        }
+
+        if (open)
+        {
+            take(line.ToString());
         }
     }
 }

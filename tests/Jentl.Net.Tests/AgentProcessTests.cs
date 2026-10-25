@@ -104,4 +104,27 @@ public sealed class AgentProcessTests
         using var a = Start("silent");
         (await a.ReadAsync(TimeSpan.FromSeconds(-1))).Should().BeNull();
     }
+
+    [Fact]
+    public async Task AFloodingAgent_IsHeldToAFewShortLines_AndStillAnswersAfterwards()
+    {
+        using var a = Start("flood");
+        a.Send("go");
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (!a.ErrorOutput.Contains("flooded") && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+
+        a.ErrorOutput.Should().Contain("flooded");
+        var (count, longest) = (0, 0);
+        while (await a.ReadAsync(TimeSpan.FromMilliseconds(300)) is { } line)
+        {
+            (count, longest) = (count + 1, Math.Max(longest, line.Length));
+        }
+
+        count.Should().BeLessThanOrEqualTo(AgentProcess.MaxLines, "only the last lines are kept");
+        longest.Should().Be(AgentProcess.MaxLineLength, "a longer line is cut");
+        (await a.AskAsync("hi", OneSecond)).Should().Be("hi");
+    }
 }

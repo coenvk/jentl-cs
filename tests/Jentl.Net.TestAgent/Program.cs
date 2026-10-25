@@ -1,4 +1,4 @@
-﻿// Modes: echo, slow:<ms>, crash, silent, chatty.
+﻿// Modes: echo, slow:<ms>, crash, deaf, silent, chatty, flood.
 var mode = args.Length > 0 ? args[0] : "echo";
 var delay = 0;
 if (mode.StartsWith("slow:", StringComparison.Ordinal))
@@ -19,6 +19,24 @@ switch (mode)
     case "silent":
         while (Console.In.ReadLine() is not null)
         {
+        }
+
+        return 0;
+    case "flood":
+        // Floods stdout after the first line (many lines, then one far too long), says so on stderr, then echoes.
+        Console.In.ReadLine();
+        var lineOfFlood = new string('x', 1024);
+        for (var i = 0; i < 20_000; i++)
+        {
+            Console.Out.WriteLine(lineOfFlood);
+        }
+
+        Console.Out.WriteLine(new string('y', 3 << 20));
+        Console.Out.Flush();
+        Console.Error.WriteLine("flooded");
+        while (Console.In.ReadLine() is { } echoed)
+        {
+            Console.Out.WriteLine(echoed);
         }
 
         return 0;
