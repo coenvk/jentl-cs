@@ -381,6 +381,18 @@ public sealed class GpuView : IMeshView
 /// <summary>Helpers for any <see cref="IMeshView"/>.</summary>
 public static class MeshViewExtensions
 {
+    /// <summary>Draws every part of <paramref name="model"/>, placed by <paramref name="world"/>, translucent parts last.</summary>
+    public static void DrawModel(this IMeshView view, MeshModel model, Numerics.Matrix4x4 world)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        ArgumentNullException.ThrowIfNull(model);
+        var parts = model.Parts;
+        for (var i = 0; i < parts.Count; i++)
+        {
+            view.DrawMesh(parts[i].Mesh, world, parts[i].Material);
+        }
+    }
+
     /// <summary>Draws the living <paramref name="particles"/> as points, each its size, colour and fading alpha.</summary>
     public static void DrawParticles(this IMeshView view, Particles particles)
     {

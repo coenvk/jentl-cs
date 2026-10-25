@@ -192,6 +192,17 @@ public sealed class Renderer
         }
     }
 
+    /// <summary>Draws every part of <paramref name="model"/>, placed by <paramref name="world"/>, translucent parts last.</summary>
+    public void DrawModel(MeshModel model, Matrix4x4 world)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var parts = model.Parts;
+        for (var i = 0; i < parts.Count; i++)
+        {
+            DrawMesh(parts[i].Mesh, world, parts[i].Material);
+        }
+    }
+
     /// <summary>
     /// Draws one triangle, its corners placed by <paramref name="world"/>, with its vertex colours blended across and,
     /// given a <paramref name="texture"/>, that texture on it, tinted by the colours; <paramref name="translucent"/>

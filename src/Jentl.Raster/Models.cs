@@ -3,6 +3,50 @@ using Jentl.Geometry;
 
 namespace Jentl.Raster;
 
+/// <summary>
+/// A thing made of several materials (a car's paint, glass, tyres and lamps): one mesh per material, translucent ones
+/// last so they show what is behind them. Make one with <see cref="MeshModelBuilder"/>; draw it with
+/// <see cref="Renderer.DrawModel"/> (or <c>DrawModel</c> on a mesh view).
+/// </summary>
+public sealed class MeshModel
+{
+    internal MeshModel(IReadOnlyList<(Mesh Mesh, Material Material)> parts)
+    {
+        Parts = parts;
+        Bounds = parts.Count == 0 ? default : parts.Select(p => p.Mesh.Bounds).Aggregate((a, b) => a.Union(b));
+    }
+
+    public IReadOnlyList<(Mesh Mesh, Material Material)> Parts { get; }
+
+    public Box3 Bounds { get; }
+}
+
+/// <summary>Puts a <see cref="MeshModel"/> together from placed meshes; pieces of the same material are joined into one mesh.</summary>
+public sealed class MeshModelBuilder
+{
+    private readonly List<(Material Material, List<(Mesh Mesh, Matrix4x4 Place)> Pieces)> _groups = [];
+
+    /// <summary>Adds <paramref name="mesh"/>, placed by <paramref name="place"/>, in <paramref name="material"/>.</summary>
+    public MeshModelBuilder Add(Mesh mesh, Matrix4x4 place, Material material)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(material);
+        var group = _groups.FindIndex(g => g.Material == material);
+        if (group < 0)
+        {
+            _groups.Add((material, []));
+            group = _groups.Count - 1;
+        }
+
+        _groups[group].Pieces.Add((mesh, place));
+        return this;
+    }
+
+    public MeshModel Build() => new([.. _groups
+        .OrderBy(g => g.Material.Translucent)
+        .Select(g => (MeshBuilder.Combine(g.Pieces), g.Material))]);
+}
+
 /// <summary>Meshes made from pictures.</summary>
 public static class Models
 {

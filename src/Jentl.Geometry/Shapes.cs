@@ -38,6 +38,38 @@ public static class Polygon2
     }
 
     /// <summary>
+    /// A convex polygon with every side moved <paramref name="distance"/> inwards (outwards if negative), counter-clockwise:
+    /// a window inside its frame, a border inside a panel. The distance must leave something of the polygon.
+    /// </summary>
+    public static IReadOnlyList<Vector2> Inset(IReadOnlyList<Vector2> polygon, float distance)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
+        var points = IsCounterClockwise(polygon) ? polygon.ToList() : polygon.Reverse().ToList();
+        var n = points.Count;
+
+        // Each side's line moved in along its inward normal (to the left, counter-clockwise), as a point and a direction.
+        var lines = new (Vector2 Point, Vector2 Direction)[n];
+        for (var i = 0; i < n; i++)
+        {
+            var d = Vector2.Normalize(points[(i + 1) % n] - points[i]);
+            lines[i] = (points[i] + (new Vector2(-d.Y, d.X) * distance), d);
+        }
+
+        // Each corner is where the lines of its two sides now meet.
+        var result = new Vector2[n];
+        for (var i = 0; i < n; i++)
+        {
+            var (a, b) = (lines[(i + n - 1) % n], lines[i]);
+            var cross = Segment2.Cross(a.Direction, b.Direction);
+            result[i] = MathF.Abs(cross) < 1e-9f
+                ? b.Point
+                : a.Point + (a.Direction * (Segment2.Cross(b.Point - a.Point, b.Direction) / cross));
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// The outline of a picture's solid pixels (e.g. a sprite's opaque ones), along the pixel edges with only its
     /// corners, in pixel units with y down as the picture runs: pixel (x, y) is the square from (x, y) to (x + 1, y + 1).
     /// The biggest piece is kept (pieces touching only at a corner are apart) and holes in it are filled, so the outline

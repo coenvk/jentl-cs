@@ -277,3 +277,46 @@ public class BillboardTests
         Vector3.TransformNormal(Vector3.UnitZ, side).X.Should().BeApproximately(-1, 1e-4f);
     }
 }
+
+public class CombineAndInsetTests
+{
+    [Fact]
+    public void Combine_JoinsPlacedMeshesIntoOne()
+    {
+        var box = MeshBuilder.Box(Vector3.One);
+
+        var both = MeshBuilder.Combine([(box, Matrix4x4.Identity), (box, Matrix4x4.CreateTranslation(3, 0, 0))]);
+
+        both.Triangles.Should().HaveCount(box.Triangles.Count * 2);
+        both.Positions.Should().HaveCount(box.Positions.Count * 2);
+        both.UVs.Should().HaveCount(both.Positions.Count);
+        both.Bounds.Should().Be(new Box3(new Vector3(-0.5f), new Vector3(3.5f, 0.5f, 0.5f)));
+        both.Triangles.Select(t => both.TriangleAt(t)).Should().OnlyContain(t => t.Area > 0);
+    }
+
+    [Fact]
+    public void Combine_GivesMeshesWithoutTextureCoordinatesZeroes()
+    {
+        var bare = new Mesh([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], [new TriangleIndices(0, 1, 2)]);
+
+        var both = MeshBuilder.Combine([(bare, Matrix4x4.Identity), (MeshBuilder.Quad(), Matrix4x4.Identity)]);
+
+        both.UVs.Should().HaveCount(both.Positions.Count);
+        both.UVs.Take(3).Should().OnlyContain(uv => uv == Vector2.Zero);
+    }
+
+    [Fact]
+    public void Inset_ShrinksAConvexPolygonByTheDistance()
+    {
+        Vector2[] square = [new(0, 0), new(4, 0), new(4, 4), new(0, 4)];
+
+        Polygon2.Inset(square, 1).Should().BeEquivalentTo([new Vector2(1, 1), new Vector2(3, 1), new Vector2(3, 3), new Vector2(1, 3)]);
+        Polygon2.Inset([.. square.Reverse()], 1).Should().BeEquivalentTo([new Vector2(1, 1), new Vector2(3, 1), new Vector2(3, 3), new Vector2(1, 3)]);
+
+        // A trapezoid (a car's side window): its slanted sides move in by the distance too.
+        Vector2[] trapezoid = [new(0, 0), new(6, 0), new(4, 2), new(2, 2)];
+        var inset = Polygon2.Inset(trapezoid, 0.5f);
+        Math.Abs(Polygon2.SignedArea(inset)).Should().BeLessThan(Math.Abs(Polygon2.SignedArea(trapezoid)));
+        inset.Should().OnlyContain(p => Polygon2.Contains(trapezoid, p));
+    }
+}

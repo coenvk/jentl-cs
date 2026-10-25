@@ -204,6 +204,27 @@ public static class MeshBuilder
     }
 
     /// <summary>
+    /// One mesh of several, each placed by its matrix: fewer, bigger meshes draw faster, and a model of many pieces in
+    /// one material becomes one. Pieces without texture coordinates get zeroes.
+    /// </summary>
+    public static Mesh Combine(IReadOnlyList<(Mesh Mesh, Matrix4x4 Place)> parts)
+    {
+        ArgumentNullException.ThrowIfNull(parts);
+        var (positions, normals, uvs, triangles) = (new List<Vector3>(), new List<Vector3>(), new List<Vector2>(), new List<TriangleIndices>());
+        foreach (var (mesh, place) in parts)
+        {
+            var placed = mesh.Transform(place);
+            var first = positions.Count;
+            positions.AddRange(placed.Positions);
+            normals.AddRange(placed.Normals);
+            uvs.AddRange(placed.UVs.Count == placed.Positions.Count ? placed.UVs : Enumerable.Repeat(Vector2.Zero, placed.Positions.Count));
+            triangles.AddRange(placed.Triangles.Select(t => new TriangleIndices(t.A + first, t.B + first, t.C + first)));
+        }
+
+        return new Mesh(positions, triangles, normals, uvs);
+    }
+
+    /// <summary>
     /// An upright square, 1 by 1, standing on the middle of its bottom edge and facing +Z, with the whole texture on it
     /// upright: a cut-out for <see cref="Billboard.Upright"/> to turn towards the camera (a tree, a sign, a spectator).
     /// </summary>

@@ -702,12 +702,12 @@ counter-clockwise; `System.Numerics` projection conventions (row vectors, depth 
 |---|---|
 | `Ray`, `Segment2`, `Segment3`, `Planes` | A ray's points; where segments cross; closest point on a segment; planes through a point or three points, signed distance, where a segment or ray meets one |
 | `Triangle` | Normal, area, centroid, barycentric weights, containment, ray hits from either side (Möller–Trumbore) |
-| `Polygon2` | Signed area and winding, point-in-polygon (concave too), ear-clipping triangulation that always gives counter-clockwise triangles; `Outline` traces a picture's solid pixels into one simple polygon (the biggest piece, holes filled, corners only) |
+| `Polygon2` | Signed area and winding, point-in-polygon (concave too), ear-clipping triangulation that always gives counter-clockwise triangles; `Outline` traces a picture's solid pixels into one simple polygon (the biggest piece, holes filled, corners only); `Inset` moves a convex polygon's sides in (a window in its frame) |
 | `Box2`, `Box3` | Axis-aligned boxes: contains, overlaps, union, corners, transformed bounds, ray entry (slab test) |
 | `Frustum` | The six planes of a view-projection matrix; whether a point or box is in view |
 | `Clipping.ClipPolygon` | Cuts a polygon of any vertex type by a plane (Sutherland–Hodgman), interpolating the new vertices |
 | `Edge` | The edge function rasterizers walk (value, step per pixel) and a top-left fill rule so shared edges are drawn once |
-| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders, cones, upright quads (`Billboard.Upright` turns one to face the camera) and extruded 2D outlines (their caps mapped across the outline or a picture you give, their sides reading colours just inside the outline or deeper, past a dark border); `Transform` moves a copy |
+| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders, cones, upright quads (`Billboard.Upright` turns one to face the camera) and extruded 2D outlines (their caps mapped across the outline or a picture you give, their sides reading colours just inside the outline or deeper, past a dark border); `Transform` moves a copy, `Combine` joins placed meshes into one |
 
 ```csharp
 var car = MeshBuilder.Extrude(sideProfile, depth: 1.8f).Transform(Matrix4x4.CreateRotationY(MathF.PI / 4));
@@ -728,6 +728,7 @@ if (frustum.Test(car.Bounds) != Containment.Outside) { /* draw it */ }
 | `Renderer.DrawMesh` | A `Jentl.Geometry` mesh with a `Material` (colour and `Shading`: unlit, flat per face, or smooth per vertex) under a `Lighting` (one directional light and ambient) |
 | `Texture` | An image on triangles (packed RGBA): nearest or bilinear sampling, repeat or clamp; texels with alpha under one half are cut out (nothing drawn, no depth written). A `Material` or `DrawTriangle` takes one, tinted by the colour; meshes from `MeshBuilder` all have texture coordinates (an extruded outline takes the texture across its caps, and its sides take the colours along their edge, like pixel art extruded into blocks) |
 | `Renderer.Mapping` | `PerspectiveCorrect` (textures stay put on surfaces at an angle) or `Affine` (spread straight across the screen, as the first PlayStation did: the textures swim, a retro look) |
+| `MeshModel`, `MeshModelBuilder`, `DrawModel` | A thing of several materials (paint, glass, tyres): add placed meshes with their materials, and pieces of one material are joined into one mesh; translucent parts draw last |
 | `Material.Translucent` | Blended over what is behind by alpha, writing no depth: shadows (`Textures.Spot` makes a round one), glass, water; draw after the solid things |
 | `Sky`, `Renderer.Clear(sky)` | Clears to a sky as the camera sees it: the zenith's colour overhead fading to the horizon's at eye level, the ground's below |
 | `Renderer.Fog` | Distance fog: from `Start` to `End` in front of the camera things fade into its colour; clear to the same colour and the horizon melts into the sky (and far triangles need no clipping by eye) |
