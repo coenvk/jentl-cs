@@ -10,6 +10,13 @@ public sealed class AgentProcessTests
         "dotnet", [Path.Combine(AppContext.BaseDirectory, "TestAgent", "Jentl.Net.TestAgent.dll"), mode]));
 
     [Fact]
+    public void AnAgentProcess_IsAnAgent()
+    {
+        using var a = Start("echo");
+        a.Should().BeAssignableTo<IAgent>().Which.IsAway.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Ask_GetsTheAnswer()
     {
         using var a = Start("echo");

@@ -17,7 +17,7 @@ namespace Jentl.Net;
 /// no more than <see cref="MaxLines"/> lines of at most <see cref="MaxLineLength"/> characters: older lines are dropped,
 /// and a longer line is cut.
 /// </remarks>
-public sealed class AgentProcess : IDisposable
+public sealed class AgentProcess : IAgent
 {
     /// <summary>How many of the last lines on stderr are kept.</summary>
     public const int ErrorLines = 50;
@@ -105,10 +105,10 @@ public sealed class AgentProcess : IDisposable
         }
     }
 
-    /// <summary>Whether the agent is no longer running (it ended, was stopped, or never started).</summary>
+    /// <inheritdoc/>
     public bool HasExited => _final?.HasExited ?? (_process is null || _process.HasExited);
 
-    /// <summary>What is wrong with the agent ("could not start: …", "exited with code 3", "timed out"), or null when all is well.</summary>
+    /// <inheritdoc/>
     public string? Problem
     {
         get
@@ -132,7 +132,7 @@ public sealed class AgentProcess : IDisposable
         }
     }
 
-    /// <summary>The last <see cref="ErrorLines"/> lines the agent wrote to stderr.</summary>
+    /// <inheritdoc/>
     public IReadOnlyList<string> ErrorOutput
     {
         get
@@ -144,7 +144,7 @@ public sealed class AgentProcess : IDisposable
         }
     }
 
-    /// <summary>Sends one line to the agent. Never blocks: the line is queued and written in the background, so an agent that stops reading costs only its own answers. Does nothing when the agent is gone.</summary>
+    /// <inheritdoc/>
     public void Send(string line)
     {
         if (_process is not null && _final is null)
@@ -153,7 +153,7 @@ public sealed class AgentProcess : IDisposable
         }
     }
 
-    /// <summary>The next line from the agent, or null when none came within the limit or the agent has exited.</summary>
+    /// <inheritdoc/>
     public async Task<string?> ReadAsync(TimeSpan limit)
     {
         using var timeout = new CancellationTokenSource(limit < TimeSpan.Zero ? TimeSpan.Zero : limit);
@@ -176,10 +176,7 @@ public sealed class AgentProcess : IDisposable
         }
     }
 
-    /// <summary>
-    /// Asks the agent something: throws away every line it sent before (late answers to earlier questions), sends the
-    /// line and reads the answer. Null when there was none in time.
-    /// </summary>
+    /// <inheritdoc/>
     public Task<string?> AskAsync(string line, TimeSpan limit)
     {
         while (_lines.Reader.TryRead(out _))
@@ -190,7 +187,7 @@ public sealed class AgentProcess : IDisposable
         return ReadAsync(limit);
     }
 
-    /// <summary>Kills the agent and everything it started. Safe to call again, or on an agent that has exited.</summary>
+    /// <inheritdoc/>
     public void Stop()
     {
         if (_process is null || _final is not null)
