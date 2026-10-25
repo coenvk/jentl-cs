@@ -230,7 +230,9 @@ public static class MeshBuilder
             var (p, q) = (points[i], points[(i + 1) % points.Count]);
             var d = q - p;
             var outward = Vector3.Normalize(new Vector3(d.Y, -d.X, 0));
-            builder.Quad(new Vector3(p, back), new Vector3(q, back), new Vector3(q, front), new Vector3(p, front), outward);
+            // A side takes the picture's colours along its edge, stretched across the depth, as pixel art extruded into blocks.
+            var (up, uq) = (Uv(i), Uv((i + 1) % points.Count));
+            builder.Quad(new Vector3(p, back), new Vector3(q, back), new Vector3(q, front), new Vector3(p, front), outward, [up, uq, uq, up]);
         }
 
         return builder.Build();

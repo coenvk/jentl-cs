@@ -726,7 +726,7 @@ if (frustum.Test(car.Bounds) != Containment.Outside) { /* draw it */ }
 | `Camera` | Position, target, field of view, near and far; view, projection and view-projection matrices |
 | `Renderer.DrawTriangle` | One triangle with vertex colours: transformed, clipped against the view (triangles through the camera's plane are cut, not smeared), back faces culled, pixel centres filled with the top-left rule (shared edges drawn once), depth-tested, colours blended perspective-correctly |
 | `Renderer.DrawMesh` | A `Jentl.Geometry` mesh with a `Material` (colour and `Shading`: unlit, flat per face, or smooth per vertex) under a `Lighting` (one directional light and ambient) |
-| `Texture` | An image on triangles (packed RGBA): nearest or bilinear sampling, repeat or clamp; texels with alpha under one half are cut out (nothing drawn, no depth written). A `Material` or `DrawTriangle` takes one, tinted by the colour; meshes from `MeshBuilder` all have texture coordinates |
+| `Texture` | An image on triangles (packed RGBA): nearest or bilinear sampling, repeat or clamp; texels with alpha under one half are cut out (nothing drawn, no depth written). A `Material` or `DrawTriangle` takes one, tinted by the colour; meshes from `MeshBuilder` all have texture coordinates (an extruded outline takes the texture across its caps, and its sides take the colours along their edge, like pixel art extruded into blocks) |
 | `Renderer.Mapping` | `PerspectiveCorrect` (textures stay put on surfaces at an angle) or `Affine` (spread straight across the screen, as the first PlayStation did: the textures swim, a retro look) |
 | `RenderStats` | Triangles and pixels drawn since the last `Clear` |
 

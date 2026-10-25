@@ -187,3 +187,20 @@ public class MeshTextureCoordinateTests
         mesh.UVs[corner].Should().Be(new Vector2(1, 0)); // right, top (v runs down the image)
     }
 }
+
+public class ExtrudeSideTests
+{
+    [Fact]
+    public void Extrude_SidesTakeTheColoursAlongTheirEdge()
+    {
+        Vector2[] outline = [new(0, 0), new(4, 0), new(4, 2), new(0, 2)];
+
+        var mesh = MeshBuilder.Extrude(outline, 1);
+
+        // Every vertex of a side (normal across the outline) has the cap's texture coordinate for its corner of the outline.
+        Vector2 CapUv(Vector3 p) => new(p.X / 4, 1 - (p.Y / 2));
+        var sides = Enumerable.Range(0, mesh.Positions.Count).Where(i => Math.Abs(mesh.Normals[i].Z) < 0.5f).ToList();
+        sides.Should().NotBeEmpty();
+        sides.Select(i => Vector2.Distance(mesh.UVs[i], CapUv(mesh.Positions[i]))).Should().OnlyContain(d => d < 1e-5f);
+    }
+}
