@@ -193,9 +193,11 @@ public static class MeshBuilder
             var (a0, a1) = (MathF.Tau * s / segments, MathF.Tau * (s + 1) / segments);
             Vector3 Rim(float angle, float y) => new(MathF.Cos(angle) * radius, y, MathF.Sin(angle) * radius);
             var (n0, n1) = (Vector3.Normalize(Rim(a0, 0)), Vector3.Normalize(Rim(a1, 0)));
-            builder.Smooth([(Rim(a0, bottom), n0), (Rim(a1, bottom), n1), (Rim(a1, top), n1), (Rim(a0, top), n0)]);
-            builder.Triangle(new Vector3(0, top, 0), Rim(a0, top), Rim(a1, top), Vector3.UnitY);
-            builder.Triangle(new Vector3(0, bottom, 0), Rim(a1, bottom), Rim(a0, bottom), -Vector3.UnitY);
+            var (u0, u1) = (s / (float)segments, (s + 1) / (float)segments);
+            builder.Smooth([(Rim(a0, bottom), n0), (Rim(a1, bottom), n1), (Rim(a1, top), n1), (Rim(a0, top), n0)], [new(u0, 1), new(u1, 1), new(u1, 0), new(u0, 0)]);
+            Vector2 Cap(float angle) => new((MathF.Cos(angle) + 1) / 2, (MathF.Sin(angle) + 1) / 2);
+            builder.Triangle(new Vector3(0, top, 0), Rim(a0, top), Rim(a1, top), Vector3.UnitY, [new(0.5f, 0.5f), Cap(a0), Cap(a1)]);
+            builder.Triangle(new Vector3(0, bottom, 0), Rim(a1, bottom), Rim(a0, bottom), -Vector3.UnitY, [new(0.5f, 0.5f), Cap(a1), Cap(a0)]);
         }
 
         return builder.Build();
@@ -211,11 +213,16 @@ public static class MeshBuilder
         var points = Polygon2.IsCounterClockwise(outline) ? outline.ToList() : outline.Reverse().ToList();
         var (front, back) = (depth / 2, -depth / 2);
         var builder = new Builder();
+
+        // The caps take the texture across the outline's bounds, upright (v runs down), as a side view would be drawn.
+        var bounds = Box2.FromPoints(points);
+        var span = Vector2.Max(bounds.Size, new Vector2(1e-6f));
+        Vector2 Uv(int i) => new((points[i].X - bounds.Min.X) / span.X, 1 - ((points[i].Y - bounds.Min.Y) / span.Y));
         foreach (var t in Polygon2.Triangulate(points))
         {
             Vector3 At(int i, float z) => new(points[i].X, points[i].Y, z);
-            builder.Triangle(At(t.A, front), At(t.B, front), At(t.C, front), Vector3.UnitZ);
-            builder.Triangle(At(t.A, back), At(t.C, back), At(t.B, back), -Vector3.UnitZ);
+            builder.Triangle(At(t.A, front), At(t.B, front), At(t.C, front), Vector3.UnitZ, [Uv(t.A), Uv(t.B), Uv(t.C)]);
+            builder.Triangle(At(t.A, back), At(t.C, back), At(t.B, back), -Vector3.UnitZ, [Uv(t.A), Uv(t.C), Uv(t.B)]);
         }
 
         for (var i = 0; i < points.Count; i++)
@@ -241,29 +248,35 @@ public static class MeshBuilder
     private sealed class Builder
     {
         private readonly List<Vector3> _positions = [];
+        // A quad's corners run bottom-left, bottom-right, top-right, top-left: the whole texture, upright.
+        private static readonly Vector2[] QuadUVs = [new(0, 1), new(1, 1), new(1, 0), new(0, 0)];
+        private static readonly Vector2[] TriangleUVs = [new(0, 1), new(1, 1), new(0.5f, 0)];
+
         private readonly List<Vector3> _normals = [];
+        private readonly List<Vector2> _uvs = [];
         private readonly List<TriangleIndices> _triangles = [];
 
-        public void Triangle(Vector3 a, Vector3 b, Vector3 c, Vector3 facing) =>
-            Add([(a, facing), (b, facing), (c, facing)], facing);
+        public void Triangle(Vector3 a, Vector3 b, Vector3 c, Vector3 facing, Vector2[]? uvs = null) =>
+            Add([(a, facing), (b, facing), (c, facing)], facing, uvs ?? TriangleUVs);
 
-        public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 facing) =>
-            Add([(a, facing), (b, facing), (c, facing), (d, facing)], facing);
+        public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 facing, Vector2[]? uvs = null) =>
+            Add([(a, facing), (b, facing), (c, facing), (d, facing)], facing, uvs ?? QuadUVs);
 
         /// <summary>A quad with its own normal per corner; it faces the way its corners' normals average.</summary>
-        public void Smooth((Vector3 Position, Vector3 Normal)[] corners) =>
-            Add(corners, corners.Aggregate(Vector3.Zero, (sum, c) => sum + c.Normal));
+        public void Smooth((Vector3 Position, Vector3 Normal)[] corners, Vector2[] uvs) =>
+            Add(corners, corners.Aggregate(Vector3.Zero, (sum, c) => sum + c.Normal), uvs);
 
-        public Mesh Build() => new(_positions, _triangles, _normals);
+        public Mesh Build() => new(_positions, _triangles, _normals, _uvs);
 
         // A fan of triangles over the corners (a triangle or a quad), flipped if it would face away from `facing`.
-        private void Add((Vector3 Position, Vector3 Normal)[] corners, Vector3 facing)
+        private void Add((Vector3 Position, Vector3 Normal)[] corners, Vector3 facing, Vector2[] uvs)
         {
             var first = _positions.Count;
-            foreach (var (position, normal) in corners)
+            for (var i = 0; i < corners.Length; i++)
             {
-                _positions.Add(position);
-                _normals.Add(normal);
+                _positions.Add(corners[i].Position);
+                _normals.Add(corners[i].Normal);
+                _uvs.Add(uvs[i]);
             }
 
             var flip = Vector3.Dot(Vector3.Cross(corners[1].Position - corners[0].Position, corners[2].Position - corners[0].Position), facing) < 0;

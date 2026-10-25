@@ -150,3 +150,40 @@ public class MeshTests
         make.Should().Throw<ArgumentException>();
     }
 }
+
+public class MeshTextureCoordinateTests
+{
+    [Fact]
+    public void Builders_GiveEveryVertexATextureCoordinate()
+    {
+        Vector2[] outline = [new(0, 0), new(4, 0), new(4, 2), new(0, 2)];
+        foreach (var mesh in new[] { MeshBuilder.Box(Vector3.One), MeshBuilder.Cylinder(1, 2), MeshBuilder.Extrude(outline, 1) })
+        {
+            mesh.UVs.Should().HaveCount(mesh.Positions.Count);
+            mesh.UVs.Should().OnlyContain(uv => uv.X >= 0 && uv.X <= 1 && uv.Y >= 0 && uv.Y <= 1);
+        }
+    }
+
+    [Fact]
+    public void Box_EachFaceSpansTheWholeTexture()
+    {
+        var box = MeshBuilder.Box(Vector3.One);
+
+        for (var face = 0; face < 6; face++)
+        {
+            var uvs = box.UVs.Skip(face * 4).Take(4).ToList();
+            uvs.Should().Contain(Vector2.Zero).And.Contain(Vector2.One);
+        }
+    }
+
+    [Fact]
+    public void Extrude_CapsAreMappedAcrossTheOutline()
+    {
+        Vector2[] outline = [new(0, 0), new(4, 0), new(4, 2), new(0, 2)];
+
+        var mesh = MeshBuilder.Extrude(outline, 1);
+
+        var corner = mesh.Positions.Select((p, i) => (p, i)).First(x => x.p == new Vector3(4, 2, 0.5f)).i;
+        mesh.UVs[corner].Should().Be(new Vector2(1, 0)); // right, top (v runs down the image)
+    }
+}

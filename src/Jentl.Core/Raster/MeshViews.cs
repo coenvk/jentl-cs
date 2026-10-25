@@ -90,6 +90,7 @@ public sealed class GpuView : IMeshView
     private readonly BasicEffect _effect;
     private readonly ConditionalWeakTable<Mesh, Buffers> _smooth = [];
     private readonly ConditionalWeakTable<Mesh, Buffers> _flat = [];
+    private readonly ConditionalWeakTable<Jentl.Raster.Texture, Texture2D> _textures = [];
     private RenderTargetBinding[] _previous = [];
 
     public GpuView(GraphicsDevice device, int width, int height)
@@ -134,6 +135,27 @@ public sealed class GpuView : IMeshView
         _effect.DiffuseColor = new Vector3(material.Color.X, material.Color.Y, material.Color.Z);
         _effect.Alpha = material.Color.W;
         _effect.LightingEnabled = material.Shading != Shading.Unlit;
+        _effect.TextureEnabled = material.Texture is not null;
+        if (material.Texture is { } texture)
+        {
+            // The same texels on the card; see-through ones are blended here rather than cut out as on the CPU.
+            _effect.Texture = _textures.GetValue(texture, t =>
+            {
+                var uploaded = new Texture2D(_device, t.Width, t.Height, false, SurfaceFormat.Color);
+                uploaded.SetData(t.Pixels);
+                return uploaded;
+            });
+            var point = texture.Filter == Jentl.Raster.TextureFilter.Nearest;
+            _device.SamplerStates[0] = texture.Wrap == Jentl.Raster.TextureWrap.Repeat
+                ? (point ? SamplerState.PointWrap : SamplerState.LinearWrap)
+                : (point ? SamplerState.PointClamp : SamplerState.LinearClamp);
+            _device.BlendState = BlendState.NonPremultiplied;
+        }
+        else
+        {
+            _device.BlendState = BlendState.Opaque;
+        }
+
         if (_effect.LightingEnabled)
         {
             _effect.AmbientLightColor = Convert3D.ToXna(Lighting.Ambient);

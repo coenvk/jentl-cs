@@ -3,8 +3,8 @@ using Jentl.Geometry;
 
 namespace Jentl.Raster;
 
-/// <summary>A corner of a triangle to draw: where it is (before the world transform) and its colour.</summary>
-public readonly record struct Vertex(Vector3 Position, Vector4 Color);
+/// <summary>A corner of a triangle to draw: where it is (before the world transform), its colour, and its texture coordinate.</summary>
+public readonly record struct Vertex(Vector3 Position, Vector4 Color, Vector2 UV = default);
 
 /// <summary>How a mesh's surface takes the light.</summary>
 public enum Shading
@@ -19,8 +19,8 @@ public enum Shading
     Smooth,
 }
 
-/// <summary>What a mesh is made of: a colour, and how it is lit.</summary>
-public sealed record Material(Vector4 Color, Shading Shading = Shading.Smooth);
+/// <summary>What a mesh is made of: a colour, how it is lit, and optionally a texture (tinted by the colour).</summary>
+public sealed record Material(Vector4 Color, Shading Shading = Shading.Smooth, Texture? Texture = null);
 
 /// <summary>One directional light (the way it travels, and its colour) plus light from everywhere.</summary>
 public sealed record Lighting(Vector3 Direction, Vector3 Color, Vector3 Ambient)
@@ -83,6 +83,9 @@ public sealed class Renderer
     /// <summary>Whether triangles seen from behind (clockwise on screen) are skipped.</summary>
     public bool CullBackFaces { get; set; } = true;
 
+    /// <summary>How textures are spread across triangles: correctly, or affine for a wobbly retro look.</summary>
+    public TextureMapping Mapping { get; set; } = TextureMapping.PerspectiveCorrect;
+
     public Lighting Lighting { get; set; } = Lighting.Default;
 
     public RenderStats Stats { get; } = new();
@@ -103,6 +106,7 @@ public sealed class Renderer
         Matrix4x4.Invert(world, out var inverse);
         var normalMatrix = Matrix4x4.Transpose(inverse);
         Vector3 WorldNormal(Vector3 n) => SafeNormalize(Vector3.TransformNormal(n, normalMatrix));
+        var uvs = mesh.UVs.Count == mesh.Positions.Count ? mesh.UVs : null;
         foreach (var t in mesh.Triangles)
         {
             Vector3 pa = mesh.Positions[t.A], pb = mesh.Positions[t.B], pc = mesh.Positions[t.C];
@@ -123,18 +127,22 @@ public sealed class Renderer
                     break;
             }
 
-            DrawTriangle(new Vertex(pa, ca), new Vertex(pb, cb), new Vertex(pc, cc), world);
+            Vector2 ua = uvs?[t.A] ?? default, ub = uvs?[t.B] ?? default, uc = uvs?[t.C] ?? default;
+            DrawTriangle(new Vertex(pa, ca, ua), new Vertex(pb, cb, ub), new Vertex(pc, cc, uc), world, material.Texture);
         }
     }
 
-    /// <summary>Draws one triangle, its corners placed by <paramref name="world"/>, with its vertex colours blended across.</summary>
-    public void DrawTriangle(in Vertex a, in Vertex b, in Vertex c, Matrix4x4 world)
+    /// <summary>
+    /// Draws one triangle, its corners placed by <paramref name="world"/>, with its vertex colours blended across and,
+    /// given a <paramref name="texture"/>, that texture on it, tinted by the colours.
+    /// </summary>
+    public void DrawTriangle(in Vertex a, in Vertex b, in Vertex c, Matrix4x4 world, Texture? texture = null)
     {
         var transform = world * ViewProjection;
         _polygon.Clear();
-        _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(a.Position, 1), transform), a.Color));
-        _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(b.Position, 1), transform), b.Color));
-        _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(c.Position, 1), transform), c.Color));
+        _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(a.Position, 1), transform), a.Color, a.UV));
+        _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(b.Position, 1), transform), b.Color, b.UV));
+        _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(c.Position, 1), transform), c.Color, c.UV));
 
         IReadOnlyList<ClipVertex> polygon = _polygon;
         if (!AllInside(polygon))
@@ -149,7 +157,8 @@ public sealed class Renderer
             }
         }
 
-        // To the screen: pixels, y down; depth and the colours divided by w for perspective-correct blending.
+        // To the screen: pixels, y down; depth, and the colours and texture coordinates divided by w so they blend
+        // perspective-correctly (affine mapping keeps the texture coordinates as they are instead).
         Span<ScreenVertex> screen = stackalloc ScreenVertex[polygon.Count];
         for (var i = 0; i < polygon.Count; i++)
         {
@@ -160,7 +169,9 @@ public sealed class Renderer
                 new Vector2((ndc.X + 1) * 0.5f * Target.Width, (1 - ndc.Y) * 0.5f * Target.Height),
                 ndc.Z,
                 inverseW,
-                v.Color * inverseW);
+                v.Color * inverseW,
+                v.UV * inverseW,
+                v.UV);
         }
 
         // Counter-clockwise in view (y up) is clockwise on the y-down screen: a positive screen area is a back face.
@@ -173,7 +184,7 @@ public sealed class Renderer
         Stats.Triangles++;
         for (var i = 1; i < screen.Length - 1; i++)
         {
-            Fill(screen[0], screen[i], screen[i + 1]);
+            Fill(screen[0], screen[i], screen[i + 1], texture);
         }
     }
 
@@ -203,7 +214,7 @@ public sealed class Renderer
     }
 
     // Fills the pixel centres inside the triangle, walking the three edge functions across its bounding box.
-    private void Fill(in ScreenVertex v0, in ScreenVertex v1, in ScreenVertex v2)
+    private void Fill(in ScreenVertex v0, in ScreenVertex v1, in ScreenVertex v2, Texture? texture)
     {
         var (a, b, c) = (v0, v1, v2);
         var area = Segment2.Cross(b.Position - a.Position, c.Position - a.Position);
@@ -234,6 +245,7 @@ public sealed class Renderer
         var inverseArea = 1 / area;
         var pixels = Target.Pixels;
         var depths = Depth.Depths;
+        var affine = Mapping == TextureMapping.Affine;
         for (var y = minY; y <= maxY; y++)
         {
             var start = new Vector2(minX + 0.5f, y + 0.5f);
@@ -253,9 +265,23 @@ public sealed class Renderer
                     continue;
                 }
 
-                depths[i] = z;
                 var inverseW = (la * a.InverseW) + (lb * b.InverseW) + (lc * c.InverseW);
                 var color = ((la * a.ColorOverW) + (lb * b.ColorOverW) + (lc * c.ColorOverW)) / inverseW;
+                if (texture is not null)
+                {
+                    var uv = affine
+                        ? (la * a.UV) + (lb * b.UV) + (lc * c.UV)
+                        : ((la * a.UVOverW) + (lb * b.UVOverW) + (lc * c.UVOverW)) / inverseW;
+                    var texel = texture.Sample(uv);
+                    if (texel.W < 0.5f)
+                    {
+                        continue; // cut out: nothing drawn, no depth written
+                    }
+
+                    color *= texel;
+                }
+
+                depths[i] = z;
                 pixels[i] = Colors.Pack(color);
                 Stats.Pixels++;
             }
@@ -272,11 +298,11 @@ public sealed class Renderer
 
     private static Vector3 SafeNormalize(Vector3 v) => v.LengthSquared() > 0 ? Vector3.Normalize(v) : Vector3.Zero;
 
-    private readonly record struct ClipVertex(Vector4 Position, Vector4 Color)
+    private readonly record struct ClipVertex(Vector4 Position, Vector4 Color, Vector2 UV)
     {
         public static ClipVertex Lerp(ClipVertex a, ClipVertex b, float t) =>
-            new(Vector4.Lerp(a.Position, b.Position, t), Vector4.Lerp(a.Color, b.Color, t));
+            new(Vector4.Lerp(a.Position, b.Position, t), Vector4.Lerp(a.Color, b.Color, t), Vector2.Lerp(a.UV, b.UV, t));
     }
 
-    private readonly record struct ScreenVertex(Vector2 Position, float Depth, float InverseW, Vector4 ColorOverW);
+    private readonly record struct ScreenVertex(Vector2 Position, float Depth, float InverseW, Vector4 ColorOverW, Vector2 UVOverW, Vector2 UV);
 }
