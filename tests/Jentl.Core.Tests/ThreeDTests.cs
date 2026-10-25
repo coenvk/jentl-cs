@@ -43,6 +43,21 @@ public class GpuMeshDataTests
     }
 }
 
+public class GpuIndexTests
+{
+    [Fact]
+    public void SmallMeshes_Use16BitIndices_BigOnesDrawWithout()
+    {
+        GpuMeshData.IndexSize(100).Should().Be(Microsoft.Xna.Framework.Graphics.IndexElementSize.SixteenBits);
+        GpuMeshData.IndexSize(65_535).Should().Be(Microsoft.Xna.Framework.Graphics.IndexElementSize.SixteenBits);
+        GpuMeshData.IndexSize(65_536).Should().BeNull("the browser's Reach profile has no 32-bit indices, so such meshes are drawn without");
+    }
+
+    [Fact]
+    public void ToShorts_KeepsEveryIndex() =>
+        GpuMeshData.ToShorts([0, 1, 65_535]).Should().Equal(0, 1, unchecked((short)65_535));
+}
+
 public class MatrixConversionTests
 {
     [Fact]

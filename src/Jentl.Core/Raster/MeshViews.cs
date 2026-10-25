@@ -187,13 +187,20 @@ public sealed class GpuView : IMeshView
         public static Buffers Create(GraphicsDevice device, Mesh mesh, bool flat)
         {
             var (vertices, indices) = GpuMeshData.Build(mesh, flat);
+            if (indices.Length > 0 && GpuMeshData.IndexSize(vertices.Length) is null)
+            {
+                // Too many vertices for 16-bit indices: draw every triangle's corners in order instead.
+                vertices = [.. indices.Select(i => vertices[i])];
+                indices = [];
+            }
+
             var vertexBuffer = new VertexBuffer(device, typeof(VertexPositionNormalTexture), vertices.Length, BufferUsage.WriteOnly);
             vertexBuffer.SetData(vertices);
             IndexBuffer? indexBuffer = null;
             if (indices.Length > 0)
             {
-                indexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, indices.Length, BufferUsage.WriteOnly);
-                indexBuffer.SetData(indices);
+                indexBuffer = new IndexBuffer(device, IndexElementSize.SixteenBits, indices.Length, BufferUsage.WriteOnly);
+                indexBuffer.SetData(GpuMeshData.ToShorts(indices));
             }
 
             return new Buffers(vertexBuffer, indexBuffer, mesh.Triangles.Count);

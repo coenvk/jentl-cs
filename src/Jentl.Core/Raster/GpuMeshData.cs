@@ -25,6 +25,25 @@ public static class Convert3D
 /// </summary>
 public static class GpuMeshData
 {
+    /// <summary>
+    /// The index size for a mesh of <paramref name="vertexCount"/> vertices: 16 bits when they fit, or null when they
+    /// don't, as the browser's graphics (KNI's Reach profile) has no 32-bit indices; such meshes are drawn unindexed.
+    /// </summary>
+    public static IndexElementSize? IndexSize(int vertexCount) => vertexCount <= ushort.MaxValue ? IndexElementSize.SixteenBits : null;
+
+    /// <summary>Indices as 16-bit values (indices above 32 767 wrap into the sign bit, as unsigned 16-bit indices are stored).</summary>
+    public static short[] ToShorts(IReadOnlyList<int> indices)
+    {
+        ArgumentNullException.ThrowIfNull(indices);
+        var shorts = new short[indices.Count];
+        for (var i = 0; i < shorts.Length; i++)
+        {
+            shorts[i] = unchecked((short)(ushort)indices[i]);
+        }
+
+        return shorts;
+    }
+
     public static (VertexPositionNormalTexture[] Vertices, int[] Indices) Build(Mesh mesh, bool flat)
     {
         ArgumentNullException.ThrowIfNull(mesh);
