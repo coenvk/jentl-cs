@@ -73,3 +73,20 @@ public class MatrixConversionTests
         b.W.Should().BeApproximately(a.W, 1e-5f);
     }
 }
+
+public class RasterTextureTests
+{
+    [Fact]
+    public void From_CopiesARegionOfAnImage_AsPackedTexels()
+    {
+        var image = new Jentl.Assets.Image(3, 2);
+        image.Pixels[((1 * 3) + 2) * 4] = 255; // (2, 1): red
+        image.Pixels[(((1 * 3) + 2) * 4) + 3] = 255;
+
+        var texture = RasterTextures.From(image, new Microsoft.Xna.Framework.Rectangle(1, 1, 2, 1));
+
+        texture.Width.Should().Be(2);
+        texture.Height.Should().Be(1);
+        texture.Pixels.Should().Equal(0u, Jentl.Raster.Colors.Pack(new Vector4(1, 0, 0, 1)));
+    }
+}

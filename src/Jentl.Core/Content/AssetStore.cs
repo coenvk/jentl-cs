@@ -90,6 +90,12 @@ public sealed class AssetStore(GraphicsDevice device) : IDisposable
         return texture;
     }
 
+    /// <summary>
+    /// An image decoded but kept off the graphics card (for the software renderer, say, through
+    /// <see cref="Raster.RasterTextures"/>); read afresh each time, so keep what you make of it.
+    /// </summary>
+    public Image Image(string path) => Png.Decode(ReadBytes(path));
+
     /// <summary>An atlas by its description's path (<c>Assets/sprites.atlas.json</c>); the image sits next to it.</summary>
     public TextureAtlas Atlas(string path)
     {

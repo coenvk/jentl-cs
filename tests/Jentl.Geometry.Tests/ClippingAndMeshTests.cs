@@ -204,3 +204,31 @@ public class ExtrudeSideTests
         sides.Select(i => Vector2.Distance(mesh.UVs[i], CapUv(mesh.Positions[i]))).Should().OnlyContain(d => d < 1e-5f);
     }
 }
+
+public class MoreMeshTests
+{
+    [Fact]
+    public void Extrude_CanMapTheCapsAcrossAGivenPicture()
+    {
+        // A 2x2 square in the middle of a 4x4 picture takes the middle of the texture.
+        Vector2[] outline = [new(1, 1), new(3, 1), new(3, 3), new(1, 3)];
+
+        var mesh = MeshBuilder.Extrude(outline, 1, picture: new Box2(Vector2.Zero, new Vector2(4)));
+
+        var front = Enumerable.Range(0, mesh.Positions.Count).Where(i => mesh.Normals[i] == Vector3.UnitZ).ToList();
+        front.Select(i => mesh.UVs[i]).Should().OnlyContain(uv => uv.X >= 0.25f - 1e-5f && uv.X <= 0.75f + 1e-5f && uv.Y >= 0.25f - 1e-5f && uv.Y <= 0.75f + 1e-5f);
+        front.Should().Contain(i => mesh.Positions[i].X == 1 && mesh.Positions[i].Y == 3 && Vector2.Distance(mesh.UVs[i], new Vector2(0.25f, 0.25f)) < 1e-5f);
+    }
+
+    [Fact]
+    public void Cone_StandsOnItsBase_PointUp()
+    {
+        var cone = MeshBuilder.Cone(1, 2, segments: 8);
+
+        cone.Bounds.Min.Y.Should().BeApproximately(-1, 1e-5f);
+        cone.Bounds.Max.Y.Should().BeApproximately(1, 1e-5f);
+        cone.Triangles.Should().HaveCount(16);
+        cone.Triangles.Select(t => cone.TriangleAt(t)).Should().OnlyContain(t => Vector3.Dot(t.Normal, t.Centroid) > 0);
+        cone.UVs.Should().HaveCount(cone.Positions.Count);
+    }
+}

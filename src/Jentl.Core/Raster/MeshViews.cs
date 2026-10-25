@@ -22,7 +22,16 @@ public interface IMeshView : IDisposable
     /// <summary>World to clip space (System.Numerics conventions).</summary>
     Numerics.Matrix4x4 ViewProjection { get; set; }
 
+    /// <summary>
+    /// World to the camera's space, part of <see cref="ViewProjection"/>: the graphics card measures fog from it.
+    /// <see cref="MeshViewExtensions.Look"/> sets both from a camera.
+    /// </summary>
+    Numerics.Matrix4x4 View { get; set; }
+
     Lighting Lighting { get; set; }
+
+    /// <summary>Distance fog, or null for none.</summary>
+    Fog? Fog { get; set; }
 
     /// <summary>The finished picture, after <see cref="Finish"/>.</summary>
     Texture2D Texture { get; }
@@ -58,10 +67,19 @@ public sealed class SoftwareView : IMeshView
         set => Renderer.ViewProjection = value;
     }
 
+    /// <summary>Not needed here: the renderer measures fog from the projection.</summary>
+    public Numerics.Matrix4x4 View { get; set; } = Numerics.Matrix4x4.Identity;
+
     public Lighting Lighting
     {
         get => Renderer.Lighting;
         set => Renderer.Lighting = value;
+    }
+
+    public Fog? Fog
+    {
+        get => Renderer.Fog;
+        set => Renderer.Fog = value;
     }
 
     public Texture2D Texture => _texture;
@@ -104,7 +122,11 @@ public sealed class GpuView : IMeshView
 
     public Numerics.Matrix4x4 ViewProjection { get; set; } = Numerics.Matrix4x4.Identity;
 
+    public Numerics.Matrix4x4 View { get; set; } = Numerics.Matrix4x4.Identity;
+
     public Lighting Lighting { get; set; } = Lighting.Default;
+
+    public Fog? Fog { get; set; }
 
     public Texture2D Texture => _target;
 
@@ -129,9 +151,20 @@ public sealed class GpuView : IMeshView
         var flat = material.Shading == Shading.Flat;
         var buffers = (flat ? _flat : _smooth).GetValue(mesh, m => Buffers.Create(_device, m, flat));
 
-        // The combined view-projection goes in Projection; lighting is worked out in world space from World.
+        // The view goes in View (fog is measured there) and the rest of the view-projection in Projection; lighting is
+        // worked out in world space from World.
+        Numerics.Matrix4x4.Invert(View, out var inverseView);
         _effect.World = Convert3D.ToXna(world);
-        _effect.Projection = Convert3D.ToXna(ViewProjection);
+        _effect.View = Convert3D.ToXna(View);
+        _effect.Projection = Convert3D.ToXna(inverseView * ViewProjection);
+        _effect.FogEnabled = Fog is not null;
+        if (Fog is { } fog)
+        {
+            _effect.FogColor = new Vector3(fog.Color.X, fog.Color.Y, fog.Color.Z);
+            _effect.FogStart = fog.Start;
+            _effect.FogEnd = fog.End;
+        }
+
         _effect.DiffuseColor = new Vector3(material.Color.X, material.Color.Y, material.Color.Z);
         _effect.Alpha = material.Color.W;
         _effect.LightingEnabled = material.Shading != Shading.Unlit;
@@ -227,5 +260,18 @@ public sealed class GpuView : IMeshView
 
             return new Buffers(vertexBuffer, indexBuffer, mesh.Triangles.Count);
         }
+    }
+}
+
+/// <summary>Helpers for any <see cref="IMeshView"/>.</summary>
+public static class MeshViewExtensions
+{
+    /// <summary>Looks through <paramref name="camera"/>: sets the view and the view-projection, at the view's shape.</summary>
+    public static void Look(this IMeshView view, Camera camera)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        ArgumentNullException.ThrowIfNull(camera);
+        view.View = camera.View;
+        view.ViewProjection = camera.ViewProjection(view.Size.X / (float)Math.Max(1, view.Size.Y));
     }
 }

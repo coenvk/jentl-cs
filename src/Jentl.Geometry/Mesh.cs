@@ -203,19 +203,42 @@ public static class MeshBuilder
         return builder.Build();
     }
 
+    /// <summary>An upright cone of <paramref name="radius"/> and <paramref name="height"/>, centred, point up, with a flat base; flat sides.</summary>
+    public static Mesh Cone(float radius, float height, int segments = 16)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(segments, 3);
+        var builder = new Builder();
+        var (top, bottom) = (height / 2, -height / 2);
+        for (var s = 0; s < segments; s++)
+        {
+            var (a0, a1) = (MathF.Tau * s / segments, MathF.Tau * (s + 1) / segments);
+            Vector3 Rim(float angle) => new(MathF.Cos(angle) * radius, bottom, MathF.Sin(angle) * radius);
+            var middle = (a0 + a1) / 2;
+            var outward = new Vector3(MathF.Cos(middle) * height, radius, MathF.Sin(middle) * height);
+            var (u0, u1) = (s / (float)segments, (s + 1) / (float)segments);
+            builder.Triangle(Rim(a0), Rim(a1), new Vector3(0, top, 0), outward, [new(u0, 1), new(u1, 1), new((u0 + u1) / 2, 0)]);
+            Vector2 Cap(float angle) => new((MathF.Cos(angle) + 1) / 2, (MathF.Sin(angle) + 1) / 2);
+            builder.Triangle(new Vector3(0, bottom, 0), Rim(a1), Rim(a0), -Vector3.UnitY, [new(0.5f, 0.5f), Cap(a1), Cap(a0)]);
+        }
+
+        return builder.Build();
+    }
+
     /// <summary>
     /// A prism from a 2D outline (any simple polygon, either winding) in the XY plane, <paramref name="depth"/> deep
     /// along Z and centred on it: a flat cap at each end and flat sides. A side view becomes a low-poly model this way.
+    /// The caps take the texture upright across <paramref name="picture"/> (the outline's bounds if not given): pass
+    /// the whole picture's area when the outline covers only part of it, as a sprite's does.
     /// </summary>
-    public static Mesh Extrude(IReadOnlyList<Vector2> outline, float depth)
+    public static Mesh Extrude(IReadOnlyList<Vector2> outline, float depth, Box2? picture = null)
     {
         ArgumentNullException.ThrowIfNull(outline);
         var points = Polygon2.IsCounterClockwise(outline) ? outline.ToList() : outline.Reverse().ToList();
         var (front, back) = (depth / 2, -depth / 2);
         var builder = new Builder();
 
-        // The caps take the texture across the outline's bounds, upright (v runs down), as a side view would be drawn.
-        var bounds = Box2.FromPoints(points);
+        // The caps take the texture across the picture, upright (v runs down), as a side view would be drawn.
+        var bounds = picture ?? Box2.FromPoints(points);
         var span = Vector2.Max(bounds.Size, new Vector2(1e-6f));
         Vector2 Uv(int i) => new((points[i].X - bounds.Min.X) / span.X, 1 - ((points[i].Y - bounds.Min.Y) / span.Y));
         foreach (var t in Polygon2.Triangulate(points))

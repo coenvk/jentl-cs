@@ -38,6 +38,140 @@ public static class Polygon2
     }
 
     /// <summary>
+    /// The outline of a picture's solid pixels (e.g. a sprite's opaque ones), along the pixel edges with only its
+    /// corners, in pixel units with y down as the picture runs: pixel (x, y) is the square from (x, y) to (x + 1, y + 1).
+    /// The biggest piece is kept (pieces touching only at a corner are apart) and holes in it are filled, so the outline
+    /// is one simple polygon, ready for <see cref="Triangulate"/> or <see cref="MeshBuilder.Extrude"/>. Empty if no
+    /// pixel is solid.
+    /// </summary>
+    public static IReadOnlyList<Vector2> Outline(int width, int height, Func<int, int, bool> solid)
+    {
+        ArgumentNullException.ThrowIfNull(solid);
+        ArgumentOutOfRangeException.ThrowIfNegative(width);
+        ArgumentOutOfRangeException.ThrowIfNegative(height);
+
+        // A border of empty pixels round the picture, so every piece has outside all round it.
+        var (w, h) = (width + 2, height + 2);
+        var grid = new bool[w * h];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                grid[((y + 1) * w) + x + 1] = solid(x, y);
+            }
+        }
+
+        // The biggest piece, then everything not reachable from the border without crossing it (the piece and its holes).
+        var piece = new bool[grid.Length];
+        var best = 0;
+        var seen = new bool[grid.Length];
+        for (var i = 0; i < grid.Length; i++)
+        {
+            if (grid[i] && !seen[i])
+            {
+                var found = Flood(w, h, i, j => grid[j], seen);
+                if (found.Count > best)
+                {
+                    best = found.Count;
+                    Array.Clear(piece);
+                    found.ForEach(j => piece[j] = true);
+                }
+            }
+        }
+
+        if (best == 0)
+        {
+            return [];
+        }
+
+        var outside = new bool[grid.Length];
+        Flood(w, h, 0, j => !piece[j], outside);
+
+        // Each solid pixel's sides that face outside, all running the same way round; with holes filled and pieces
+        // joined by sides only, every corner has one way on (a corner touch would close off a gap, which is filled).
+        var next = new Dictionary<(int X, int Y), (int X, int Y)>();
+        for (var y = 0; y < h; y++)
+        {
+            for (var x = 0; x < w; x++)
+            {
+                if (outside[(y * w) + x])
+                {
+                    continue;
+                }
+
+                if (outside[((y - 1) * w) + x])
+                {
+                    next[(x, y)] = (x + 1, y);
+                }
+
+                if (outside[(y * w) + x + 1])
+                {
+                    next[(x + 1, y)] = (x + 1, y + 1);
+                }
+
+                if (outside[((y + 1) * w) + x])
+                {
+                    next[(x + 1, y + 1)] = (x, y + 1);
+                }
+
+                if (outside[(y * w) + x - 1])
+                {
+                    next[(x, y + 1)] = (x, y);
+                }
+            }
+        }
+
+        // Walk round once, keeping only the corners where the way turns; back out of the border's offset.
+        var start = next.Keys.Min();
+        var path = new List<(int X, int Y)>();
+        var at = start;
+        do
+        {
+            path.Add(at);
+            at = next[at];
+        }
+        while (at != start);
+
+        var corners = new List<Vector2>();
+        for (var i = 0; i < path.Count; i++)
+        {
+            var (p, c, n) = (path[(i + path.Count - 1) % path.Count], path[i], path[(i + 1) % path.Count]);
+            if ((c.X - p.X, c.Y - p.Y) != (n.X - c.X, n.Y - c.Y))
+            {
+                corners.Add(new Vector2(c.X - 1, c.Y - 1));
+            }
+        }
+
+        return corners;
+    }
+
+    // The pixels reachable from `from` through side neighbours that pass `open`, marked in `seen`.
+    private static List<int> Flood(int width, int height, int from, Func<int, bool> open, bool[] seen)
+    {
+        var found = new List<int>();
+        var stack = new Stack<int>();
+        stack.Push(from);
+        seen[from] = true;
+        while (stack.Count > 0)
+        {
+            var i = stack.Pop();
+            found.Add(i);
+            var (x, y) = (i % width, i / width);
+            foreach (var (nx, ny) in new[] { (x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1) })
+            {
+                var j = (ny * width) + nx;
+                if (nx >= 0 && ny >= 0 && nx < width && ny < height && !seen[j] && open(j))
+                {
+                    seen[j] = true;
+                    stack.Push(j);
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
     /// Cuts a simple polygon (concave is fine, no holes or self-crossings) into n - 2 triangles by ear clipping. The
     /// triangles index the input and always run counter-clockwise, whichever way the input runs.
     /// </summary>

@@ -38,6 +38,13 @@ public sealed record Lighting(Vector3 Direction, Vector3 Color, Vector3 Ambient)
     }
 }
 
+/// <summary>
+/// Haze that thickens with distance in front of the camera: nothing nearer than <paramref name="Start"/>, only
+/// <paramref name="Color"/> from <paramref name="End"/> on, blended evenly between. Clear to the same colour for a
+/// horizon that melts into the sky.
+/// </summary>
+public sealed record Fog(Vector4 Color, float Start, float End);
+
 /// <summary>What the last frame drew.</summary>
 public sealed class RenderStats
 {
@@ -87,6 +94,9 @@ public sealed class Renderer
     public TextureMapping Mapping { get; set; } = TextureMapping.PerspectiveCorrect;
 
     public Lighting Lighting { get; set; } = Lighting.Default;
+
+    /// <summary>Distance fog, or null for none.</summary>
+    public Fog? Fog { get; set; }
 
     public RenderStats Stats { get; } = new();
 
@@ -259,6 +269,11 @@ public sealed class Renderer
         var depths = Depth.Depths;
         var affine = Mapping == TextureMapping.Affine;
         var drawnPixels = 0;
+
+        // Fog by the distance in front of the camera, which is w.
+        var fogged = Fog is not null;
+        var (fogColor, fogStart) = fogged ? (Fog!.Color, Fog.Start) : (Vector4.Zero, 0);
+        var fogScale = fogged ? 1 / MathF.Max(Fog!.End - Fog.Start, 1e-6f) : 0;
         for (var y = minY; y <= maxY; y++)
         {
             // Find the first covered pixel of the row; the span runs until a pixel is not covered (triangles are convex).
@@ -312,6 +327,14 @@ public sealed class Renderer
 
                     if (drawn)
                     {
+                        if (fogged)
+                        {
+                            var f = Math.Clamp((w - fogStart) * fogScale, 0, 1);
+                            r += (fogColor.X - r) * f;
+                            g += (fogColor.Y - g) * f;
+                            bl += (fogColor.Z - bl) * f;
+                        }
+
                         depths[i] = z;
                         pixels[i] = Colors.Pack(r, g, bl, al);
                         drawnPixels++;
