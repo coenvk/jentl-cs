@@ -667,6 +667,29 @@ using var agent = AgentProcess.Start(new AgentCommand("python3", ["bots/random_b
 var answer = await agent.AskAsync(StateJson(game, seat), TimeSpan.FromSeconds(2));   // null when it was late
 ```
 
+### Agents on their owners' computers
+
+An agent can also run on its owner's computer and play on a server: a runner starts it and relays its lines over a
+WebSocket. The server says when to start and stop it and sends it lines; the runner sends back the agent's lines, in
+the order it wrote them, and its exit.
+
+| Part | What it does |
+|---|---|
+| `Relay` | The JSON messages, one per text frame with a `type`: `RelayHello` (token and `Relay.Version`), `RelayLine` and `RelayExited` up; `RelayWelcome`, `RelayRefused`, `RelayStart`, `RelayLine`, `RelayStop` and `RelayStatus` (the game's own JSON, for the runner to show) down. `Read` gives null for anything it does not know |
+| `SocketLines` | A WebSocket as lines: `Send` queues without blocking, `ReadAllAsync` reads until the socket closes, `CloseAsync` sends what is queued and closes. A message over `maxLength` bytes (64 KiB) or more than `maxPerSecond` (200) in a second closes the socket with a policy violation, and `Problem` says which |
+| `AgentRelay` | The runner: `RunAsync` connects, says hello and does what the server asks; a dropped connection is tried again after 1, 2, 4 … 30 seconds while the agent keeps running, and only `RelayRefused` (or cancelling) ends it. `Status` tells the owner what happens ("connected as Bot", "reconnecting in 4 s") |
+
+```csharp
+using var relay = new AgentRelay(async cancel =>
+{
+    var socket = new ClientWebSocket();
+    await socket.ConnectAsync(new Uri("wss://example.org/bots"), cancel);
+    return socket;
+}, token, new AgentCommand("python3", ["my_bot.py"]));
+relay.Status += Console.WriteLine;
+await relay.RunAsync(cancel);
+```
+
 ## Leaderboards
 
 High-score tables on the device, and online ones on the game server.
