@@ -12,13 +12,13 @@ draws them.
 | `Jentl.Core` | The screen layer for MonoGame: game loop and scenes, input (keyboard, pointer, gamepad), UI widgets, audio and a synthesizer, particles and sprite animation, camera and virtual resolution, render layers, lighting and post effects, timers and coroutines, a debug overlay, localization, and an asset store with hot reload |
 | `Jentl.Core.Kni` | The same, built against KNI for the browser |
 | `Jentl.Puzzle` | Grid puzzles: boards, rules through recorded turns, exact undo and redo, level files |
-| `Jentl.Cards` | Card games: cards, piles, tables, rules, undo and redo, hints |
+| `Jentl.Cards` | Card games: cards, piles, tables, rules, undo and redo, hints, chips |
 | `Jentl.Rpg` | Turn-based RPGs: Tiled maps, field of view, actors and combat, items, quests, dialogue, saves |
-| `Jentl.Multiplayer` | Turn-based games for humans and bots at one table |
-| `Jentl.Net` | Online play: a JSON protocol, an authoritative room server, online leaderboards and a WebSocket client |
+| `Jentl.Multiplayer` | Turn-based games for humans and bots at one table, with timed decisions and duplicate seatings |
+| `Jentl.Net` | Online play: a JSON protocol, an authoritative room server, online leaderboards, a WebSocket client, and agents in their own process |
 | `Jentl.Ecs` | An entity component system |
 | `Jentl.Physics` | 2D rigid-body physics |
-| `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations; leaderboards and made-up player names |
+| `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations, running statistics; leaderboards and made-up player names |
 | `Jentl.Tracks` | Tracks and roads: paths built from straights and arcs, with position, heading and curvature along them |
 | `Jentl.Geometry` | Geometry on System.Numerics: rays, segments, planes, triangles, polygons (area, containment, triangulation), boxes, view frustums, polygon clipping, edge functions, and triangle meshes with builders (box, plane, sphere, cylinder, cone, extruded outline), outlines traced from pictures |
 | `Jentl.Raster` | A software renderer: frame and depth buffers, a camera, and triangles drawn on the CPU with clipping, back-face culling, depth testing, perspective-correct colours, textures, flat or smooth lighting, distance fog, and models extruded from sprites; `Jentl.Core.Raster` shows its pictures and draws the same meshes on the GPU |

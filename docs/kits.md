@@ -140,6 +140,24 @@ view.Draw(batch, cardRenderer, input.Cursor.Position);
 `TableView.HasSlot` hides the outline of piles that should vanish once empty, and when piles overlap (a pyramid)
 taps and drops go to the pile placed last, which is drawn on top.
 
+### Chips
+
+Betting games need money on the table. `Chips.Break(amount)` gives the fewest chips, largest value first, and
+`Chips.Stacks(chips, maxPerStack)` splits them into stacks for the screen. `ChipRenderer` draws the stacks in colours
+per denomination, and `ChipFlight` slides a pile of chips from one spot to another for a pot being won or a bet placed.
+
+| Part | What it does |
+|---|---|
+| `Chips` | The standard denominations (1 to 25000); `Break(amount)` into chips, and `Stacks(chips, maxPerStack)` into stacks |
+| `ChipRenderer` | Draws stacks of flat chips in their denomination's colour: `Width` for layout, `DrawAmount` to draw |
+| `ChipFlight` | A pile of chips (`Amount`) easing from one point to another: `Update` each frame, then draw at `Position` until `IsDone` |
+
+```csharp
+var chips = Chips.Break(1_275);                                     // 1000 x1, 100 x2, 25 x3
+ChipRenderer.DrawAmount(batch, potCentre, 1_275, chipWidth: 24);    // the stacks, side by side
+var flight = new ChipFlight(1_275, potCentre, winnerSeat, TimeSpan.FromSeconds(0.6));
+```
+
 ### A game screen in the app
 
 In this app, `CardGameScene` (in `Sokoban.Desktop/Scenes`) provides everything card game screens share: the top bar,
@@ -295,6 +313,25 @@ Online play is in the next section; the game only ever sees seats and moves. Uno
 (`src/Uno`) is the example: `UnoGame` implements the rules, `RandomUnoBot` and `SmartUnoBot` the opponents, and
 `UnoMatch` adds up rounds to 500 points. Texas Hold'em (`src/Poker`) is the second: `HoldemHand` is one
 hand (blinds, betting rounds, side pots), `HoldemTable` the sit-and-go around it, and `PokerBot` the opponents.
+
+### Timed decisions and fair seatings
+
+A bot in another process may be slow, or answer with a move that is not allowed. `Decisions.DecideAsync` waits for the
+answer no longer than a limit, and falls back to a move of the game's choosing when it is late, illegal, or the agent
+is gone. `Decided<TMove>` says which: its `Fault` is `None` (the agent's own answer), `Late`, `Illegal` or `Gone`.
+`Seatings.Duplicate(seats)` gives the seatings for playing the same game several times so that every bot sits in every
+seat once; for two seats, `[[0, 1], [1, 0]]`.
+
+```csharp
+var decided = await Decisions.DecideAsync(
+    ask: async _ => ParseMove(await agent.AskAsync(StateJson(game, seat), TimeSpan.FromSeconds(2))),
+    limit: TimeSpan.FromSeconds(2),
+    isLegal: move => game.LegalMoves(seat).Contains(move),
+    fallback: () => game.LegalMoves(seat)[0],
+    isGone: () => agent.HasExited);
+game.Apply(seat, decided.Move);
+if (decided.Fault != Fault.None) { ShowNotice($"{seat.Name}: {decided.Fault}"); }
+```
 
 ## UI toolkit
 
@@ -605,6 +642,26 @@ in the server's game list.
 There are no accounts: players are "Player 1" to "Player 4" by seat, and a dropped connection can't rejoin its seat
 (a bot carries on for it).
 
+### Agents in their own process
+
+A bot can be a program of its own, in any language: it reads one line on stdin and writes one line on stdout. Every
+wait has a time limit, so a silent or crashed agent costs a turn, not the game. Nothing throws for a misbehaving agent:
+`Problem` says what went wrong (`"timed out"`, `"exited with code 3"`), and `ErrorOutput` keeps the last lines it wrote
+to stderr.
+
+| Part | What it does |
+|---|---|
+| `AgentCommand` | What to run: the program, its arguments (passed as they are, no shell) and the working directory |
+| `AgentProcess.Start` | Starts the agent; never throws, a command that cannot start is an agent that has already exited |
+| `AskAsync(line, limit)` | Throws away the lines the agent sent before (late answers to earlier questions), sends `line`, and returns its answer, or null when none came in time |
+| `Send`, `ReadAsync(limit)` | Sends a line without ever blocking; reads the next line with a time limit |
+| `Problem`, `ErrorOutput`, `Stop` | What is wrong (or null), the last stderr lines, and killing the agent with everything it started |
+
+```csharp
+using var agent = AgentProcess.Start(new AgentCommand("python3", ["bots/random_bot.py"], WorkingDirectory: botsDir));
+var answer = await agent.AskAsync(StateJson(game, seat), TimeSpan.FromSeconds(2));   // null when it was late
+```
+
 ## Leaderboards
 
 High-score tables on the device, and online ones on the game server.
@@ -697,6 +754,7 @@ Paddock (a car collecting game) is built on these.
 | `Jentl.Collect.RechargingCounter` | Tickets, energy or lives that come back one per interval on the wall clock, also while the game is closed. Save its `RechargeState` (a count and a time); `Count`, `NextIn` and `TrySpend` work it out at any moment. Setting the clock back gives nothing back |
 | `Jentl.Collect.StableSeed` | A `Random` seed from text that is the same on every platform and run (FNV-1a), for seeding by an id |
 | `Jentl.Collect.Rotation` | Equal periods from an epoch, for things on a calendar (this week's events): `PeriodAt(time)` and `Pick(items, time, offset)` give every device the same answer without a server |
+| `Jentl.Collect.RunningStats` | The mean, standard deviation and 95% margin of a series of numbers, updated one value at a time (`Add`): `Count`, `Mean`, `StandardDeviation`, `Margin95` (how far the mean may be off). For comparing results of simulated runs |
 | `Jentl.Tracks.TrackPath` | A path built from `Straight` and `Arc` pieces (positive degrees turn left on a screen whose y points down): `At(distance)` gives position and heading, `CurvatureAt` the bend, `Polyline` points for drawing. A path whose end meets its start is a circuit and wraps |
 | `Jentl.Assets.PixelCanvas` | Pixel art drawn in code: rectangles, lines, ellipses, outlines, mirroring; `ToImage()` for `AtlasBuilder`, `ToPng()` for a file |
 | `Jentl.Core.Tracks.RoadPainter` | Paints a `TrackPath` as a road from above (verge, surface, kerbs in corners tighter than 60 units, a dashed centre line) into pixels, and `ToTexture` puts them on the GPU |
@@ -711,6 +769,10 @@ if (tickets.TrySpend(ref state, DateTimeOffset.UtcNow)) { /* race */ }
 
 var oval = TrackPath.Build([new Straight(200), new Arc(40, 180), new Straight(200), new Arc(40, 180)]);
 var pose = oval.At(distance);                               // where a car is, and which way it points
+
+var payouts = new RunningStats();
+foreach (var run in simulatedRuns) { payouts.Add(run.Payout); }
+var average = $"{payouts.Mean:F1} ± {payouts.Margin95:F1}";  // the mean, with its 95% margin
 ```
 
 ## Geometry: shapes, tests and meshes
