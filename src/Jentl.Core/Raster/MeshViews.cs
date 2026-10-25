@@ -10,7 +10,7 @@ namespace Jentl.Core.Raster;
 /// <summary>
 /// Draws 3D meshes into a picture that a scene then shows as a texture. Two kinds draw the same meshes, camera and
 /// light: <see cref="SoftwareView"/> on the CPU (Jentl.Raster, a chunky retro look at low resolution) and
-/// <see cref="GpuView"/> on the graphics card (smooth, any resolution). Call <see cref="Begin"/>, draw, then
+/// <see cref="GpuView"/> on the graphics card (smooth, any resolution). Call <c>Begin</c>, draw, then
 /// <see cref="Finish"/> while the sprite batch is not begun (e.g. in <c>Scene.DrawLayers</c>), and draw
 /// <see cref="Texture"/> in <c>Draw</c>.
 /// </summary>
@@ -38,6 +38,9 @@ public interface IMeshView : IDisposable
 
     /// <summary>Starts a picture: clears it to <paramref name="background"/>.</summary>
     void Begin(Color background);
+
+    /// <summary>Starts a picture: clears it to <paramref name="sky"/> as the camera sees it (set the camera first).</summary>
+    void Begin(Sky sky);
 
     void DrawMesh(Mesh mesh, Numerics.Matrix4x4 world, Material material);
 
@@ -92,6 +95,8 @@ public sealed class SoftwareView : IMeshView
     public Texture2D Texture => _texture;
 
     public void Begin(Color background) => Renderer.Clear(background.PackedValue);
+
+    public void Begin(Sky sky) => Renderer.Clear(sky);
 
     public void DrawMesh(Mesh mesh, Numerics.Matrix4x4 world, Material material) => Renderer.DrawMesh(mesh, world, material);
 
@@ -149,7 +154,7 @@ public sealed class GpuView : IMeshView
 
     public Texture2D Texture => _target;
 
-    /// <summary>Triangles drawn since <see cref="Begin"/>.</summary>
+    /// <summary>Triangles drawn since <c>Begin</c>.</summary>
     public int Triangles { get; private set; }
 
     public void Begin(Color background)
@@ -161,6 +166,44 @@ public sealed class GpuView : IMeshView
         _device.BlendState = BlendState.Opaque;
         _device.RasterizerState = Cull;
         Triangles = 0;
+    }
+
+    public void Begin(Sky sky)
+    {
+        ArgumentNullException.ThrowIfNull(sky);
+        Begin(Color.Black);
+
+        // Bands across the screen, each blending between the sky's colours at its edges, drawn straight in clip space.
+        const int Bands = 32;
+        Numerics.Matrix4x4.Invert(ViewProjection, out var inverse);
+        var vertices = new VertexPositionColor[Bands * 6];
+        for (var i = 0; i < Bands; i++)
+        {
+            var (top, bottom) = (1 - (2f * i / Bands), 1 - (2f * (i + 1) / Bands));
+            var (above, below) = (Tint(sky.ColorAtRow(inverse, top)), Tint(sky.ColorAtRow(inverse, bottom)));
+            VertexPositionColor At(float x, float y, Color c) => new(new Vector3(x, y, 0), c);
+            var (a, b, c, d) = (At(-1, top, above), At(1, top, above), At(1, bottom, below), At(-1, bottom, below));
+            (vertices[i * 6], vertices[(i * 6) + 1], vertices[(i * 6) + 2]) = (a, b, c);
+            (vertices[(i * 6) + 3], vertices[(i * 6) + 4], vertices[(i * 6) + 5]) = (a, c, d);
+        }
+
+        _effect.World = _effect.View = _effect.Projection = Matrix.Identity;
+        _effect.LightingEnabled = _effect.TextureEnabled = _effect.FogEnabled = false;
+        _effect.VertexColorEnabled = true;
+        _effect.DiffuseColor = Vector3.One;
+        _effect.Alpha = 1;
+        _device.DepthStencilState = DepthStencilState.None;
+        _device.RasterizerState = RasterizerState.CullNone;
+        foreach (var pass in _effect.CurrentTechnique.Passes)
+        {
+            pass.Apply();
+            _device.DrawUserPrimitives(PrimitiveType.TriangleList, vertices, 0, Bands * 2);
+        }
+
+        _device.DepthStencilState = DepthStencilState.Default;
+        _device.RasterizerState = Cull;
+
+        static Color Tint(Numerics.Vector4 v) => new(v.X, v.Y, v.Z, 1f);
     }
 
     public void DrawMesh(Mesh mesh, Numerics.Matrix4x4 world, Material material)
@@ -208,6 +251,14 @@ public sealed class GpuView : IMeshView
         {
             _device.BlendState = BlendState.Opaque;
         }
+
+        // Translucent: blended over what is there, tested against depth but not writing it.
+        if (material.Translucent)
+        {
+            _device.BlendState = BlendState.NonPremultiplied;
+        }
+
+        _device.DepthStencilState = material.Translucent ? DepthStencilState.DepthRead : DepthStencilState.Default;
 
         if (_effect.LightingEnabled)
         {

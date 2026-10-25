@@ -249,3 +249,31 @@ public class MoreMeshTests
         cone.UVs.Should().HaveCount(cone.Positions.Count);
     }
 }
+
+public class BillboardTests
+{
+    [Fact]
+    public void Quad_StandsUpright_OnItsBottomMiddle_FacingZ()
+    {
+        var quad = MeshBuilder.Quad();
+
+        quad.Bounds.Should().Be(new Box3(new Vector3(-0.5f, 0, 0), new Vector3(0.5f, 1, 0)));
+        quad.Triangles.Select(t => quad.TriangleAt(t).Normal).Should().OnlyContain(n => n == Vector3.UnitZ);
+        quad.UVs.Should().Contain(new Vector2(0, 0)).And.Contain(new Vector2(1, 1));
+    }
+
+    [Fact]
+    public void Billboard_TurnsTheQuadToFaceTheEye_StayingUpright()
+    {
+        var world = Billboard.Upright(new Vector3(5, 0, 5), eye: new Vector3(5, 3, 15), width: 2, height: 4);
+        var quad = MeshBuilder.Quad().Transform(world);
+
+        quad.Bounds.Min.Y.Should().BeApproximately(0, 1e-5f);
+        quad.Bounds.Max.Y.Should().BeApproximately(4, 1e-5f);
+        quad.Bounds.Size.X.Should().BeApproximately(2, 1e-4f);
+        quad.TriangleAt(quad.Triangles[0]).Normal.Z.Should().BeApproximately(1, 1e-4f, "the eye is straight down +z");
+
+        var side = Billboard.Upright(Vector3.Zero, eye: new Vector3(-10, 0, 0), width: 1, height: 1);
+        Vector3.TransformNormal(Vector3.UnitZ, side).X.Should().BeApproximately(-1, 1e-4f);
+    }
+}

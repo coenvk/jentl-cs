@@ -707,7 +707,7 @@ counter-clockwise; `System.Numerics` projection conventions (row vectors, depth 
 | `Frustum` | The six planes of a view-projection matrix; whether a point or box is in view |
 | `Clipping.ClipPolygon` | Cuts a polygon of any vertex type by a plane (Sutherland–Hodgman), interpolating the new vertices |
 | `Edge` | The edge function rasterizers walk (value, step per pixel) and a top-left fill rule so shared edges are drawn once |
-| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders, cones and extruded 2D outlines (their caps mapped across the outline or a picture you give, their sides reading colours just inside the outline or deeper, past a dark border); `Transform` moves a copy |
+| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders, cones, upright quads (`Billboard.Upright` turns one to face the camera) and extruded 2D outlines (their caps mapped across the outline or a picture you give, their sides reading colours just inside the outline or deeper, past a dark border); `Transform` moves a copy |
 
 ```csharp
 var car = MeshBuilder.Extrude(sideProfile, depth: 1.8f).Transform(Matrix4x4.CreateRotationY(MathF.PI / 4));
@@ -728,6 +728,8 @@ if (frustum.Test(car.Bounds) != Containment.Outside) { /* draw it */ }
 | `Renderer.DrawMesh` | A `Jentl.Geometry` mesh with a `Material` (colour and `Shading`: unlit, flat per face, or smooth per vertex) under a `Lighting` (one directional light and ambient) |
 | `Texture` | An image on triangles (packed RGBA): nearest or bilinear sampling, repeat or clamp; texels with alpha under one half are cut out (nothing drawn, no depth written). A `Material` or `DrawTriangle` takes one, tinted by the colour; meshes from `MeshBuilder` all have texture coordinates (an extruded outline takes the texture across its caps, and its sides take the colours along their edge, like pixel art extruded into blocks) |
 | `Renderer.Mapping` | `PerspectiveCorrect` (textures stay put on surfaces at an angle) or `Affine` (spread straight across the screen, as the first PlayStation did: the textures swim, a retro look) |
+| `Material.Translucent` | Blended over what is behind by alpha, writing no depth: shadows (`Textures.Spot` makes a round one), glass, water; draw after the solid things |
+| `Sky`, `Renderer.Clear(sky)` | Clears to a sky as the camera sees it: the zenith's colour overhead fading to the horizon's at eye level, the ground's below |
 | `Renderer.Fog` | Distance fog: from `Start` to `End` in front of the camera things fade into its colour; clear to the same colour and the horizon melts into the sky (and far triangles need no clipping by eye) |
 | `Models.FromPicture` | A sprite made solid: its opaque pixels' outline extruded, the picture on both sides and its colours along the edges, standing on its lowest row. A side view of a car becomes a blocky 3D car |
 | `Renderer.DrawPoint`, `Particles` | Particles in 3D: `Particles` emits, moves (gravity, drag, an optional floor), ages and fades them, replacing the oldest when full; each is drawn as a square facing the camera, blended by its alpha, hidden by nearer things but hiding nothing |
@@ -741,7 +743,8 @@ renderer.DrawMesh(MeshBuilder.Extrude(carProfile, 1.6f), Matrix4x4.CreateRotatio
 ```
 
 A textured scene of about 300 triangles at 320×180 takes about 1 ms a frame on a desktop and about 3 ms in the
-browser (15 ms when .NET is interpreted there rather than compiled ahead of time). Each row of a triangle steps its
+browser (15 ms when .NET is interpreted there rather than compiled ahead of time). Once warmed up, drawing makes no
+garbage, so the collector never stops a frame. Each row of a triangle steps its
 values by a fixed amount per pixel, and nearest texels on power-of-two textures are read with a mask.
 
 `Jentl.Core.Raster` puts 3D on screen. An `IMeshView` draws meshes into a picture that a scene shows as a texture:
@@ -750,7 +753,7 @@ sampling), or `GpuView` with MonoGame's `BasicEffect` on the graphics card, into
 Both take the same meshes, `Material`s, `Lighting`, `Fog` and camera (`view.Look(camera)` sets the view and the
 view-projection; the graphics card needs the view on its own to measure fog), so a scene can switch between them.
 `RasterTextures.From` turns an image from `AssetStore.Image` (or a sprite's region of an atlas image) into a
-`Jentl.Raster.Texture`. `DrawPoint` (and `view.DrawParticles(particles)`) draws particles on either view, at `Finish`
+`Jentl.Raster.Texture`. `Begin(sky)` clears to a `Sky` on either view (set the camera first). `DrawPoint` (and `view.DrawParticles(particles)`) draws particles on either view, at `Finish`
 after the meshes. Call
 `Begin`, `DrawMesh`, `Finish` from `Scene.DrawLayers` (the sprite batch is not begun there), and draw `Texture` in
 `Draw`.

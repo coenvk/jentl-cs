@@ -203,6 +203,17 @@ public static class MeshBuilder
         return builder.Build();
     }
 
+    /// <summary>
+    /// An upright square, 1 by 1, standing on the middle of its bottom edge and facing +Z, with the whole texture on it
+    /// upright: a cut-out for <see cref="Billboard.Upright"/> to turn towards the camera (a tree, a sign, a spectator).
+    /// </summary>
+    public static Mesh Quad()
+    {
+        var builder = new Builder();
+        builder.Quad(new Vector3(-0.5f, 0, 0), new Vector3(0.5f, 0, 0), new Vector3(0.5f, 1, 0), new Vector3(-0.5f, 1, 0), Vector3.UnitZ);
+        return builder.Build();
+    }
+
     /// <summary>An upright cone of <paramref name="radius"/> and <paramref name="height"/>, centred, point up, with a flat base; flat sides.</summary>
     public static Mesh Cone(float radius, float height, int segments = 16)
     {
@@ -320,5 +331,20 @@ public static class MeshBuilder
                 _triangles.Add(flip ? new TriangleIndices(first, first + i + 1, first + i) : new TriangleIndices(first, first + i, first + i + 1));
             }
         }
+    }
+}
+
+/// <summary>Placing flat cut-outs so they face the camera.</summary>
+public static class Billboard
+{
+    /// <summary>
+    /// Where to draw <see cref="MeshBuilder.Quad"/> so it stands at <paramref name="foot"/>, <paramref name="width"/>
+    /// by <paramref name="height"/>, upright and turned about the vertical to face <paramref name="eye"/>.
+    /// </summary>
+    public static Matrix4x4 Upright(Vector3 foot, Vector3 eye, float width, float height)
+    {
+        var to = eye - foot;
+        var turn = to.X == 0 && to.Z == 0 ? 0 : MathF.Atan2(to.X, to.Z);
+        return Matrix4x4.CreateScale(width, height, 1) * Matrix4x4.CreateRotationY(turn) * Matrix4x4.CreateTranslation(foot);
     }
 }

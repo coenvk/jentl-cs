@@ -19,8 +19,39 @@ public enum Shading
     Smooth,
 }
 
-/// <summary>What a mesh is made of: a colour, how it is lit, and optionally a texture (tinted by the colour).</summary>
-public sealed record Material(Vector4 Color, Shading Shading = Shading.Smooth, Texture? Texture = null);
+/// <summary>
+/// What a mesh is made of: a colour, how it is lit, and optionally a texture (tinted by the colour). A
+/// <paramref name="Translucent"/> one is blended over what is behind it by its alpha and writes no depth (shadows,
+/// glass, water): draw it after the solid things it shows.
+/// </summary>
+public sealed record Material(Vector4 Color, Shading Shading = Shading.Smooth, Texture? Texture = null, bool Translucent = false);
+
+/// <summary>
+/// A sky to clear to: <paramref name="Zenith"/> overhead fading to <paramref name="Horizon"/> at eye level, and
+/// <paramref name="Ground"/> (the horizon's colour if not given) below it, by where each pixel looks.
+/// </summary>
+public sealed record Sky(Vector4 Zenith, Vector4 Horizon, Vector4? Ground = null)
+{
+    /// <summary>The colour looking along <paramref name="direction"/> (any length).</summary>
+    public Vector4 ColorAlong(Vector3 direction)
+    {
+        var up = direction.Y / MathF.Max(direction.Length(), 1e-12f);
+        return up < 0 ? Ground ?? Horizon : Vector4.Lerp(Horizon, Zenith, MathF.Sqrt(up));
+    }
+
+    /// <summary>
+    /// The colour of a row of the picture, <paramref name="ndcY"/> from -1 (bottom) to 1 (top), through the middle of
+    /// it, given the inverse of the view-projection.
+    /// </summary>
+    public Vector4 ColorAtRow(Matrix4x4 inverseViewProjection, float ndcY)
+    {
+        var near = Vector4.Transform(new Vector4(0, ndcY, 0, 1), inverseViewProjection);
+        var far = Vector4.Transform(new Vector4(0, ndcY, 1, 1), inverseViewProjection);
+        var from = new Vector3(near.X, near.Y, near.Z) / near.W;
+        var to = new Vector3(far.X, far.Y, far.Z) / far.W;
+        return ColorAlong(to - from);
+    }
+}
 
 /// <summary>One directional light (the way it travels, and its colour) plus light from everywhere.</summary>
 public sealed record Lighting(Vector3 Direction, Vector3 Color, Vector3 Ambient)
@@ -111,6 +142,20 @@ public sealed class Renderer
         Stats.Reset();
     }
 
+    /// <summary>Clears the picture to <paramref name="sky"/> as seen through <see cref="ViewProjection"/>, the depth to far, and the stats.</summary>
+    public void Clear(Sky sky)
+    {
+        ArgumentNullException.ThrowIfNull(sky);
+        Clear(0);
+        Matrix4x4.Invert(ViewProjection, out var inverse);
+        var (width, height) = (Target.Width, Target.Height);
+        for (var y = 0; y < height; y++)
+        {
+            var color = Colors.Pack(sky.ColorAtRow(inverse, 1 - (2 * (y + 0.5f) / height)));
+            Array.Fill(Target.Pixels, color, y * width, width);
+        }
+    }
+
     /// <summary>Draws <paramref name="mesh"/> placed by <paramref name="world"/>, coloured and lit as <paramref name="material"/> says.</summary>
     public void DrawMesh(Mesh mesh, Matrix4x4 world, Material material)
     {
@@ -143,15 +188,16 @@ public sealed class Renderer
             }
 
             Vector2 ua = uvs?[t.A] ?? default, ub = uvs?[t.B] ?? default, uc = uvs?[t.C] ?? default;
-            DrawTriangle(new Vertex(pa, ca, ua), new Vertex(pb, cb, ub), new Vertex(pc, cc, uc), world, material.Texture);
+            DrawTriangle(new Vertex(pa, ca, ua), new Vertex(pb, cb, ub), new Vertex(pc, cc, uc), world, material.Texture, material.Translucent);
         }
     }
 
     /// <summary>
     /// Draws one triangle, its corners placed by <paramref name="world"/>, with its vertex colours blended across and,
-    /// given a <paramref name="texture"/>, that texture on it, tinted by the colours.
+    /// given a <paramref name="texture"/>, that texture on it, tinted by the colours; <paramref name="translucent"/>
+    /// blends it by its alpha and writes no depth (see <see cref="Material"/>).
     /// </summary>
-    public void DrawTriangle(in Vertex a, in Vertex b, in Vertex c, Matrix4x4 world, Texture? texture = null)
+    public void DrawTriangle(in Vertex a, in Vertex b, in Vertex c, Matrix4x4 world, Texture? texture = null, bool translucent = false)
     {
         var transform = world * ViewProjection;
         _polygon.Clear();
@@ -202,7 +248,7 @@ public sealed class Renderer
         Stats.Triangles++;
         for (var i = 1; i < screen.Length - 1; i++)
         {
-            Fill(screen[0], screen[i], screen[i + 1], texture);
+            Fill(screen[0], screen[i], screen[i + 1], texture, translucent);
         }
     }
 
@@ -301,7 +347,7 @@ public sealed class Renderer
     // coordinates over w) is linear in screen space, so each row finds its covered span from the edge functions,
     // works the values out once at the span's start, and then only adds a fixed step per pixel: cheap enough for the
     // browser's interpreter.
-    private void Fill(in ScreenVertex v0, in ScreenVertex v1, in ScreenVertex v2, Texture? texture)
+    private void Fill(in ScreenVertex v0, in ScreenVertex v1, in ScreenVertex v2, Texture? texture, bool translucent)
     {
         var (a, b, c) = (v0, v1, v2);
         var area = Segment2.Cross(b.Position - a.Position, c.Position - a.Position);
@@ -385,7 +431,7 @@ public sealed class Renderer
                     if (texture is not null)
                     {
                         var texel = affine ? texture.Fetch(screen.X, screen.Y) : texture.Fetch(surface.X * w, surface.Y * w);
-                        if (texel >> 24 < 128)
+                        if (texel >> 24 < 128 && !translucent)
                         {
                             drawn = false; // cut out: nothing drawn, no depth written
                         }
@@ -409,8 +455,24 @@ public sealed class Renderer
                             bl += (fogColor.Z - bl) * f;
                         }
 
-                        depths[i] = z;
-                        pixels[i] = Colors.Pack(r, g, bl, al);
+                        if (translucent)
+                        {
+                            // Over what is there by alpha; no depth, so what is behind still shows through later ones.
+                            const float Scale = 1 / 255f;
+                            var under = pixels[i];
+                            var alpha = Math.Clamp(al, 0, 1);
+                            var keep = 1 - alpha;
+                            pixels[i] = Colors.Pack(
+                                (r * alpha) + ((under & 0xFF) * Scale * keep),
+                                (g * alpha) + (((under >> 8) & 0xFF) * Scale * keep),
+                                (bl * alpha) + (((under >> 16) & 0xFF) * Scale * keep),
+                                alpha + ((under >> 24) * Scale * keep));
+                        }
+                        else
+                        {
+                            depths[i] = z;
+                            pixels[i] = Colors.Pack(r, g, bl, al);
+                        }
                         drawnPixels++;
                     }
                 }
