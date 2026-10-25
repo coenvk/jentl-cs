@@ -32,3 +32,18 @@ public class LeaderboardTableTests
         rows[11].Should().Be(new LeaderboardRow("42", "Swift Otter 27", "12", Highlight: true));
     }
 }
+
+public class ButtonRowTests
+{
+    [Fact]
+    public void AButtonsValue_CanFollowWhatItShows()
+    {
+        var name = "Swift Otter 27";
+        var row = new ButtonRow("Name", () => name = "Brave Fox 11", () => name);
+
+        row.Value.Should().Be("Swift Otter 27");
+        row.Activate();
+        row.Value.Should().Be("Brave Fox 11");
+        new ButtonRow("Back", () => { }).Value.Should().BeEmpty();
+    }
+}

@@ -116,12 +116,30 @@ public sealed class ChoiceRow(string label, IReadOnlyList<string> choices, Func<
     internal override void Adjust(int direction) => set(((get() + direction) % choices.Count + choices.Count) % choices.Count);
 }
 
-/// <summary>A row that does something when chosen, like a menu item: "Back", "Reset progress".</summary>
-public sealed class ButtonRow(string label, Action press, string value = "") : FormRow(label)
+/// <summary>
+/// A row that does something when chosen, like a menu item: "Back", "Reset progress". It can show a value on the
+/// right, fixed or worked out each time it is drawn ("Name: Swift Otter 27", with a press making a new one).
+/// </summary>
+public sealed class ButtonRow : FormRow
 {
-    internal override string Value => value;
+    private readonly Action _press;
+    private readonly Func<string> _value;
 
-    internal override void Activate() => press();
+    public ButtonRow(string label, Action press, string value = "")
+        : this(label, press, () => value)
+    {
+    }
+
+    public ButtonRow(string label, Action press, Func<string> value)
+        : base(label)
+    {
+        _press = press ?? throw new ArgumentNullException(nameof(press));
+        _value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    internal override string Value => _value();
+
+    internal override void Activate() => _press();
 }
 
 /// <summary>
