@@ -676,7 +676,7 @@ the order it wrote them, and its exit.
 | Part | What it does |
 |---|---|
 | `Relay` | The JSON messages, one per text frame with a `type`: `RelayHello` (token and `Relay.Version`), `RelayLine` and `RelayExited` up; `RelayWelcome`, `RelayRefused`, `RelayStart`, `RelayLine`, `RelayStop` and `RelayStatus` (the game's own JSON, for the runner to show) down. `Read` gives null for anything it does not know |
-| `SocketLines` | A WebSocket as lines: `Send` queues without blocking, `ReadAllAsync` reads until the socket closes, `CloseAsync` sends what is queued and closes. A message over `maxLength` bytes (64 KiB) or more than `maxPerSecond` (200) in a second closes the socket with a policy violation, and `Problem` says which |
+| `SocketLines` | A WebSocket as lines: `Send` queues without blocking, `ReadAllAsync` reads until the socket closes, `CloseAsync` sends what is queued and closes. A message over `maxLength` bytes (64 KiB) or in more than `MaxFrames` (1,024) frames, more than `maxPerSecond` (200) in a second, or a binary message closes the socket with a policy violation, and `Problem` says which |
 | `AgentRelay` | The runner: `RunAsync` connects, says hello and does what the server asks; a dropped connection is tried again after 1, 2, 4 … 30 seconds while the agent keeps running, and only `RelayRefused` (or cancelling) ends it. `Status` tells the owner what happens ("connected as Bot", "reconnecting in 4 s") |
 
 ```csharp

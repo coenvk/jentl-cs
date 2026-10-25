@@ -237,6 +237,55 @@ public sealed class AgentRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task BinaryMessages_CloseTheSocket()
+    {
+        using var pair = SocketPair.Create();
+        using var server = new SocketLines(pair.Server, maxPerSecond: 10);
+        var read = server.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        using var client = new SocketLines(pair.Client);
+        var clientRead = client.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        await SendFramesAsync(pair.Client, 50, System.Net.WebSockets.WebSocketMessageType.Binary, [1, 2, 3], endOfMessage: true);
+
+        (await read).Should().BeEmpty();
+        server.Problem.Should().Contain("binary");
+        await clientRead;
+        pair.Client.CloseStatus.Should().Be(System.Net.WebSockets.WebSocketCloseStatus.PolicyViolation);
+    }
+
+    [Fact]
+    public async Task AMessageThatNeverEnds_InEmptyFrames_ClosesTheSocket()
+    {
+        using var pair = SocketPair.Create();
+        using var server = new SocketLines(pair.Server);
+        var read = server.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        using var client = new SocketLines(pair.Client);
+        var clientRead = client.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        await SendFramesAsync(pair.Client, 1, System.Net.WebSockets.WebSocketMessageType.Text, "x"u8.ToArray(), endOfMessage: false);
+        await SendFramesAsync(pair.Client, SocketLines.MaxFrames + 10, System.Net.WebSockets.WebSocketMessageType.Text, [], endOfMessage: false);
+
+        (await read).Should().BeEmpty();
+        server.Problem.Should().Contain("too many frames");
+        await clientRead;
+        pair.Client.CloseStatus.Should().Be(System.Net.WebSockets.WebSocketCloseStatus.PolicyViolation);
+    }
+
+    /// <summary>Writes raw frames until the other side closes.</summary>
+    private static async Task SendFramesAsync(System.Net.WebSockets.WebSocket socket, int count, System.Net.WebSockets.WebSocketMessageType type, byte[] data, bool endOfMessage)
+    {
+        try
+        {
+            for (var i = 0; i < count && socket.State == System.Net.WebSockets.WebSocketState.Open; i++)
+            {
+                await socket.SendAsync(data, type, endOfMessage, CancellationToken.None);
+            }
+        }
+        catch (System.Net.WebSockets.WebSocketException)
+        {
+            // The other side closed: that is what the test waits for.
+        }
+    }
+
+    [Fact]
     public async Task Closing_SendsWhatWasQueuedFirst_AndEndsTheOtherSidesReading()
     {
         using var pair = SocketPair.Create();

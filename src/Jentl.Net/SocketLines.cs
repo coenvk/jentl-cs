@@ -7,9 +7,9 @@ namespace Jentl.Net;
 
 /// <summary>
 /// A WebSocket as lines of text, one text frame each, with limits for a peer that misbehaves: a message longer than
-/// <c>maxLength</c> bytes, or more than <c>maxPerSecond</c> messages within one second, closes the socket with a
-/// policy-violation status, and <see cref="Problem"/> says which. Sending never blocks: lines are queued and written in
-/// the background.
+/// <c>maxLength</c> bytes or in more than <see cref="MaxFrames"/> frames, more than <c>maxPerSecond</c> messages within
+/// one second, or any binary message closes the socket with a policy-violation status, and <see cref="Problem"/> says
+/// which. Sending never blocks: lines are queued and written in the background.
 /// </summary>
 /// <remarks>
 /// At most <see cref="MaxQueued"/> lines wait to be sent; when more come (the peer stopped reading), the oldest are
@@ -19,6 +19,12 @@ public sealed class SocketLines : IDisposable
 {
     /// <summary>How many lines wait to be sent at most; when more come, the oldest are dropped.</summary>
     public const int MaxQueued = 1024;
+
+    /// <summary>
+    /// How many reads one message may take at most: a peer sends a message in one frame, or a few, never in endless
+    /// empty pieces. (A frame bigger than the read buffer of 4 KiB takes several reads, so this also bounds maxLength's use.)
+    /// </summary>
+    public const int MaxFrames = 1024;
 
     // How long closing waits for the queued lines to go out before it gives up on them.
     private static readonly TimeSpan CloseWait = TimeSpan.FromSeconds(5);
@@ -104,10 +110,14 @@ public sealed class SocketLines : IDisposable
         }
     }
 
-    /// <summary>The next whole text message, or null when the socket closed or broke, or the message was too long.</summary>
+    /// <summary>
+    /// The next whole text message, or null when the socket closed or broke, or the peer broke a limit: a message too
+    /// long or in too many frames, or a binary message (the lines are text; a binary one would escape the counting).
+    /// </summary>
     private async Task<string?> ReceiveAsync(byte[] buffer, MemoryStream message, CancellationToken cancel)
     {
         message.SetLength(0);
+        var frames = 0;
         try
         {
             while (_socket.State == WebSocketState.Open)
@@ -116,6 +126,18 @@ public sealed class SocketLines : IDisposable
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
                     await CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye").ConfigureAwait(false);
+                    return null;
+                }
+
+                if (result.MessageType != WebSocketMessageType.Text)
+                {
+                    await ViolatedAsync("binary message (only text is accepted)").ConfigureAwait(false);
+                    return null;
+                }
+
+                if (++frames > MaxFrames)
+                {
+                    await ViolatedAsync($"message in too many frames (over {MaxFrames})").ConfigureAwait(false);
                     return null;
                 }
 
@@ -128,12 +150,7 @@ public sealed class SocketLines : IDisposable
 
                 if (result.EndOfMessage)
                 {
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        return Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
-                    }
-
-                    message.SetLength(0); // a binary frame is no line: skipped
+                    return Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
                 }
             }
         }
