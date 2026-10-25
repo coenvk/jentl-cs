@@ -11,4 +11,16 @@
     <ProjectReference Include="..\..\src\Jentl.Net\Jentl.Net.csproj" />
   </ItemGroup>
 
+  <!-- The stand-in bot the AgentProcess tests run: built first, and copied next to the tests (run as dotnet TestAgent/Jentl.Net.TestAgent.dll <mode>). -->
+  <ItemGroup>
+    <ProjectReference Include="..\Jentl.Net.TestAgent\Jentl.Net.TestAgent.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="CopyTestAgent" AfterTargets="Build">
+    <ItemGroup>
+      <TestAgentFile Include="..\Jentl.Net.TestAgent\bin\$(Configuration)\$(TargetFramework)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(TestAgentFile)" DestinationFiles="@(TestAgentFile->'$(OutDir)TestAgent\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

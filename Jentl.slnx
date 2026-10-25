@@ -25,6 +25,7 @@
     <Project Path="tests/Jentl.Ecs.Tests/Jentl.Ecs.Tests.csproj" />
     <Project Path="tests/Jentl.Geometry.Tests/Jentl.Geometry.Tests.csproj" />
     <Project Path="tests/Jentl.Multiplayer.Tests/Jentl.Multiplayer.Tests.csproj" />
+    <Project Path="tests/Jentl.Net.TestAgent/Jentl.Net.TestAgent.csproj" />
     <Project Path="tests/Jentl.Net.Tests/Jentl.Net.Tests.csproj" />
     <Project Path="tests/Jentl.Physics.Tests/Jentl.Physics.Tests.csproj" />
     <Project Path="tests/Jentl.Puzzle.Tests/Jentl.Puzzle.Tests.csproj" />
