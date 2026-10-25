@@ -32,6 +32,11 @@ public sealed class AgentProcess : IDisposable
     private readonly Task _finished = Task.CompletedTask;
     private volatile bool _timedOut;
     private volatile bool _stopped;
+    private readonly Channel<string> _outgoing = Channel.CreateUnbounded<string>();
+    private volatile Final? _final;
+
+    /// <summary>What was true of the agent when it was disposed (the process object can no longer be asked).</summary>
+    private sealed record Final(bool HasExited, string? Problem);
 
     private AgentProcess(Process? process, string? startProblem)
     {
@@ -43,6 +48,7 @@ public sealed class AgentProcess : IDisposable
             return;
         }
 
+        _ = Task.Run(WriteInputAsync);
         var output = Task.Run(ReadOutputAsync);
         var errors = Task.Run(ReadErrorsAsync);
         _finished = Task.Run(async () =>
@@ -94,7 +100,7 @@ public sealed class AgentProcess : IDisposable
     }
 
     /// <summary>Whether the agent is no longer running (it ended, was stopped, or never started).</summary>
-    public bool HasExited => _process is null || _process.HasExited;
+    public bool HasExited => _final?.HasExited ?? (_process is null || _process.HasExited);
 
     /// <summary>What is wrong with the agent ("could not start: …", "exited with code 3", "timed out"), or null when all is well.</summary>
     public string? Problem
@@ -104,6 +110,11 @@ public sealed class AgentProcess : IDisposable
             if (_startProblem is not null)
             {
                 return _startProblem;
+            }
+
+            if (_final is { } final)
+            {
+                return final.Problem;
             }
 
             if (_process!.HasExited && !_stopped)
@@ -127,29 +138,19 @@ public sealed class AgentProcess : IDisposable
         }
     }
 
-    /// <summary>Sends one line to the agent. Does nothing when the agent is gone.</summary>
+    /// <summary>Sends one line to the agent. Never blocks: the line is queued and written in the background, so an agent that stops reading costs only its own answers. Does nothing when the agent is gone.</summary>
     public void Send(string line)
     {
-        if (_process is null || _process.HasExited)
+        if (_process is not null && _final is null)
         {
-            return;
-        }
-
-        try
-        {
-            _process.StandardInput.WriteLine(line);
-            _process.StandardInput.Flush();
-        }
-        catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
-        {
-            // The agent ended between the check and the write: the exit shows in Problem.
+            _outgoing.Writer.TryWrite(line);
         }
     }
 
     /// <summary>The next line from the agent, or null when none came within the limit or the agent has exited.</summary>
     public async Task<string?> ReadAsync(TimeSpan limit)
     {
-        using var timeout = new CancellationTokenSource(limit);
+        using var timeout = new CancellationTokenSource(limit < TimeSpan.Zero ? TimeSpan.Zero : limit);
         try
         {
             var line = await _lines.Reader.ReadAsync(timeout.Token).ConfigureAwait(false);
@@ -186,12 +187,18 @@ public sealed class AgentProcess : IDisposable
     /// <summary>Kills the agent and everything it started. Safe to call again, or on an agent that has exited.</summary>
     public void Stop()
     {
-        if (_process is null)
+        if (_process is null || _final is not null)
         {
             return;
         }
 
-        _stopped = true;
+        // An exit that happened before is the agent's own (a crash keeps its problem); only a running agent is stopped by us.
+        if (!_process.HasExited)
+        {
+            _stopped = true;
+        }
+
+        _outgoing.Writer.TryComplete();
         try
         {
             _process.Kill(entireProcessTree: true);
@@ -214,8 +221,35 @@ public sealed class AgentProcess : IDisposable
     /// <summary>Stops the agent.</summary>
     public void Dispose()
     {
+        if (_process is null || _final is not null)
+        {
+            return;
+        }
+
         Stop();
-        _process?.Dispose();
+        _final = new Final(HasExited, Problem);
+        _process.Dispose();
+    }
+
+    private async Task WriteInputAsync()
+    {
+        try
+        {
+            var input = _process!.StandardInput;
+            await foreach (var line in _outgoing.Reader.ReadAllAsync().ConfigureAwait(false))
+            {
+                await input.WriteLineAsync(line).ConfigureAwait(false);
+                await input.FlushAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            // The agent ended or closed its input: the exit shows in Problem.
+        }
+        finally
+        {
+            _outgoing.Writer.TryComplete();
+        }
     }
 
     private async Task ReadOutputAsync()

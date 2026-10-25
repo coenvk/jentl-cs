@@ -63,4 +63,45 @@ public sealed class AgentProcessTests
         (await a.AskAsync("two", OneSecond)).Should().Be("hello world");
         (await a.ReadAsync(OneSecond)).Should().Be("two");
     }
+
+    [Fact]
+    public async Task StoppingACrashedAgent_KeepsItsProblem()
+    {
+        using var a = Start("crash");
+        (await a.AskAsync("x", OneSecond)).Should().BeNull();
+        a.Stop();
+        a.Problem.Should().Be("exited with code 3");
+    }
+
+    [Fact]
+    public async Task AfterDispose_ItStillAnswers_WithoutThrowing()
+    {
+        var a = Start("crash");
+        (await a.AskAsync("x", OneSecond)).Should().BeNull();
+        a.Dispose();
+        (a.HasExited, a.Problem).Should().Be((true, "exited with code 3"));
+        a.Invoking(x => x.Send("late")).Should().NotThrow();
+    }
+
+    [Fact]
+    public async Task ADeafAgent_NeverBlocksTheSender_AndSimplyDoesNotAnswer()
+    {
+        using var a = Start("deaf");
+        var line = new string('x', 1024);
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        for (var i = 0; i < 2000; i++)
+        {
+            a.Send(line);
+        }
+
+        timer.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
+        (await a.AskAsync("x", TimeSpan.FromMilliseconds(200))).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ANegativeLimit_IsZero()
+    {
+        using var a = Start("silent");
+        (await a.ReadAsync(TimeSpan.FromSeconds(-1))).Should().BeNull();
+    }
 }

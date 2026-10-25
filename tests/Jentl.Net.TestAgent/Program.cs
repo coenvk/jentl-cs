@@ -13,6 +13,9 @@ switch (mode)
         Console.In.ReadLine();
         Console.Error.WriteLine("boom");
         return 3;
+    case "deaf":
+        Thread.Sleep(Timeout.Infinite);
+        return 0;
     case "silent":
         while (Console.In.ReadLine() is not null)
         {
