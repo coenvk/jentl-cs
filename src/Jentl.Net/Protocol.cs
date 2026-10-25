@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using Jentl.Collect;
 
 namespace Jentl.Net;
 
@@ -10,6 +11,8 @@ namespace Jentl.Net;
 [JsonDerivedType(typeof(StartGame), "start")]
 [JsonDerivedType(typeof(PlayerAction), "action")]
 [JsonDerivedType(typeof(LeaveRoom), "leave")]
+[JsonDerivedType(typeof(SubmitScore), "submit-score")]
+[JsonDerivedType(typeof(GetScores), "get-scores")]
 public abstract record ClientMessage;
 
 /// <summary>Opens a room for <paramref name="Game"/> with <paramref name="Seats"/> places; the creator hosts it.</summary>
@@ -26,6 +29,12 @@ public sealed record PlayerAction(JsonElement Action) : ClientMessage;
 
 public sealed record LeaveRoom : ClientMessage;
 
+/// <summary>Puts <paramref name="Score"/> on the leaderboard <paramref name="Board"/> as <paramref name="Name"/> (one of <see cref="PlayerNames"/>).</summary>
+public sealed record SubmitScore(string Board, string Name, long Score) : ClientMessage;
+
+/// <summary>Asks for the top of <paramref name="Board"/>, and where <paramref name="Name"/> stands on it if given.</summary>
+public sealed record GetScores(string Board, string? Name) : ClientMessage;
+
 /// <summary>What the server sends to a player's device.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(RoomJoined), "joined")]
@@ -34,6 +43,7 @@ public sealed record LeaveRoom : ClientMessage;
 [JsonDerivedType(typeof(GameState), "state")]
 [JsonDerivedType(typeof(ServerError), "error")]
 [JsonDerivedType(typeof(RoomClosed), "closed")]
+[JsonDerivedType(typeof(Scores), "scores")]
 public abstract record ServerMessage;
 
 /// <summary>You are in room <paramref name="Code"/>, in seat <paramref name="Seat"/>.</summary>
@@ -53,6 +63,12 @@ public sealed record ServerError(string Text) : ServerMessage;
 /// <summary>The room is gone (the host left before starting, or everyone left).</summary>
 public sealed record RoomClosed(string Reason) : ServerMessage;
 
+/// <summary>
+/// The top of leaderboard <paramref name="Board"/>, best first; and the asking player's place (0 is the top) and line,
+/// if they are on it.
+/// </summary>
+public sealed record Scores(string Board, IReadOnlyList<LeaderboardEntry> Top, int? Rank, LeaderboardEntry? Mine) : ServerMessage;
+
 public enum SeatKind
 {
     /// <summary>Nobody yet.</summary>
@@ -70,6 +86,7 @@ public sealed record SeatInfo(int Seat, string Name, SeatKind Kind, bool Connect
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(ClientMessage))]
 [JsonSerializable(typeof(ServerMessage))]
+[JsonSerializable(typeof(Dictionary<string, List<LeaderboardEntry>>))]
 internal sealed partial class ProtocolJson : JsonSerializerContext;
 
 /// <summary>Turns messages into JSON text and back.</summary>

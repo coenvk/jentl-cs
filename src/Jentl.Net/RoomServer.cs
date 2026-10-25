@@ -56,11 +56,14 @@ public sealed class RoomServer
     private readonly Dictionary<string, Room> _rooms = new(StringComparer.Ordinal);
     private readonly Dictionary<IConnection, Room> _where = [];
     private readonly Random _random;
+    private readonly ScoreServer? _scores;
 
     /// <param name="games">How to make each kind of game, by name ("uno").</param>
-    public RoomServer(IReadOnlyDictionary<string, Func<IRoomGame>> games, int? seed = null)
+    /// <param name="scores">The leaderboards to answer score messages from, or null for a server that keeps none.</param>
+    public RoomServer(IReadOnlyDictionary<string, Func<IRoomGame>> games, int? seed = null, ScoreServer? scores = null)
     {
         _games = games ?? throw new ArgumentNullException(nameof(games));
+        _scores = scores;
         _random = seed is { } s ? new Random(s) : new Random();
     }
 
@@ -81,6 +84,13 @@ public sealed class RoomServer
         if (Protocol.ReadClient(text) is not { } message)
         {
             Send(connection, new ServerError("That message makes no sense."));
+            return;
+        }
+
+        // Leaderboards have nothing to do with rooms, and keep their own lock.
+        if (message is SubmitScore or GetScores)
+        {
+            Send(connection, _scores?.Handle(message) ?? new ServerError("This server keeps no leaderboards."));
             return;
         }
 

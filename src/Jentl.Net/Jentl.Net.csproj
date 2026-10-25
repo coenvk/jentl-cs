@@ -1,10 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Jentl's online play: JSON protocol, an authoritative room server and a WebSocket client. Framework-free.</Description>
+    <Description>Jentl's online play: JSON protocol, an authoritative room server, online leaderboards and a WebSocket client. Framework-free.</Description>
   </PropertyGroup>
 
-  <!-- Online play: the message protocol, the room server and a WebSocket client; framework-free. -->
+  <!-- Online play: the message protocol, the room server, leaderboards and a WebSocket client; framework-free. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Jentl.Collect\Jentl.Collect.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Jentl.Net.Tests" />

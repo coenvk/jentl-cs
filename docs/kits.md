@@ -605,6 +605,27 @@ in the server's game list.
 There are no accounts: players are "Player 1" to "Player 4" by seat, and a dropped connection can't rejoin its seat
 (a bot carries on for it).
 
+## Leaderboards
+
+High-score tables on the device, and online ones on the game server.
+
+| Part | What it does |
+|---|---|
+| `Jentl.Collect.Leaderboard` | The best scores, best first, up to a capacity: `ScoreOrder.HigherIsBetter` (points) or `LowerIsBetter` (time, moves). `Submit(entry)` returns the place it took (0 is the top) or null; equal scores keep the order they came in; `bestPerName` keeps one line per name. `ToJson`/`FromJson` for the save file (the order and capacity stay in code) |
+| `Jentl.Collect.PlayerNames` | Made-up names such as "Swift Otter 27" (adjective, animal, 10 to 99): `Make(random)` for a new one, `IsValid(name)` to check one. No typing, and nothing of a player's own wording on a public board |
+| `Jentl.Net.ScoreServer` | The online boards: `BoardRules` per board name (order, the range a real score falls in, capacity), one line per name, kept in a JSON file. Turns away unknown boards, names `PlayerNames` would not make and scores out of range. Give it to the `RoomServer` (`scores:`), which passes it `SubmitScore` and `GetScores`; the answer is `Scores`: the top ten, and the player's place and line |
+| `Jentl.Core.UI.LeaderboardTable` | Draws a board: `Rows(top, rank, mine, format)` numbers the lines and picks out the player's (adding it after a gap when they are further down), `Draw` puts them on screen |
+
+```csharp
+var board = Leaderboard.FromJson(saved, ScoreOrder.HigherIsBetter);
+if (board.Submit(new LeaderboardEntry(name, score, DateTimeOffset.Now)) is { } place) { /* a new high score, at place */ }
+client.Send(new SubmitScore("bricks", name, score));          // online, if there is a server
+var rows = LeaderboardTable.Rows(board.Entries, place, null, s => s.ToString("N0"));
+```
+
+The server can't see the game being played, so a player who wants to can send a made-up score inside a board's range;
+keep the ranges tight.
+
 ## Localization
 
 `Jentl.Core.Localization.Localizer` translates gettext style: the English text is the key, so code reads naturally

@@ -37,6 +37,7 @@
     <ProjectReference Include="..\Jentl.Assets\Jentl.Assets.csproj" />
     <ProjectReference Include="..\Jentl.Tracks\Jentl.Tracks.csproj" />
     <ProjectReference Include="..\Jentl.Raster\Jentl.Raster.csproj" />
+    <ProjectReference Include="..\Jentl.Collect\Jentl.Collect.csproj" />
   </ItemGroup>
 
 </Project>
