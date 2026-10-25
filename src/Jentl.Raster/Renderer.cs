@@ -198,6 +198,70 @@ public sealed class Renderer
         }
     }
 
+    /// <summary>
+    /// Draws a square <paramref name="size"/> across facing the camera at <paramref name="position"/>, as a particle:
+    /// blended over what is there by the colour's alpha, hidden behind nearer things, fogged, but writing no depth, so
+    /// particles never hide each other or what is drawn after them. Nothing is drawn behind the camera or past far.
+    /// </summary>
+    public void DrawPoint(Vector3 position, float size, Vector4 color)
+    {
+        var clip = Vector4.Transform(new Vector4(position, 1), ViewProjection);
+        if (clip.W <= 0 || clip.Z < 0 || clip.Z > clip.W)
+        {
+            return;
+        }
+
+        // The view-projection's y column is the view's (unit length) times the projection's vertical scale, so its
+        // length gives how many pixels a unit spans at distance w.
+        var inverseW = 1 / clip.W;
+        var (width, height) = (Target.Width, Target.Height);
+        var m = ViewProjection;
+        var half = size * new Vector3(m.M12, m.M22, m.M32).Length() * 0.5f * height * inverseW / 2;
+        var (cx, cy) = ((clip.X * inverseW + 1) * 0.5f * width, (1 - (clip.Y * inverseW)) * 0.5f * height);
+
+        // The pixels whose centres fall inside the square.
+        var minX = Math.Max(0, (int)MathF.Ceiling(cx - half - 0.5f));
+        var maxX = Math.Min(width - 1, (int)MathF.Ceiling(cx + half - 0.5f) - 1);
+        var minY = Math.Max(0, (int)MathF.Ceiling(cy - half - 0.5f));
+        var maxY = Math.Min(height - 1, (int)MathF.Ceiling(cy + half - 0.5f) - 1);
+        if (minX > maxX || minY > maxY)
+        {
+            return;
+        }
+
+        var z = clip.Z * inverseW;
+        var (r, g, b, a) = (color.X, color.Y, color.Z, Math.Clamp(color.W, 0, 1));
+        if (Fog is { } fog)
+        {
+            var f = Math.Clamp((clip.W - fog.Start) / MathF.Max(fog.End - fog.Start, 1e-6f), 0, 1);
+            (r, g, b) = (r + ((fog.Color.X - r) * f), g + ((fog.Color.Y - g) * f), b + ((fog.Color.Z - b) * f));
+        }
+
+        var pixels = Target.Pixels;
+        var depths = Depth.Depths;
+        for (var y = minY; y <= maxY; y++)
+        {
+            for (var x = minX; x <= maxX; x++)
+            {
+                var i = (y * width) + x;
+                if (z >= depths[i])
+                {
+                    continue;
+                }
+
+                var under = pixels[i];
+                const float Scale = 1 / 255f;
+                var keep = 1 - a;
+                pixels[i] = Colors.Pack(
+                    (r * a) + ((under & 0xFF) * Scale * keep),
+                    (g * a) + (((under >> 8) & 0xFF) * Scale * keep),
+                    (b * a) + (((under >> 16) & 0xFF) * Scale * keep),
+                    a + ((under >> 24) * Scale * keep));
+                Stats.Pixels++;
+            }
+        }
+    }
+
     // Each plane of the view in clip space; inside is zero or more (depth runs 0 to 1, as System.Numerics projects).
     private static readonly Func<ClipVertex, float>[] ClipPlanes =
     [

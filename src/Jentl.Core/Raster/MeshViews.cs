@@ -41,6 +41,12 @@ public interface IMeshView : IDisposable
 
     void DrawMesh(Mesh mesh, Numerics.Matrix4x4 world, Material material);
 
+    /// <summary>
+    /// A square <paramref name="size"/> across facing the camera, blended by its colour's alpha (a particle). Points
+    /// are drawn at <see cref="Finish"/>, after the meshes: hidden by nearer ones, never hiding anything themselves.
+    /// </summary>
+    void DrawPoint(Numerics.Vector3 position, float size, Numerics.Vector4 color);
+
     /// <summary>Finishes the picture into <see cref="Texture"/>.</summary>
     void Finish();
 }
@@ -49,6 +55,7 @@ public interface IMeshView : IDisposable
 public sealed class SoftwareView : IMeshView
 {
     private readonly Texture2D _texture;
+    private readonly List<(Numerics.Vector3 Position, float Size, Numerics.Vector4 Color)> _points = [];
 
     public SoftwareView(GraphicsDevice device, int width, int height)
     {
@@ -88,7 +95,18 @@ public sealed class SoftwareView : IMeshView
 
     public void DrawMesh(Mesh mesh, Numerics.Matrix4x4 world, Material material) => Renderer.DrawMesh(mesh, world, material);
 
-    public void Finish() => _texture.SetData(Renderer.Target.Pixels);
+    public void DrawPoint(Numerics.Vector3 position, float size, Numerics.Vector4 color) => _points.Add((position, size, color));
+
+    public void Finish()
+    {
+        foreach (var (position, size, color) in _points)
+        {
+            Renderer.DrawPoint(position, size, color);
+        }
+
+        _points.Clear();
+        _texture.SetData(Renderer.Target.Pixels);
+    }
 
     public void Dispose() => _texture.Dispose();
 }
@@ -109,6 +127,7 @@ public sealed class GpuView : IMeshView
     private readonly ConditionalWeakTable<Mesh, Buffers> _smooth = [];
     private readonly ConditionalWeakTable<Mesh, Buffers> _flat = [];
     private readonly ConditionalWeakTable<Jentl.Raster.Texture, Texture2D> _textures = [];
+    private readonly List<VertexPositionColor> _points = [];
     private RenderTargetBinding[] _previous = [];
 
     public GpuView(GraphicsDevice device, int width, int height)
@@ -168,6 +187,7 @@ public sealed class GpuView : IMeshView
         _effect.DiffuseColor = new Vector3(material.Color.X, material.Color.Y, material.Color.Z);
         _effect.Alpha = material.Color.W;
         _effect.LightingEnabled = material.Shading != Shading.Unlit;
+        _effect.VertexColorEnabled = false;
         _effect.TextureEnabled = material.Texture is not null;
         if (material.Texture is { } texture)
         {
@@ -218,8 +238,52 @@ public sealed class GpuView : IMeshView
         Triangles += buffers.Triangles;
     }
 
+    public void DrawPoint(Numerics.Vector3 position, float size, Numerics.Vector4 color)
+    {
+        // The camera's right and up in the world are the view's first two columns.
+        var right = new Numerics.Vector3(View.M11, View.M21, View.M31) * (size / 2);
+        var up = new Numerics.Vector3(View.M12, View.M22, View.M32) * (size / 2);
+        var tint = new Color(color.X, color.Y, color.Z, color.W);
+        VertexPositionColor Corner(Numerics.Vector3 p) => new(Convert3D.ToXna(p), tint);
+        var (a, b, c, d) = (Corner(position - right - up), Corner(position + right - up), Corner(position + right + up), Corner(position - right + up));
+        _points.AddRange([a, b, c, a, c, d]);
+    }
+
     public void Finish()
     {
+        if (_points.Count > 0)
+        {
+            Numerics.Matrix4x4.Invert(View, out var inverseView);
+            _effect.World = Matrix.Identity;
+            _effect.View = Convert3D.ToXna(View);
+            _effect.Projection = Convert3D.ToXna(inverseView * ViewProjection);
+            _effect.LightingEnabled = false;
+            _effect.TextureEnabled = false;
+            _effect.VertexColorEnabled = true;
+            _effect.DiffuseColor = Vector3.One;
+            _effect.Alpha = 1;
+            _effect.FogEnabled = Fog is not null;
+            if (Fog is { } fog)
+            {
+                _effect.FogColor = new Vector3(fog.Color.X, fog.Color.Y, fog.Color.Z);
+                _effect.FogStart = fog.Start;
+                _effect.FogEnd = fog.End;
+            }
+
+            _device.BlendState = BlendState.NonPremultiplied;
+            _device.DepthStencilState = DepthStencilState.DepthRead;
+            _device.RasterizerState = RasterizerState.CullNone;
+            var vertices = _points.ToArray();
+            foreach (var pass in _effect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                _device.DrawUserPrimitives(PrimitiveType.TriangleList, vertices, 0, vertices.Length / 3);
+            }
+
+            _points.Clear();
+            _device.DepthStencilState = DepthStencilState.Default;
+        }
+
         _device.SetRenderTargets(_previous);
         _device.RasterizerState = RasterizerState.CullCounterClockwise;
     }
@@ -266,6 +330,17 @@ public sealed class GpuView : IMeshView
 /// <summary>Helpers for any <see cref="IMeshView"/>.</summary>
 public static class MeshViewExtensions
 {
+    /// <summary>Draws the living <paramref name="particles"/> as points, each its size, colour and fading alpha.</summary>
+    public static void DrawParticles(this IMeshView view, Particles particles)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        ArgumentNullException.ThrowIfNull(particles);
+        foreach (var p in particles.Live)
+        {
+            view.DrawPoint(p.Position, p.Size, p.Color with { W = p.Alpha });
+        }
+    }
+
     /// <summary>Looks through <paramref name="camera"/>: sets the view and the view-projection, at the view's shape.</summary>
     public static void Look(this IMeshView view, Camera camera)
     {

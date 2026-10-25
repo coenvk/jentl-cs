@@ -730,6 +730,7 @@ if (frustum.Test(car.Bounds) != Containment.Outside) { /* draw it */ }
 | `Renderer.Mapping` | `PerspectiveCorrect` (textures stay put on surfaces at an angle) or `Affine` (spread straight across the screen, as the first PlayStation did: the textures swim, a retro look) |
 | `Renderer.Fog` | Distance fog: from `Start` to `End` in front of the camera things fade into its colour; clear to the same colour and the horizon melts into the sky (and far triangles need no clipping by eye) |
 | `Models.FromPicture` | A sprite made solid: its opaque pixels' outline extruded, the picture on both sides and its colours along the edges, standing on its lowest row. A side view of a car becomes a blocky 3D car |
+| `Renderer.DrawPoint`, `Particles` | Particles in 3D: `Particles` emits, moves (gravity, drag, an optional floor), ages and fades them, replacing the oldest when full; each is drawn as a square facing the camera, blended by its alpha, hidden by nearer things but hiding nothing |
 | `RenderStats` | Triangles and pixels drawn since the last `Clear` |
 
 ```csharp
@@ -749,6 +750,7 @@ sampling), or `GpuView` with MonoGame's `BasicEffect` on the graphics card, into
 Both take the same meshes, `Material`s, `Lighting`, `Fog` and camera (`view.Look(camera)` sets the view and the
 view-projection; the graphics card needs the view on its own to measure fog), so a scene can switch between them.
 `RasterTextures.From` turns an image from `AssetStore.Image` (or a sprite's region of an atlas image) into a
-`Jentl.Raster.Texture`. Call
+`Jentl.Raster.Texture`. `DrawPoint` (and `view.DrawParticles(particles)`) draws particles on either view, at `Finish`
+after the meshes. Call
 `Begin`, `DrawMesh`, `Finish` from `Scene.DrawLayers` (the sprite batch is not begun there), and draw `Texture` in
 `Draw`.
