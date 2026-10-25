@@ -56,4 +56,36 @@ public sealed class SaveStoreTests : IDisposable
 
         act.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void MoveFolders_BringsFoldersOverFromAnotherApp()
+    {
+        var old = new SaveStore(Path.Combine(_directory, "old"));
+        Directory.CreateDirectory(Path.Combine(old.Directory, "bots"));
+        File.WriteAllText(Path.Combine(old.Directory, "bots", "mine.bot.json"), "{}");
+        old.WriteText("settings.json", "kept");
+
+        var moved = _store.MoveFolders(old, "bots", "workshop");
+
+        moved.Should().Equal("bots");
+        File.ReadAllText(Path.Combine(_store.Directory, "bots", "mine.bot.json")).Should().Be("{}");
+        Directory.Exists(Path.Combine(old.Directory, "bots")).Should().BeFalse();
+        old.ReadText("settings.json").Should().Be("kept", "only the named folders move");
+    }
+
+    [Fact]
+    public void MoveFolders_LeavesAFolderThisStoreAlreadyHas()
+    {
+        var old = new SaveStore(Path.Combine(_directory, "old"));
+        Directory.CreateDirectory(Path.Combine(old.Directory, "bots"));
+        Directory.CreateDirectory(Path.Combine(_store.Directory, "bots"));
+
+        _store.MoveFolders(old, "bots").Should().BeEmpty();
+
+        Directory.Exists(Path.Combine(old.Directory, "bots")).Should().BeTrue("nothing is overwritten or merged");
+    }
+
+    [Fact]
+    public void MoveFolders_FromAStoreThatIsNotThere_MovesNothing() =>
+        _store.MoveFolders(new SaveStore(Path.Combine(_directory, "never")), "bots").Should().BeEmpty();
 }

@@ -53,6 +53,30 @@ public sealed class SaveStore : ISaveStore
 
     public void Delete(string name) => File.Delete(PathOf(name));
 
+    /// <summary>
+    /// Moves the named folders over from <paramref name="from"/>'s directory (another app's, when a game moved out of
+    /// it), each only when <paramref name="from"/> has it and this store has none yet: nothing is merged or overwritten.
+    /// </summary>
+    /// <returns>The names of the folders that were moved.</returns>
+    public IReadOnlyList<string> MoveFolders(SaveStore from, params IEnumerable<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        List<string> moved = [];
+        foreach (var name in names)
+        {
+            var source = Path.Combine(from.Directory, name);
+            var target = Path.Combine(Directory, name);
+            if (System.IO.Directory.Exists(source) && !System.IO.Directory.Exists(target))
+            {
+                System.IO.Directory.CreateDirectory(Directory);
+                System.IO.Directory.Move(source, target);
+                moved.Add(name);
+            }
+        }
+
+        return moved;
+    }
+
     public string? Quarantine(string name, DateTimeOffset now)
     {
         var path = PathOf(name);
