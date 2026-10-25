@@ -707,7 +707,7 @@ counter-clockwise; `System.Numerics` projection conventions (row vectors, depth 
 | `Frustum` | The six planes of a view-projection matrix; whether a point or box is in view |
 | `Clipping.ClipPolygon` | Cuts a polygon of any vertex type by a plane (Sutherland–Hodgman), interpolating the new vertices |
 | `Edge` | The edge function rasterizers walk (value, step per pixel) and a top-left fill rule so shared edges are drawn once |
-| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders, cones and extruded 2D outlines (their caps mapped across the outline or a picture you give); `Transform` moves a copy |
+| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders, cones and extruded 2D outlines (their caps mapped across the outline or a picture you give, their sides reading colours just inside the outline or deeper, past a dark border); `Transform` moves a copy |
 
 ```csharp
 var car = MeshBuilder.Extrude(sideProfile, depth: 1.8f).Transform(Matrix4x4.CreateRotationY(MathF.PI / 4));

@@ -228,9 +228,11 @@ public static class MeshBuilder
     /// A prism from a 2D outline (any simple polygon, either winding) in the XY plane, <paramref name="depth"/> deep
     /// along Z and centred on it: a flat cap at each end and flat sides. A side view becomes a low-poly model this way.
     /// The caps take the texture upright across <paramref name="picture"/> (the outline's bounds if not given): pass
-    /// the whole picture's area when the outline covers only part of it, as a sprite's does.
+    /// the whole picture's area when the outline covers only part of it, as a sprite's does. The sides take the
+    /// picture's colours from just inside the outline, or <paramref name="sideInset"/> in (in outline units) to read
+    /// past a dark border drawn round it.
     /// </summary>
-    public static Mesh Extrude(IReadOnlyList<Vector2> outline, float depth, Box2? picture = null)
+    public static Mesh Extrude(IReadOnlyList<Vector2> outline, float depth, Box2? picture = null, float sideInset = 0)
     {
         ArgumentNullException.ThrowIfNull(outline);
         var points = Polygon2.IsCounterClockwise(outline) ? outline.ToList() : outline.Reverse().ToList();
@@ -240,7 +242,11 @@ public static class MeshBuilder
         // The caps take the texture across the picture, upright (v runs down), as a side view would be drawn.
         var bounds = picture ?? Box2.FromPoints(points);
         var span = Vector2.Max(bounds.Size, new Vector2(1e-6f));
-        Vector2 Uv(int i) => new((points[i].X - bounds.Min.X) / span.X, 1 - ((points[i].Y - bounds.Min.Y) / span.Y));
+        Vector2 UvAt(Vector2 p) => new((p.X - bounds.Min.X) / span.X, 1 - ((p.Y - bounds.Min.Y) / span.Y));
+        Vector2 Uv(int i) => UvAt(points[i]);
+
+        // Just inside at least, so nearest sampling on an outline along texel edges never reads the texel beyond it.
+        var inset = MathF.Max(sideInset, MathF.Max(span.X, span.Y) * 1e-4f);
         foreach (var t in Polygon2.Triangulate(points))
         {
             Vector3 At(int i, float z) => new(points[i].X, points[i].Y, z);
@@ -253,8 +259,12 @@ public static class MeshBuilder
             var (p, q) = (points[i], points[(i + 1) % points.Count]);
             var d = q - p;
             var outward = Vector3.Normalize(new Vector3(d.Y, -d.X, 0));
-            // A side takes the picture's colours along its edge, stretched across the depth, as pixel art extruded into blocks.
-            var (up, uq) = (Uv(i), Uv((i + 1) % points.Count));
+            // A side takes the picture's colours along its edge, stretched across the depth, as pixel art extruded into
+            // blocks: read a little inside it, and in from both ends.
+            var along = d / MathF.Max(d.Length(), 1e-12f);
+            var inward = new Vector2(-outward.X, -outward.Y) * inset;
+            var end = along * MathF.Min(inset, d.Length() / 4);
+            var (up, uq) = (UvAt(p + inward + end), UvAt(q + inward - end));
             builder.Quad(new Vector3(p, back), new Vector3(q, back), new Vector3(q, front), new Vector3(p, front), outward, [up, uq, uq, up]);
         }
 

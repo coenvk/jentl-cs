@@ -11,9 +11,10 @@ public static class Models
     /// <see cref="Polygon2.Outline"/>) extruded <paramref name="depth"/> deep along Z, each texel
     /// <paramref name="pixelSize"/> across. Drawn with the picture as its texture, both sides show the picture and the
     /// edges its colours, as pixel art made into blocks. The model is centred on X and Z and stands on its lowest
-    /// opaque row at y = 0, so a car sprite's wheels touch the ground. Empty if no texel is opaque.
+    /// opaque row at y = 0, so a car sprite's wheels touch the ground. The edges read their colours
+    /// <paramref name="sideInset"/> texels in from the outline (past a dark border, say). Empty if no texel is opaque.
     /// </summary>
-    public static Mesh FromPicture(Texture picture, float pixelSize, float depth)
+    public static Mesh FromPicture(Texture picture, float pixelSize, float depth, float sideInset = 0)
     {
         ArgumentNullException.ThrowIfNull(picture);
         var (width, height) = (picture.Width, picture.Height);
@@ -28,6 +29,6 @@ public static class Models
         var (middle, bottom) = ((bounds.Min.X + bounds.Max.X) / 2, bounds.Max.Y);
         Vector2 Place(Vector2 p) => new((p.X - middle) * pixelSize, (bottom - p.Y) * pixelSize);
         var whole = new Box2(Place(new Vector2(0, height)), Place(new Vector2(width, 0)));
-        return MeshBuilder.Extrude([.. outline.Select(Place)], depth, whole);
+        return MeshBuilder.Extrude([.. outline.Select(Place)], depth, whole, sideInset * pixelSize);
     }
 }

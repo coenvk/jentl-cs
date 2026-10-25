@@ -197,11 +197,12 @@ public class ExtrudeSideTests
 
         var mesh = MeshBuilder.Extrude(outline, 1);
 
-        // Every vertex of a side (normal across the outline) has the cap's texture coordinate for its corner of the outline.
+        // Every vertex of a side (normal across the outline) has the cap's texture coordinate for its corner of the outline,
+        // nudged a hair inside it.
         Vector2 CapUv(Vector3 p) => new(p.X / 4, 1 - (p.Y / 2));
         var sides = Enumerable.Range(0, mesh.Positions.Count).Where(i => Math.Abs(mesh.Normals[i].Z) < 0.5f).ToList();
         sides.Should().NotBeEmpty();
-        sides.Select(i => Vector2.Distance(mesh.UVs[i], CapUv(mesh.Positions[i]))).Should().OnlyContain(d => d < 1e-5f);
+        sides.Select(i => Vector2.Distance(mesh.UVs[i], CapUv(mesh.Positions[i]))).Should().OnlyContain(d => d < 1e-3f);
     }
 }
 
@@ -218,6 +219,22 @@ public class MoreMeshTests
         var front = Enumerable.Range(0, mesh.Positions.Count).Where(i => mesh.Normals[i] == Vector3.UnitZ).ToList();
         front.Select(i => mesh.UVs[i]).Should().OnlyContain(uv => uv.X >= 0.25f - 1e-5f && uv.X <= 0.75f + 1e-5f && uv.Y >= 0.25f - 1e-5f && uv.Y <= 0.75f + 1e-5f);
         front.Should().Contain(i => mesh.Positions[i].X == 1 && mesh.Positions[i].Y == 3 && Vector2.Distance(mesh.UVs[i], new Vector2(0.25f, 0.25f)) < 1e-5f);
+    }
+
+    [Fact]
+    public void Extrude_SidesReadTheirColoursJustInsideTheOutline()
+    {
+        Vector2[] square = [new(0, 0), new(4, 0), new(4, 4), new(0, 4)];
+
+        // Strictly inside by default (so nearest sampling never lands on the texel beyond the edge), and as deep as asked.
+        foreach (var (inset, low) in new[] { (0f, 0f), (1f, 0.25f) })
+        {
+            var mesh = MeshBuilder.Extrude(square, 1, sideInset: inset);
+            var sides = Enumerable.Range(0, mesh.Positions.Count).Where(i => mesh.Normals[i].Z == 0).Select(i => mesh.UVs[i]).ToList();
+            sides.Should().NotBeEmpty();
+            sides.Should().OnlyContain(uv => uv.X > low - 1e-5f && uv.X < 1 - low + 1e-5f && uv.Y > low - 1e-5f && uv.Y < 1 - low + 1e-5f);
+            sides.Should().OnlyContain(uv => uv.X > 0 && uv.X < 1 && uv.Y > 0 && uv.Y < 1);
+        }
     }
 
     [Fact]
