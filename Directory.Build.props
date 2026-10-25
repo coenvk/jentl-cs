@@ -16,7 +16,7 @@
 
   <!-- Packages: one per library in src/, all versioned together (CI sets Version from the release tag). -->
   <PropertyGroup>
-    <Version>0.4.2</Version>
+    <Version>0.4.3</Version>
     <PackageProjectUrl>https://github.com/coenvk/jentl-cs</PackageProjectUrl>
     <RepositoryUrl>https://github.com/coenvk/jentl-cs</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

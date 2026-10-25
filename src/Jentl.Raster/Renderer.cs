@@ -65,7 +65,10 @@ public sealed class RenderStats
 /// </summary>
 public sealed class Renderer
 {
+    // The triangle being drawn, and the two lists clipping passes it between; kept, so drawing makes no garbage.
     private readonly List<ClipVertex> _polygon = new(9);
+    private readonly List<ClipVertex> _clipA = new(9);
+    private readonly List<ClipVertex> _clipB = new(9);
 
     /// <param name="target">Where to draw.</param>
     /// <param name="depth">The depth buffer, or null to make one the same size.</param>
@@ -117,8 +120,10 @@ public sealed class Renderer
         var normalMatrix = Matrix4x4.Transpose(inverse);
         Vector3 WorldNormal(Vector3 n) => SafeNormalize(Vector3.TransformNormal(n, normalMatrix));
         var uvs = mesh.UVs.Count == mesh.Positions.Count ? mesh.UVs : null;
-        foreach (var t in mesh.Triangles)
+        var triangles = mesh.Triangles;
+        for (var i = 0; i < triangles.Count; i++)
         {
+            var t = triangles[i];
             Vector3 pa = mesh.Positions[t.A], pb = mesh.Positions[t.B], pc = mesh.Positions[t.C];
             Vector4 ca, cb, cc;
             switch (material.Shading)
@@ -154,16 +159,19 @@ public sealed class Renderer
         _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(b.Position, 1), transform), b.Color, b.UV));
         _polygon.Add(new ClipVertex(Vector4.Transform(new Vector4(c.Position, 1), transform), c.Color, c.UV));
 
-        IReadOnlyList<ClipVertex> polygon = _polygon;
+        var polygon = _polygon;
         if (!AllInside(polygon))
         {
+            var into = _clipA;
             foreach (var plane in ClipPlanes)
             {
-                polygon = Clipping.ClipPolygon(polygon, plane, ClipVertex.Lerp);
-                if (polygon.Count < 3)
+                Clipping.ClipPolygon(polygon, plane, LerpClip, into);
+                if (into.Count < 3)
                 {
                     return;
                 }
+
+                (polygon, into) = (into, polygon == _polygon ? _clipB : polygon);
             }
         }
 
@@ -273,11 +281,13 @@ public sealed class Renderer
         v => v.Position.W - v.Position.Z,
     ];
 
-    private static bool AllInside(IReadOnlyList<ClipVertex> polygon)
+    private static readonly Func<ClipVertex, ClipVertex, float, ClipVertex> LerpClip = ClipVertex.Lerp;
+
+    private static bool AllInside(List<ClipVertex> polygon)
     {
-        foreach (var v in polygon)
+        for (var i = 0; i < polygon.Count; i++)
         {
-            var p = v.Position;
+            var p = polygon[i].Position;
             if (p.X < -p.W || p.X > p.W || p.Y < -p.W || p.Y > p.W || p.Z < 0 || p.Z > p.W)
             {
                 return false;

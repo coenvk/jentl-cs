@@ -335,8 +335,10 @@ public static class MeshViewExtensions
     {
         ArgumentNullException.ThrowIfNull(view);
         ArgumentNullException.ThrowIfNull(particles);
-        foreach (var p in particles.Live)
+        var live = particles.Live;
+        for (var i = 0; i < live.Count; i++)
         {
+            var p = live[i];
             view.DrawPoint(p.Position, p.Size, p.Color with { W = p.Alpha });
         }
     }

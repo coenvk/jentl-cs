@@ -13,18 +13,33 @@ public static class Clipping
     public static IReadOnlyList<T> ClipPolygon<T>(IReadOnlyList<T> polygon, Func<T, float> distance, Func<T, T, float, T> lerp)
     {
         ArgumentNullException.ThrowIfNull(polygon);
+        var result = new List<T>(polygon.Count + 2);
+        ClipPolygon(polygon, distance, lerp, result);
+        return result;
+    }
+
+    /// <summary>
+    /// As <see cref="ClipPolygon{T}(IReadOnlyList{T}, Func{T, float}, Func{T, T, float, T})"/>, into
+    /// <paramref name="result"/> (cleared first, and not <paramref name="polygon"/> itself), so a renderer can reuse
+    /// its lists and make no garbage.
+    /// </summary>
+    public static void ClipPolygon<T>(IReadOnlyList<T> polygon, Func<T, float> distance, Func<T, T, float, T> lerp, List<T> result)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
         ArgumentNullException.ThrowIfNull(distance);
         ArgumentNullException.ThrowIfNull(lerp);
-        var result = new List<T>(polygon.Count + 2);
+        ArgumentNullException.ThrowIfNull(result);
+        result.Clear();
         if (polygon.Count == 0)
         {
-            return result;
+            return;
         }
 
         var previous = polygon[^1];
         var previousDistance = distance(previous);
-        foreach (var current in polygon)
+        for (var i = 0; i < polygon.Count; i++)
         {
+            var current = polygon[i];
             var currentDistance = distance(current);
             if (currentDistance >= 0)
             {
@@ -42,8 +57,6 @@ public static class Clipping
 
             (previous, previousDistance) = (current, currentDistance);
         }
-
-        return result;
     }
 }
 
