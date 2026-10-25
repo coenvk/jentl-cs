@@ -737,3 +737,10 @@ renderer.DrawMesh(MeshBuilder.Extrude(carProfile, 1.6f), Matrix4x4.CreateRotatio
 
 A scene of about 300 triangles at 320×180 takes about 3 ms a frame on a desktop (JIT); the browser's interpreter
 is slower, so measure there.
+
+`Jentl.Core.Raster` puts 3D on screen. An `IMeshView` draws meshes into a picture that a scene shows as a texture:
+`SoftwareView` with `Jentl.Raster` on the CPU (pick a low resolution, e.g. 320×180, and draw it scaled up with point
+sampling), or `GpuView` with MonoGame's `BasicEffect` on the graphics card, into its own render target with depth.
+Both take the same meshes, `Material`s, `Lighting` and view-projection, so a scene can switch between them. Call
+`Begin`, `DrawMesh`, `Finish` from `Scene.DrawLayers` (the sprite batch is not begun there), and draw `Texture` in
+`Draw`.

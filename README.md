@@ -21,7 +21,7 @@ draws them.
 | `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations |
 | `Jentl.Tracks` | Tracks and roads: paths built from straights and arcs, with position, heading and curvature along them |
 | `Jentl.Geometry` | Geometry on System.Numerics: rays, segments, planes, triangles, polygons (area, containment, triangulation), boxes, view frustums, polygon clipping, edge functions, and triangle meshes with builders (box, plane, sphere, cylinder, extruded outline) |
-| `Jentl.Raster` | A software renderer: frame and depth buffers, a camera, and triangles drawn on the CPU with clipping, back-face culling, depth testing, perspective-correct colours and flat or smooth lighting |
+| `Jentl.Raster` | A software renderer: frame and depth buffers, a camera, and triangles drawn on the CPU with clipping, back-face culling, depth testing, perspective-correct colours and flat or smooth lighting; `Jentl.Core.Raster` shows its pictures and draws the same meshes on the GPU |
 | `Jentl.Assets` | PNG reading and writing, a pixel canvas for art drawn in code, texture atlases, asset checks |
 | `Jentl.Fluffy` | Fluffy, a finite state machine engine |
 | `Jentl.Assets.Tool` | The `jentl-assets` command line: pack atlases, check assets |
