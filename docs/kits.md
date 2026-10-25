@@ -691,3 +691,26 @@ if (tickets.TrySpend(ref state, DateTimeOffset.UtcNow)) { /* race */ }
 var oval = TrackPath.Build([new Straight(200), new Arc(40, 180), new Straight(200), new Arc(40, 180)]);
 var pose = oval.At(distance);                               // where a car is, and which way it points
 ```
+
+## Geometry: shapes, tests and meshes
+
+`Jentl.Geometry` is the maths a renderer (or a game) needs on top of `System.Numerics`, which already has vectors,
+matrices, quaternions and `Plane`. Right-handed, y up; a triangle's front is the side its corners run
+counter-clockwise; `System.Numerics` projection conventions (row vectors, depth 0 to 1).
+
+| Part | What it does |
+|---|---|
+| `Ray`, `Segment2`, `Segment3`, `Planes` | A ray's points; where segments cross; closest point on a segment; planes through a point or three points, signed distance, where a segment or ray meets one |
+| `Triangle` | Normal, area, centroid, barycentric weights, containment, ray hits from either side (Möller–Trumbore) |
+| `Polygon2` | Signed area and winding, point-in-polygon (concave too), ear-clipping triangulation that always gives counter-clockwise triangles |
+| `Box2`, `Box3` | Axis-aligned boxes: contains, overlaps, union, corners, transformed bounds, ray entry (slab test) |
+| `Frustum` | The six planes of a view-projection matrix; whether a point or box is in view |
+| `Clipping.ClipPolygon` | Cuts a polygon of any vertex type by a plane (Sutherland–Hodgman), interpolating the new vertices |
+| `Edge` | The edge function rasterizers walk (value, step per pixel) and a top-left fill rule so shared edges are drawn once |
+| `Mesh`, `MeshBuilder` | Triangle meshes with normals (worked out if not given) and texture coordinates; boxes, planes, spheres, cylinders and extruded 2D outlines; `Transform` moves a copy |
+
+```csharp
+var car = MeshBuilder.Extrude(sideProfile, depth: 1.8f).Transform(Matrix4x4.CreateRotationY(MathF.PI / 4));
+var frustum = Frustum.From(view * projection);
+if (frustum.Test(car.Bounds) != Containment.Outside) { /* draw it */ }
+```

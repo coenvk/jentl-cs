@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's geometry: rays, segments, triangles, polygons, boxes, frustums, clipping, edge functions and meshes on System.Numerics. Framework-free.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Geometry.Tests" />
+  </ItemGroup>
+
+</Project>

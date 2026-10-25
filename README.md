@@ -20,6 +20,7 @@ draws them.
 | `Jentl.Physics` | 2D rigid-body physics |
 | `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations |
 | `Jentl.Tracks` | Tracks and roads: paths built from straights and arcs, with position, heading and curvature along them |
+| `Jentl.Geometry` | Geometry on System.Numerics: rays, segments, planes, triangles, polygons (area, containment, triangulation), boxes, view frustums, polygon clipping, edge functions, and triangle meshes with builders (box, plane, sphere, cylinder, extruded outline) |
 | `Jentl.Assets` | PNG reading and writing, a pixel canvas for art drawn in code, texture atlases, asset checks |
 | `Jentl.Fluffy` | Fluffy, a finite state machine engine |
 | `Jentl.Assets.Tool` | The `jentl-assets` command line: pack atlases, check assets |

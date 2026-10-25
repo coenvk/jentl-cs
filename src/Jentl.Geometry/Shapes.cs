@@ -1,0 +1,249 @@
+﻿using System.Numerics;
+
+namespace Jentl.Geometry;
+
+/// <summary>Polygons in the plane, as lists of corners in order (y up: counter-clockwise has a positive area).</summary>
+public static class Polygon2
+{
+    /// <summary>The area, positive when the corners run counter-clockwise (shoelace formula).</summary>
+    public static float SignedArea(IReadOnlyList<Vector2> polygon)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
+        var sum = 0f;
+        for (var i = 0; i < polygon.Count; i++)
+        {
+            sum += Segment2.Cross(polygon[i], polygon[(i + 1) % polygon.Count]);
+        }
+
+        return sum / 2;
+    }
+
+    public static bool IsCounterClockwise(IReadOnlyList<Vector2> polygon) => SignedArea(polygon) > 0;
+
+    /// <summary>Whether <paramref name="point"/> lies inside (even-odd rule, so it works for concave polygons).</summary>
+    public static bool Contains(IReadOnlyList<Vector2> polygon, Vector2 point)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
+        var inside = false;
+        for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+        {
+            var (a, b) = (polygon[i], polygon[j]);
+            if ((a.Y > point.Y) != (b.Y > point.Y) && point.X < ((b.X - a.X) * (point.Y - a.Y) / (b.Y - a.Y)) + a.X)
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    }
+
+    /// <summary>
+    /// Cuts a simple polygon (concave is fine, no holes or self-crossings) into n - 2 triangles by ear clipping. The
+    /// triangles index the input and always run counter-clockwise, whichever way the input runs.
+    /// </summary>
+    public static IReadOnlyList<TriangleIndices> Triangulate(IReadOnlyList<Vector2> polygon)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
+        var order = Enumerable.Range(0, polygon.Count).ToList();
+        if (!IsCounterClockwise(polygon))
+        {
+            order.Reverse();
+        }
+
+        var triangles = new List<TriangleIndices>();
+        var guard = polygon.Count * polygon.Count;
+        var i = 0;
+        while (order.Count > 3 && guard-- > 0)
+        {
+            var (p, c, n) = (order[(i + order.Count - 1) % order.Count], order[i % order.Count], order[(i + 1) % order.Count]);
+            if (IsEar(polygon, order, p, c, n))
+            {
+                triangles.Add(new TriangleIndices(p, c, n));
+                order.RemoveAt(i % order.Count);
+                i = 0;
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        if (order.Count == 3)
+        {
+            triangles.Add(new TriangleIndices(order[0], order[1], order[2]));
+        }
+
+        return triangles;
+    }
+
+    // A convex corner whose triangle holds no other remaining corner.
+    private static bool IsEar(IReadOnlyList<Vector2> polygon, List<int> order, int p, int c, int n)
+    {
+        Vector2 a = polygon[p], b = polygon[c], d = polygon[n];
+        if (Segment2.Cross(b - a, d - b) <= 0)
+        {
+            return false;
+        }
+
+        foreach (var k in order)
+        {
+            if (k != p && k != c && k != n && InTriangle(polygon[k], a, b, d))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool InTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c) =>
+        Segment2.Cross(b - a, point - a) >= 0 && Segment2.Cross(c - b, point - b) >= 0 && Segment2.Cross(a - c, point - c) >= 0;
+}
+
+/// <summary>An axis-aligned box in the plane, from <paramref name="Min"/> to <paramref name="Max"/> (edges included).</summary>
+public readonly record struct Box2(Vector2 Min, Vector2 Max)
+{
+    public Vector2 Size => Max - Min;
+
+    public Vector2 Center => (Min + Max) / 2;
+
+    public static Box2 FromPoints(IEnumerable<Vector2> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        var list = points.ToList();
+        return new Box2(list.Aggregate(Vector2.Min), list.Aggregate(Vector2.Max));
+    }
+
+    public bool Contains(Vector2 point) => point.X >= Min.X && point.Y >= Min.Y && point.X <= Max.X && point.Y <= Max.Y;
+
+    /// <summary>Whether the boxes overlap with some area (boxes only touching at an edge don't).</summary>
+    public bool Intersects(Box2 other) => Min.X < other.Max.X && other.Min.X < Max.X && Min.Y < other.Max.Y && other.Min.Y < Max.Y;
+
+    public Box2 Union(Box2 other) => new(Vector2.Min(Min, other.Min), Vector2.Max(Max, other.Max));
+}
+
+/// <summary>An axis-aligned box in space, from <paramref name="Min"/> to <paramref name="Max"/>.</summary>
+public readonly record struct Box3(Vector3 Min, Vector3 Max)
+{
+    public Vector3 Size => Max - Min;
+
+    public Vector3 Center => (Min + Max) / 2;
+
+    public static Box3 FromPoints(IEnumerable<Vector3> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        var list = points.ToList();
+        return new Box3(list.Aggregate(Vector3.Min), list.Aggregate(Vector3.Max));
+    }
+
+    public bool Contains(Vector3 point) =>
+        point.X >= Min.X && point.Y >= Min.Y && point.Z >= Min.Z && point.X <= Max.X && point.Y <= Max.Y && point.Z <= Max.Z;
+
+    public Box3 Union(Box3 other) => new(Vector3.Min(Min, other.Min), Vector3.Max(Max, other.Max));
+
+    /// <summary>The eight corners.</summary>
+    public IReadOnlyList<Vector3> Corners()
+    {
+        var (a, b) = (Min, Max);
+        return
+        [
+            new(a.X, a.Y, a.Z), new(b.X, a.Y, a.Z), new(a.X, b.Y, a.Z), new(b.X, b.Y, a.Z),
+            new(a.X, a.Y, b.Z), new(b.X, a.Y, b.Z), new(a.X, b.Y, b.Z), new(b.X, b.Y, b.Z),
+        ];
+    }
+
+    /// <summary>The box around this box's corners once transformed (so it grows when rotated).</summary>
+    public Box3 Transform(Matrix4x4 matrix) => FromPoints(Corners().Select(c => Vector3.Transform(c, matrix)));
+
+    /// <summary>How far along <paramref name="ray"/> it enters the box (0 when it starts inside), if it does (slab test).</summary>
+    public bool Intersect(Ray ray, out float distance)
+    {
+        var near = 0f;
+        var far = float.PositiveInfinity;
+        distance = 0;
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var origin = ray.Origin[axis];
+            var direction = ray.Direction[axis];
+            if (MathF.Abs(direction) < 1e-12f)
+            {
+                if (origin < Min[axis] || origin > Max[axis])
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            var t1 = (Min[axis] - origin) / direction;
+            var t2 = (Max[axis] - origin) / direction;
+            near = MathF.Max(near, MathF.Min(t1, t2));
+            far = MathF.Min(far, MathF.Max(t1, t2));
+            if (near > far)
+            {
+                return false;
+            }
+        }
+
+        distance = near;
+        return true;
+    }
+}
+
+/// <summary>How a shape lies against a <see cref="Frustum"/>.</summary>
+public enum Containment
+{
+    Outside,
+    Intersects,
+    Inside,
+}
+
+/// <summary>
+/// What a camera can see: six planes facing inwards, taken from a view-projection matrix (System.Numerics
+/// conventions: row vectors, depth 0 to 1). Use it to skip objects that are out of sight.
+/// </summary>
+public sealed class Frustum
+{
+    private readonly Plane[] _planes;
+
+    private Frustum(Plane[] planes) => _planes = planes;
+
+    /// <summary>Left, right, bottom, top, near and far, each facing into the view.</summary>
+    public IReadOnlyList<Plane> Planes => _planes;
+
+    /// <summary>The frustum of <paramref name="viewProjection"/> (view × projection).</summary>
+    public static Frustum From(Matrix4x4 viewProjection)
+    {
+        var m = viewProjection;
+        Vector4 x = new(m.M11, m.M21, m.M31, m.M41), y = new(m.M12, m.M22, m.M32, m.M42);
+        Vector4 z = new(m.M13, m.M23, m.M33, m.M43), w = new(m.M14, m.M24, m.M34, m.M44);
+        Plane Make(Vector4 v) => Plane.Normalize(new Plane(v.X, v.Y, v.Z, v.W));
+        return new Frustum([Make(w + x), Make(w - x), Make(w + y), Make(w - y), Make(z), Make(w - z)]);
+    }
+
+    public bool Contains(Vector3 point) => _planes.All(p => p.DistanceTo(point) >= 0);
+
+    /// <summary>Whether <paramref name="box"/> is fully in view, partly, or not at all (a box near a corner may be called partly when it is outside).</summary>
+    public Containment Test(Box3 box)
+    {
+        var result = Containment.Inside;
+        foreach (var plane in _planes)
+        {
+            // The corner furthest along the normal, and the one furthest against it.
+            var n = plane.Normal;
+            var positive = new Vector3(n.X >= 0 ? box.Max.X : box.Min.X, n.Y >= 0 ? box.Max.Y : box.Min.Y, n.Z >= 0 ? box.Max.Z : box.Min.Z);
+            var negative = new Vector3(n.X >= 0 ? box.Min.X : box.Max.X, n.Y >= 0 ? box.Min.Y : box.Max.Y, n.Z >= 0 ? box.Min.Z : box.Max.Z);
+            if (plane.DistanceTo(positive) < 0)
+            {
+                return Containment.Outside;
+            }
+
+            if (plane.DistanceTo(negative) < 0)
+            {
+                result = Containment.Intersects;
+            }
+        }
+
+        return result;
+    }
+}
