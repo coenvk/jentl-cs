@@ -1,3 +1,6 @@
+| `AgentCommand.DotNet(dll, args)` | Runs a .NET program through its apphost when it has one (which finds the runtime without `dotnet` on the PATH), else as `dotnet dll` |
+| `AgentCommand.Find(name, folders)`, `SearchFolders()` | The full path of a program in the first folder that has it; the PATH's folders, and on macOS `/usr/local/bin` and `/opt/homebrew/bin`, which an app started from the Finder does not have on its PATH |
+| `Jentl.Collect.KeyedRandom` | A `Random` from a secret key and a label (HMAC-SHA256 of the label and a counter): the same numbers on every platform and run, every label its own, and neither the key nor another label's numbers can be worked out from them. For deals and seeds that players must not be able to predict |
 # Jentl game kits
 
 Examples name the games built on Jentl; their code (paths such as `apps/Sokoban`, `src/Bricks`) lives in
@@ -115,7 +118,9 @@ sealed class TurnOver : ICardRules
   Spider-style one-suit decks), so every card on the table is unique; rules compare `Rank` and `Suit`.
 - State that is not a card, such as how often Pyramid's stock was turned over, goes in a table counter:
   `turn.Count("redeals")` in the rules, `table.Counter("redeals")` to read it. Undo reverts it with the turn.
-- `Deck.Shuffled` with a seeded `Random` always gives the same deal, which makes deal numbers and tests easy.
+- `Deck.Shuffled` with a seeded `Random` always gives the same deal, which makes deal numbers and tests easy. When a
+  player must not be able to work out the rest of the deck from their own cards (bots, money, online play), shuffle
+  with a `Jentl.Collect.KeyedRandom` instead: a seeded `Random` has only 2^31 seeds, few enough to try them all.
 - `CardGame.PlayAutoMove()` plays the rules' `AutoMove` (for example, finishing a solitaire whose outcome is
   settled); call it once per animation step.
 
@@ -647,7 +652,8 @@ There are no accounts: players are "Player 1" to "Player 4" by seat, and a dropp
 A bot can be a program of its own, in any language: it reads one line on stdin and writes one line on stdout. Every
 wait has a time limit, so a silent or crashed agent costs a turn, not the game. Nothing throws for a misbehaving agent:
 `Problem` says what went wrong (`"timed out"`, `"exited with code 3"`), and `ErrorOutput` keeps the last lines it wrote
-to stderr.
+to stderr. An agent that floods its output costs little: at most `MaxLines` (1,024) lines wait to be read, the oldest
+dropped first, and a line is cut at `MaxLineLength` (1 MiB) characters.
 
 | Part | What it does |
 |---|---|

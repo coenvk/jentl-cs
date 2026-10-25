@@ -18,7 +18,7 @@ draws them.
 | `Jentl.Net` | Online play: a JSON protocol, an authoritative room server, online leaderboards, a WebSocket client, and agents in their own process |
 | `Jentl.Ecs` | An entity component system |
 | `Jentl.Physics` | 2D rigid-body physics |
-| `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations, running statistics; leaderboards and made-up player names |
+| `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations, running statistics, keyed random numbers that cannot be predicted; leaderboards and made-up player names |
 | `Jentl.Tracks` | Tracks and roads: paths built from straights and arcs, with position, heading and curvature along them |
 | `Jentl.Geometry` | Geometry on System.Numerics: rays, segments, planes, triangles, polygons (area, containment, triangulation), boxes, view frustums, polygon clipping, edge functions, and triangle meshes with builders (box, plane, sphere, cylinder, cone, extruded outline), outlines traced from pictures |
 | `Jentl.Raster` | A software renderer: frame and depth buffers, a camera, and triangles drawn on the CPU with clipping, back-face culling, depth testing, perspective-correct colours, textures, flat or smooth lighting, distance fog, and models extruded from sprites; `Jentl.Core.Raster` shows its pictures and draws the same meshes on the GPU |
