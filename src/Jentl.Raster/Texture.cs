@@ -49,7 +49,10 @@ public sealed class Texture
         }
 
         (Width, Height, Pixels) = (width, height, pixels);
+        _mask = (width & (width - 1)) == 0 && (height & (height - 1)) == 0;
     }
+
+    private readonly bool _mask;
 
     public int Width { get; }
 
@@ -89,6 +92,27 @@ public sealed class Texture
         var top = Vector4.Lerp(Colors.Unpack(Texel(x0, y0)), Colors.Unpack(Texel(x0 + 1, y0)), fx);
         var bottom = Vector4.Lerp(Colors.Unpack(Texel(x0, y0 + 1)), Colors.Unpack(Texel(x0 + 1, y0 + 1)), fx);
         return Vector4.Lerp(top, bottom, fy);
+    }
+
+    /// <summary>The packed colour at <paramref name="u"/>, <paramref name="v"/>: what the renderer reads per pixel.</summary>
+    public uint Fetch(float u, float v)
+    {
+        if (Filter == TextureFilter.Bilinear)
+        {
+            return Colors.Pack(Sample(new Vector2(u, v)));
+        }
+
+        // Truncation is flooring for coordinates that are not negative; power-of-two sizes wrap with a mask.
+        var fx = u * Width;
+        var fy = v * Height;
+        var x = fx >= 0 ? (int)fx : (int)MathF.Floor(fx);
+        var y = fy >= 0 ? (int)fy : (int)MathF.Floor(fy);
+        if (_mask && Wrap == TextureWrap.Repeat)
+        {
+            return Pixels[((y & (Height - 1)) * Width) + (x & (Width - 1))];
+        }
+
+        return Texel(x, y);
     }
 
     private uint Texel(int x, int y)

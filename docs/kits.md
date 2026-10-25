@@ -737,8 +737,9 @@ renderer.Clear(Colors.Pack(new Vector4(0.45f, 0.6f, 0.85f, 1)));
 renderer.DrawMesh(MeshBuilder.Extrude(carProfile, 1.6f), Matrix4x4.CreateRotationY(angle), new Material(red, Shading.Flat));
 ```
 
-A scene of about 300 triangles at 320×180 takes about 3 ms a frame on a desktop (JIT); the browser's interpreter
-is slower, so measure there.
+A textured scene of about 300 triangles at 320×180 takes about 1 ms a frame on a desktop and about 15 ms in the
+browser, where .NET is interpreted: enough for 60 frames a second at that size. Each row of a triangle steps its
+values by a fixed amount per pixel, and nearest texels on power-of-two textures are read with a mask.
 
 `Jentl.Core.Raster` puts 3D on screen. An `IMeshView` draws meshes into a picture that a scene shows as a texture:
 `SoftwareView` with `Jentl.Raster` on the CPU (pick a low resolution, e.g. 320×180, and draw it scaled up with point

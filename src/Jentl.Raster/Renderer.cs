@@ -213,7 +213,10 @@ public sealed class Renderer
         return true;
     }
 
-    // Fills the pixel centres inside the triangle, walking the three edge functions across its bounding box.
+    // Fills the pixel centres inside the triangle. Everything blended across it (depth, 1/w, colour and texture
+    // coordinates over w) is linear in screen space, so each row finds its covered span from the edge functions,
+    // works the values out once at the span's start, and then only adds a fixed step per pixel: cheap enough for the
+    // browser's interpreter.
     private void Fill(in ScreenVertex v0, in ScreenVertex v1, in ScreenVertex v2, Texture? texture)
     {
         var (a, b, c) = (v0, v1, v2);
@@ -243,49 +246,90 @@ public sealed class Renderer
         Edge ea = new(b.Position, c.Position), eb = new(c.Position, a.Position), ec = new(a.Position, b.Position);
         var (ba, bb, bc) = (Bias(ea), Bias(eb), Bias(ec));
         var inverseArea = 1 / area;
+        var (sa, sb, sc) = (ea.StepX * inverseArea, eb.StepX * inverseArea, ec.StepX * inverseArea);
+
+        // How much each value changes per pixel along x.
+        var dz = (sa * a.Depth) + (sb * b.Depth) + (sc * c.Depth);
+        var dw = (sa * a.InverseW) + (sb * b.InverseW) + (sc * c.InverseW);
+        var dColor = (sa * a.ColorOverW) + (sb * b.ColorOverW) + (sc * c.ColorOverW);
+        var dSurface = (sa * a.UVOverW) + (sb * b.UVOverW) + (sc * c.UVOverW);
+        var dScreen = (sa * a.UV) + (sb * b.UV) + (sc * c.UV);
+
         var pixels = Target.Pixels;
         var depths = Depth.Depths;
         var affine = Mapping == TextureMapping.Affine;
+        var drawnPixels = 0;
         for (var y = minY; y <= maxY; y++)
         {
+            // Find the first covered pixel of the row; the span runs until a pixel is not covered (triangles are convex).
             var start = new Vector2(minX + 0.5f, y + 0.5f);
             float wa = ea.Evaluate(start), wb = eb.Evaluate(start), wc = ec.Evaluate(start);
-            for (var x = minX; x <= maxX; x++, wa += ea.StepX, wb += eb.StepX, wc += ec.StepX)
+            var x = minX;
+            while (x <= maxX && (wa < ba || wb < bb || wc < bc))
             {
-                if (wa < ba || wb < bb || wc < bc)
-                {
-                    continue;
-                }
+                wa += ea.StepX;
+                wb += eb.StepX;
+                wc += ec.StepX;
+                x++;
+            }
 
-                float la = wa * inverseArea, lb = wb * inverseArea, lc = wc * inverseArea;
-                var z = (la * a.Depth) + (lb * b.Depth) + (lc * c.Depth);
-                var i = (y * width) + x;
-                if (z >= depths[i])
-                {
-                    continue;
-                }
+            if (x > maxX)
+            {
+                continue;
+            }
 
-                var inverseW = (la * a.InverseW) + (lb * b.InverseW) + (lc * c.InverseW);
-                var color = ((la * a.ColorOverW) + (lb * b.ColorOverW) + (lc * c.ColorOverW)) / inverseW;
-                if (texture is not null)
+            var (la, lb, lc) = (wa * inverseArea, wb * inverseArea, wc * inverseArea);
+            var z = (la * a.Depth) + (lb * b.Depth) + (lc * c.Depth);
+            var iw = (la * a.InverseW) + (lb * b.InverseW) + (lc * c.InverseW);
+            var color = (la * a.ColorOverW) + (lb * b.ColorOverW) + (lc * c.ColorOverW);
+            var surface = (la * a.UVOverW) + (lb * b.UVOverW) + (lc * c.UVOverW);
+            var screen = (la * a.UV) + (lb * b.UV) + (lc * c.UV);
+            var row = y * width;
+            for (; x <= maxX && wa >= ba && wb >= bb && wc >= bc; x++)
+            {
+                var i = row + x;
+                if (z < depths[i])
                 {
-                    var uv = affine
-                        ? (la * a.UV) + (lb * b.UV) + (lc * c.UV)
-                        : ((la * a.UVOverW) + (lb * b.UVOverW) + (lc * c.UVOverW)) / inverseW;
-                    var texel = texture.Sample(uv);
-                    if (texel.W < 0.5f)
+                    var w = 1 / iw;
+                    float r = color.X * w, g = color.Y * w, bl = color.Z * w, al = color.W * w;
+                    var drawn = true;
+                    if (texture is not null)
                     {
-                        continue; // cut out: nothing drawn, no depth written
+                        var texel = affine ? texture.Fetch(screen.X, screen.Y) : texture.Fetch(surface.X * w, surface.Y * w);
+                        if (texel >> 24 < 128)
+                        {
+                            drawn = false; // cut out: nothing drawn, no depth written
+                        }
+                        else
+                        {
+                            const float Scale = 1 / 255f;
+                            r *= (texel & 0xFF) * Scale;
+                            g *= ((texel >> 8) & 0xFF) * Scale;
+                            bl *= ((texel >> 16) & 0xFF) * Scale;
+                            al *= (texel >> 24) * Scale;
+                        }
                     }
 
-                    color *= texel;
+                    if (drawn)
+                    {
+                        depths[i] = z;
+                        pixels[i] = Colors.Pack(r, g, bl, al);
+                        drawnPixels++;
+                    }
                 }
 
-                depths[i] = z;
-                pixels[i] = Colors.Pack(color);
-                Stats.Pixels++;
+                wa += ea.StepX;
+                wb += eb.StepX;
+                wc += ec.StepX;
+                z += dz;
+                iw += dw;
+                color += dColor;
+                surface += dSurface;
+                screen += dScreen;
             }
         }
+
+        Stats.Pixels += drawnPixels;
     }
 
     // A pixel exactly on an edge counts only for a "top-left" edge, so shared edges are drawn once (see Edge.Covers).

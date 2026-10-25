@@ -64,6 +64,12 @@ public static class Colors
         return (uint)(c.X + 0.5f) | ((uint)(c.Y + 0.5f) << 8) | ((uint)(c.Z + 0.5f) << 16) | ((uint)(c.W + 0.5f) << 24);
     }
 
+    /// <summary>Packs separate channels (0 to 1, clamped): the same as <see cref="Pack(Vector4)"/> without building a vector.</summary>
+    public static uint Pack(float r, float g, float b, float a) =>
+        Byte(r) | (Byte(g) << 8) | (Byte(b) << 16) | (Byte(a) << 24);
+
     public static Vector4 Unpack(uint packed) =>
         new Vector4(packed & 0xFF, (packed >> 8) & 0xFF, (packed >> 16) & 0xFF, packed >> 24) / 255f;
+
+    private static uint Byte(float channel) => channel <= 0 ? 0u : channel >= 1 ? 255u : (uint)((channel * 255f) + 0.5f);
 }
