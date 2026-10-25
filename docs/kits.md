@@ -1,6 +1,3 @@
-| `AgentCommand.DotNet(dll, args)` | Runs a .NET program through its apphost when it has one (which finds the runtime without `dotnet` on the PATH), else as `dotnet dll` |
-| `AgentCommand.Find(name, folders)`, `SearchFolders()` | The full path of a program in the first folder that has it; the PATH's folders, and on macOS `/usr/local/bin` and `/opt/homebrew/bin`, which an app started from the Finder does not have on its PATH |
-| `Jentl.Collect.KeyedRandom` | A `Random` from a secret key and a label (HMAC-SHA256 of the label and a counter): the same numbers on every platform and run, every label its own, and neither the key nor another label's numbers can be worked out from them. For deals and seeds that players must not be able to predict |
 # Jentl game kits
 
 Examples name the games built on Jentl; their code (paths such as `apps/Sokoban`, `src/Bricks`) lives in
@@ -659,6 +656,8 @@ dropped first, and a line is cut at `MaxLineLength` (1 MiB) characters.
 |---|---|
 | `AgentCommand` | What to run: the program, its arguments (passed as they are, no shell) and the working directory |
 | `AgentProcess.Start` | Starts the agent; never throws, a command that cannot start is an agent that has already exited |
+| `AgentCommand.DotNet(dll, args)` | Runs a .NET program through its apphost when it has one (which finds the runtime without `dotnet` on the PATH), else as `dotnet dll` |
+| `AgentCommand.Find(name, folders)`, `SearchFolders()` | The full path of a program in the first folder that has it; the PATH's folders, and on macOS `/usr/local/bin` and `/opt/homebrew/bin`, which an app started from the Finder does not have on its PATH |
 | `AskAsync(line, limit)` | Throws away the lines the agent sent before (late answers to earlier questions), sends `line`, and returns its answer, or null when none came in time |
 | `Send`, `ReadAsync(limit)` | Sends a line without ever blocking; reads the next line with a time limit |
 | `Problem`, `ErrorOutput`, `Stop` | What is wrong (or null), the last stderr lines, and killing the agent with everything it started |
@@ -761,6 +760,7 @@ Paddock (a car collecting game) is built on these.
 | `Jentl.Collect.StableSeed` | A `Random` seed from text that is the same on every platform and run (FNV-1a), for seeding by an id |
 | `Jentl.Collect.Rotation` | Equal periods from an epoch, for things on a calendar (this week's events): `PeriodAt(time)` and `Pick(items, time, offset)` give every device the same answer without a server |
 | `Jentl.Collect.RunningStats` | The mean, standard deviation and 95% margin of a series of numbers, updated one value at a time (`Add`): `Count`, `Mean`, `StandardDeviation`, `Margin95` (how far the mean may be off). For comparing results of simulated runs |
+| `Jentl.Collect.KeyedRandom` | A `Random` from a secret key and a label (HMAC-SHA256 of the label and a counter): the same numbers on every platform and run, every label its own, and neither the key nor another label's numbers can be worked out from them. For deals and seeds that players must not be able to predict |
 | `Jentl.Tracks.TrackPath` | A path built from `Straight` and `Arc` pieces (positive degrees turn left on a screen whose y points down): `At(distance)` gives position and heading, `CurvatureAt` the bend, `Polyline` points for drawing. A path whose end meets its start is a circuit and wraps |
 | `Jentl.Assets.PixelCanvas` | Pixel art drawn in code: rectangles, lines, ellipses, outlines, mirroring; `ToImage()` for `AtlasBuilder`, `ToPng()` for a file |
 | `Jentl.Core.Tracks.RoadPainter` | Paints a `TrackPath` as a road from above (verge, surface, kerbs in corners tighter than 60 units, a dashed centre line) into pixels, and `ToTexture` puts them on the GPU |
