@@ -12,6 +12,7 @@
     <Project Path="src/Jentl.Net/Jentl.Net.csproj" />
     <Project Path="src/Jentl.Physics/Jentl.Physics.csproj" />
     <Project Path="src/Jentl.Puzzle/Jentl.Puzzle.csproj" />
+    <Project Path="src/Jentl.Raster/Jentl.Raster.csproj" />
     <Project Path="src/Jentl.Rpg/Jentl.Rpg.csproj" />
     <Project Path="src/Jentl.Tracks/Jentl.Tracks.csproj" />
   </Folder>
@@ -27,6 +28,7 @@
     <Project Path="tests/Jentl.Net.Tests/Jentl.Net.Tests.csproj" />
     <Project Path="tests/Jentl.Physics.Tests/Jentl.Physics.Tests.csproj" />
     <Project Path="tests/Jentl.Puzzle.Tests/Jentl.Puzzle.Tests.csproj" />
+    <Project Path="tests/Jentl.Raster.Tests/Jentl.Raster.Tests.csproj" />
     <Project Path="tests/Jentl.Rpg.Tests/Jentl.Rpg.Tests.csproj" />
     <Project Path="tests/Jentl.Tracks.Tests/Jentl.Tracks.Tests.csproj" />
   </Folder>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's software renderer: frame and depth buffers, a camera, and triangles drawn on the CPU with clipping, culling, depth testing, perspective-correct colours and simple lighting. Framework-free.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Raster.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Jentl.Geometry\Jentl.Geometry.csproj" />
+  </ItemGroup>
+
+</Project>

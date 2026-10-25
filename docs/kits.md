@@ -714,3 +714,26 @@ var car = MeshBuilder.Extrude(sideProfile, depth: 1.8f).Transform(Matrix4x4.Crea
 var frustum = Frustum.From(view * projection);
 if (frustum.Test(car.Bounds) != Containment.Outside) { /* draw it */ }
 ```
+
+## Raster: a software renderer
+
+`Jentl.Raster` draws triangles on the CPU into a `FrameBuffer`, for small low-resolution pictures with a retro look
+(the GPU draws everything else). Its pixels are packed like XNA's `Color`, so they go straight into a texture.
+
+| Part | What it does |
+|---|---|
+| `FrameBuffer`, `DepthBuffer`, `Colors` | The picture (packed RGBA, top-left first) and the depth per pixel (0 near, 1 far); packing colours |
+| `Camera` | Position, target, field of view, near and far; view, projection and view-projection matrices |
+| `Renderer.DrawTriangle` | One triangle with vertex colours: transformed, clipped against the view (triangles through the camera's plane are cut, not smeared), back faces culled, pixel centres filled with the top-left rule (shared edges drawn once), depth-tested, colours blended perspective-correctly |
+| `Renderer.DrawMesh` | A `Jentl.Geometry` mesh with a `Material` (colour and `Shading`: unlit, flat per face, or smooth per vertex) under a `Lighting` (one directional light and ambient) |
+| `RenderStats` | Triangles and pixels drawn since the last `Clear` |
+
+```csharp
+var camera = new Camera { Position = new Vector3(4, 3, 6), Target = Vector3.Zero };
+var renderer = new Renderer(new FrameBuffer(320, 180)) { ViewProjection = camera.ViewProjection(320 / 180f) };
+renderer.Clear(Colors.Pack(new Vector4(0.45f, 0.6f, 0.85f, 1)));
+renderer.DrawMesh(MeshBuilder.Extrude(carProfile, 1.6f), Matrix4x4.CreateRotationY(angle), new Material(red, Shading.Flat));
+```
+
+A scene of about 300 triangles at 320×180 takes about 3 ms a frame on a desktop (JIT); the browser's interpreter
+is slower, so measure there.
