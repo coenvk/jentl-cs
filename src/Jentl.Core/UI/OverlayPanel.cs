@@ -8,7 +8,8 @@ public readonly record struct PanelLine(string Text, Color Color);
 
 /// <summary>
 /// Dims the scene below and draws a centred panel with a title, some lines of text and a menu or a form.
-/// A menu that does not fit on the screen scrolls.
+/// A line too wide for the panel wraps onto more lines, a title too wide is drawn smaller, and a menu that does not
+/// fit on the screen scrolls.
 /// </summary>
 public static class OverlayPanel
 {
@@ -28,6 +29,7 @@ public static class OverlayPanel
     {
         ArgumentNullException.ThrowIfNull(fonts);
         ArgumentNullException.ThrowIfNull(menu);
+        lines = Fit(lines, fonts, TextWidth(viewport, fonts));
         var room = viewport.Height - Chrome(fonts, lines.Count) - 2 * fonts.Px(12);
         var height = menu.Height(fonts.Body, room);
         var (panel, top) = Frame(batch, viewport, fonts, title, lines, height);
@@ -38,8 +40,44 @@ public static class OverlayPanel
     {
         ArgumentNullException.ThrowIfNull(fonts);
         ArgumentNullException.ThrowIfNull(form);
+        lines = Fit(lines, fonts, TextWidth(viewport, fonts));
         var (panel, top) = Frame(batch, viewport, fonts, title, lines, form.Height(fonts.Body));
         form.Draw(batch, fonts.Body, panel.Center.X, top, panel.Width - 2 * fonts.Px(DesignPadding) / 2);
+    }
+
+    /// <summary>The lines as drawn: each one wider than <paramref name="width"/> wrapped onto as many as it needs.</summary>
+    private static IReadOnlyList<PanelLine> Fit(IReadOnlyList<PanelLine> lines, Fonts fonts, int width)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        var font = fonts.Body;
+        var fits = true;
+        foreach (var line in lines)
+        {
+            fits &= font.MeasureString(line.Text).X <= width;
+        }
+
+        if (fits)
+        {
+            return lines;
+        }
+
+        var fitted = new List<PanelLine>();
+        foreach (var line in lines)
+        {
+            // An empty line stays, as a gap.
+            var parts = font.Wrap(line.Text, width);
+            if (parts.Count == 0)
+            {
+                fitted.Add(line);
+            }
+
+            foreach (var part in parts)
+            {
+                fitted.Add(line with { Text = part });
+            }
+        }
+
+        return fitted;
     }
 
     /// <summary>The panel's height without its content.</summary>
@@ -62,7 +100,8 @@ public static class OverlayPanel
         Theme.DrawPanel(batch, panel);
 
         var y = panel.Y + padding;
-        batch.DrawText(fonts.Heading, title, new Vector2(panel.Center.X, y), Palette.Text, Align.Center);
+        var heading = fonts.Heading.MeasureString(title).X <= width - 2 * padding ? fonts.Heading : fonts.Body;
+        batch.DrawText(heading, title, new Vector2(panel.Center.X, y + ((int)fonts.Heading.LineHeight - (int)heading.LineHeight) / 2), Palette.Text, Align.Center);
         y += (int)fonts.Heading.LineHeight + 8;
         foreach (var line in lines)
         {

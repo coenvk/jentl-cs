@@ -206,4 +206,14 @@ public class CardKitTests
 
         public bool IsWon(Table table) => false;
     }
+
+    [Fact]
+    public void Symbols_ShowTheRankAndTheSuitSymbol()
+    {
+        new Card(Card.King, Suit.Spades).Symbol.Should().Be("K♠");
+        new Card(10, Suit.Hearts).Symbol.Should().Be("10♥");
+        Card.Symbols([new Card(Card.King, Suit.Spades), new Card(4, Suit.Spades), new Card(Card.King, Suit.Diamonds), new Card(Card.Ace, Suit.Clubs)])
+            .Should().Be("K♠ 4♠ K♦ A♣");
+        Card.Symbols([]).Should().BeEmpty();
+    }
 }

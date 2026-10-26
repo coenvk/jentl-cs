@@ -55,7 +55,11 @@ public static class SpriteBatchExtensions
     }
 
     /// <summary>A round dot with soft edges, <paramref name="radius"/> pixels from centre to edge.</summary>
-    public static void FillCircle(this SpriteBatch batch, Vector2 center, float radius, Color color)
+    public static void FillCircle(this SpriteBatch batch, Vector2 center, float radius, Color color) =>
+        batch.FillEllipse(center, new Vector2(radius), color);
+
+    /// <summary>An ellipse with soft edges, <paramref name="radii"/> pixels from centre to edge across and down.</summary>
+    public static void FillEllipse(this SpriteBatch batch, Vector2 center, Vector2 radii, Color color)
     {
         ArgumentNullException.ThrowIfNull(batch);
         const int Size = 32;
@@ -77,7 +81,7 @@ public static class SpriteBatchExtensions
             texture.SetData(pixels);
             return texture;
         });
-        batch.Draw(dot, center, null, color, 0, new Vector2(Size / 2f), radius * 2 / Size, SpriteEffects.None, 0);
+        batch.Draw(dot, center, null, color, 0, new Vector2(Size / 2f), radii * 2 / Size, SpriteEffects.None, 0);
     }
 
     internal static Texture2D Pixel(GraphicsDevice device) => Pixels.GetValue(device, static d =>

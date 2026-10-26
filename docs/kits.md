@@ -145,13 +145,15 @@ taps and drops go to the pile placed last, which is drawn on top.
 ### Chips
 
 Betting games need money on the table. `Chips.Break(amount)` gives the fewest chips, largest value first, and
-`Chips.Stacks(chips, maxPerStack)` splits them into stacks for the screen. `ChipRenderer` draws the stacks in colours
-per denomination, and `ChipFlight` slides a pile of chips from one spot to another for a pot being won or a bet placed.
+`Chips.Stacks(chips, maxPerStack)` splits them into stacks for the screen; `Chips.StacksOf(amount, maxPerStack)` and
+`Chips.StackCount` give the same stacks without allocating, for drawing every frame. `ChipRenderer` draws the stacks
+in colours per denomination, and `ChipFlight` slides a pile of chips from one spot to another for a pot being won or a
+bet placed. `Card.Symbol` writes a card as "K♠" and `Card.Symbols(cards)` a row of them, for logs and labels.
 
 | Part | What it does |
 |---|---|
 | `Chips` | The standard denominations (1 to 25000); `Break(amount)` into chips, and `Stacks(chips, maxPerStack)` into stacks |
-| `ChipRenderer` | Draws stacks of flat chips in their denomination's colour: `Width` for layout, `DrawAmount` to draw |
+| `ChipRenderer` | Draws stacks of chips seen from a little above, in their denomination's colour (`ColorOf`) with stripes round the edge (`StripeColorOf`, `EdgeStripe` for the geometry), a lighter rim, an inlay and a shadow under each chip: `Width` and `StackHeight` for layout, `DrawAmount` to draw; nothing is allocated per call |
 | `ChipFlight` | A pile of chips (`Amount`) easing from one point to another: `Update` each frame, then draw at `Position` until `IsDone` |
 
 ```csharp
@@ -341,15 +343,15 @@ if (decided.Fault != Fault.None) { ShowNotice($"{seat.Name}: {decided.Fault}"); 
 
 | Type | What it is |
 |---|---|
-| `Fonts` | A TrueType font in the UI's sizes (title, heading, body, small), scaled to the screen: 1 at 1280x800, smaller on phones (by width when upright). `FontTextDrawer` hands it to kits that only know `ITextDrawer` |
-| `TextExtensions` | `DrawText` with alignment and an optional shadow, and `Wrap` to break text into lines that fit |
+| `Fonts` | A TrueType font in the UI's sizes (title, heading, body, small), scaled to the screen: 1 at 1280x800, smaller on phones (by width when upright). The card suits ♠ ♥ ♦ ♣ always work: `SuitGlyphSource` draws them (from `SuitShape`, as the card art does) behind any font that lacks them. `FontTextDrawer` hands it to kits that only know `ITextDrawer` |
+| `TextExtensions` | `DrawText` with alignment and an optional shadow, and `Wrap` to break text into lines that fit (with a font, or with any `measure` function, for tests) |
 | `Palette` | The colours widgets draw with; set them at start-up to restyle everything |
 | `Theme`, `SurfaceStyle` | The rest of the look: how panels and controls (buttons, form rows, the selected menu item) are drawn — corner radius, a border in a colour, a drop shadow, in design pixels — and whether panels have their accent bar. Set `Theme.Current` at start-up; the default is the plain look. `Theme.DrawPanel` draws a panel of your own screen the way the theme does, and `SurfaceStyle.Draw` any other surface (a score box, a seat) |
-| `RoundedRectangle` | `batch.FillRoundedRectangle(bounds, radius, color)`: soft-edged round corners, from one cached quarter circle per radius |
+| `RoundedRectangle` | `batch.FillRoundedRectangle(bounds, radius, color)`: soft-edged round corners, from one cached quarter circle per radius. `batch.FillEllipse(centre, radii, color)` (and `FillCircle`) draws soft-edged ellipses |
 | `Menu` | A vertical list of pill-shaped items: keys, taps, mouse hover. Taller than its space, it scrolls: the selection stays in view, arrows show there is more, and it can be dragged |
 | `ButtonBar` | A centred row of buttons that squeezes its gaps on narrow screens |
 | `Form` with `ToggleRow`, `SliderRow`, `ButtonRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider |
-| `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen |
+| `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen; a line too wide for the panel wraps, and a title too wide is drawn in the body font |
 | `Input.Clipboard` | `TrySetText` puts text on the system clipboard on the desktop (through SDL2, which MonoGame loads); false where there is none (the browser), so the game shows the text instead |
 
 Widgets take an `ActionMap<UiAction>` for their keys and buttons (`UiKeys.Default` has arrows/WASD, Enter/Space and

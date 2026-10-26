@@ -58,6 +58,18 @@ public readonly record struct Card
         _ => Rank.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 
+    /// <summary>The card as people write it, "Q♥" or "10♠", for text on screen (Jentl's fonts all have the suits).</summary>
+    public string Symbol => RankLabel + Suit switch
+    {
+        Suit.Spades => "♠",
+        Suit.Hearts => "♥",
+        Suit.Diamonds => "♦",
+        _ => "♣",
+    };
+
+    /// <summary>The cards' <see cref="Symbol"/>s with a space between: "K♠ 4♠ K♦".</summary>
+    public static string Symbols(IEnumerable<Card> cards) => string.Join(' ', cards.Select(card => card.Symbol));
+
     /// <summary>Short code such as "QH" or "10S", handy in tests and logs.</summary>
     public override string ToString() => RankLabel + Suit.ToString()[0];
 

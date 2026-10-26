@@ -47,13 +47,23 @@ public static class TextExtensions
     public static IReadOnlyList<string> Wrap(this SpriteFontBase font, string text, float width)
     {
         ArgumentNullException.ThrowIfNull(font);
+        return Wrap(text, width, line => font.MeasureString(line).X);
+    }
+
+    /// <summary>
+    /// Breaks <paramref name="text"/> into lines no wider than <paramref name="width"/> as <paramref name="measure"/>
+    /// measures them, at spaces; a word wider than the whole width gets a line of its own.
+    /// </summary>
+    public static IReadOnlyList<string> Wrap(string text, float width, Func<string, float> measure)
+    {
         ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(measure);
         var lines = new List<string>();
         var line = "";
         foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
             var candidate = line.Length == 0 ? word : $"{line} {word}";
-            if (line.Length > 0 && font.MeasureString(candidate).X > width)
+            if (line.Length > 0 && measure(candidate) > width)
             {
                 lines.Add(line);
                 line = word;

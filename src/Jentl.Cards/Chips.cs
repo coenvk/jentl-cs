@@ -67,4 +67,80 @@ public static class Chips
 
         return stacks;
     }
+
+    /// <summary>
+    /// The stacks <see cref="Stacks"/> makes of <see cref="Break"/>(<paramref name="amount"/>) with the standard
+    /// denominations, worked out one at a time while they are walked with <c>foreach</c>, so nothing is allocated:
+    /// for drawing an amount every frame.
+    /// </summary>
+    public static ChipStacks StacksOf(int amount, int maxPerStack)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(amount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxPerStack, 1);
+        return new ChipStacks(amount, maxPerStack);
+    }
+
+    /// <summary>How many stacks <see cref="StacksOf"/> gives for <paramref name="amount"/>, without allocating.</summary>
+    public static int StackCount(int amount, int maxPerStack)
+    {
+        var count = 0;
+        foreach (var _ in StacksOf(amount, maxPerStack))
+        {
+            count++;
+        }
+
+        return count;
+    }
 }
+
+/// <summary>The stacks of an amount with the standard denominations, largest first; see <see cref="Chips.StacksOf"/>.</summary>
+#pragma warning disable CA1815 // Only ever walked with foreach; comparing two of these means nothing.
+public readonly struct ChipStacks
+{
+    private readonly int _amount;
+    private readonly int _maxPerStack;
+
+    internal ChipStacks(int amount, int maxPerStack) => (_amount, _maxPerStack) = (amount, maxPerStack);
+
+    public ChipStackEnumerator GetEnumerator() => new(_amount, _maxPerStack);
+}
+
+/// <summary>Walks <see cref="ChipStacks"/>: the largest denomination first, a full stack at a time.</summary>
+public struct ChipStackEnumerator
+{
+    private readonly int _maxPerStack;
+    private int _remaining;
+    private int _denomination;
+    private int _left;
+
+    internal ChipStackEnumerator(int amount, int maxPerStack)
+    {
+        _remaining = amount;
+        _maxPerStack = maxPerStack;
+        _denomination = Chips.Denominations.Count;
+    }
+
+    public ChipStack Current { get; private set; }
+
+    public bool MoveNext()
+    {
+        // _left counts the chips of the current denomination not yet stacked.
+        while (_left == 0)
+        {
+            if (--_denomination < 0)
+            {
+                return false;
+            }
+
+            var value = Chips.Denominations[_denomination];
+            _left = _remaining / value;
+            _remaining -= _left * value;
+        }
+
+        var count = Math.Min(_left, _maxPerStack);
+        _left -= count;
+        Current = new ChipStack(Chips.Denominations[_denomination], count);
+        return true;
+    }
+}
+#pragma warning restore CA1815

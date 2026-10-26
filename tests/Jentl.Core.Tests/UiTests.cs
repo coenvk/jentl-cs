@@ -117,4 +117,16 @@ public class UiTests
         Release();
         form.Update(_input, UiKeys.Default, Frame);
     }
+
+    [Fact]
+    public void Wrap_BreaksAtSpaces_KeepingEachLineWithinTheWidth()
+    {
+        // One unit per character.
+        static float Measure(string text) => text.Length;
+
+        TextExtensions.Wrap("a long subtitle that runs on", 12, Measure).Should().Equal("a long", "subtitle", "that runs on");
+        TextExtensions.Wrap("short", 12, Measure).Should().Equal("short");
+        TextExtensions.Wrap("", 12, Measure).Should().BeEmpty();
+        TextExtensions.Wrap("unbreakableword ok", 6, Measure).Should().Equal("unbreakableword", "ok");
+    }
 }

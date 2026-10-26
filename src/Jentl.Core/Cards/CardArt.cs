@@ -102,41 +102,18 @@ public sealed class CardArt : IDisposable
 
     private static Texture2D SuitTexture(GraphicsDevice device, Suit suit)
     {
-        Func<float, float, bool> shape = suit switch
-        {
-            Suit.Diamonds => (x, y) => MathF.Abs(x) / 0.72f + MathF.Abs(y) <= 0.95f,
-            Suit.Hearts => Heart,
-            Suit.Spades => (x, y) => Heart(x, -y + 0.15f) || Stem(x, y),
-            _ => (x, y) => Circle(x, y, 0, -0.42f, 0.33f) || Circle(x, y, -0.4f, 0.12f, 0.33f) || Circle(x, y, 0.4f, 0.12f, 0.33f)
-                || (MathF.Abs(x) < 0.09f && y > -0.2f && y < 0.4f) || Stem(x, y),
-        };
-
         var pixels = new Color[SuitSize * SuitSize];
         for (var py = 0; py < SuitSize; py++)
         {
             for (var px = 0; px < SuitSize; px++)
             {
-                // Map the pixel to [-1, 1] with y pointing down.
-                var coverage = Coverage((sx, sy) => shape((px + sx) / SuitSize * 2 - 1, (py + sy) / SuitSize * 2 - 1));
-                pixels[py * SuitSize + px] = new Color(Color.White, coverage);
+                pixels[py * SuitSize + px] = new Color(Color.White, SuitShape.Coverage(suit, px, py, SuitSize, Samples));
             }
         }
 
         var texture = new Texture2D(device, SuitSize, SuitSize);
         texture.SetData(pixels);
         return texture;
-
-        // The classic heart curve (x² + y² - 1)³ = x²y³, flipped to point down and scaled to fill the square.
-        static bool Heart(float x, float y)
-        {
-            float hx = x * 1.25f, hy = -(y * 1.25f) + 0.25f;
-            var a = hx * hx + hy * hy - 1;
-            return a * a * a - hx * hx * hy * hy * hy <= 0;
-        }
-
-        static bool Stem(float x, float y) => y > 0.35f && y < 0.95f && MathF.Abs(x) < 0.08f + (y - 0.35f) * 0.55f;
-
-        static bool Circle(float x, float y, float cx, float cy, float r) => (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
     }
 
     /// <summary>Fraction of <see cref="Samples"/>² sub-pixel points inside a shape.</summary>

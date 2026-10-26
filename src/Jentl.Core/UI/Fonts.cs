@@ -1,11 +1,14 @@
 ﻿using FontStashSharp;
+using FontStashSharp.Interfaces;
+using FontStashSharp.Rasterizers.StbTrueTypeSharp;
 using Microsoft.Xna.Framework;
 
 namespace Jentl.Core.UI;
 
 /// <summary>
 /// A font in the sizes the UI uses, scaled to the screen. Glyphs are rasterised on demand,
-/// so a new scale (resizing the window, rotating a phone) just renders new sizes.
+/// so a new scale (resizing the window, rotating a phone) just renders new sizes. The card suits ♠ ♥ ♦ ♣ come
+/// from <see cref="SuitGlyphSource"/> when the font has none of its own.
 /// </summary>
 public sealed class Fonts : IDisposable
 {
@@ -24,8 +27,11 @@ public sealed class Fonts : IDisposable
     public Fonts(byte[] font)
     {
         // The sprite batch blends non-premultiplied (see JentlGame), so the glyph atlas must be too.
-        _system = new FontSystem(new FontSystemSettings { GlyphRenderResult = GlyphRenderResult.NonPremultiplied });
+        var settings = new FontSystemSettings { GlyphRenderResult = GlyphRenderResult.NonPremultiplied };
+        settings.FontLoader = new Loader(settings);
+        _system = new FontSystem(settings);
         _system.AddFont(font);
+        _system.AddFont(SuitGlyphSource.Marker);
     }
 
     /// <summary>UI scale: 1 at 1280x800, smaller on small screens.</summary>
@@ -62,4 +68,18 @@ public sealed class Fonts : IDisposable
     public int Px(float designPixels) => (int)MathF.Round(designPixels * Scale);
 
     public void Dispose() => _system.Dispose();
+
+    /// <summary>Loads font files as FontStashSharp does by default, and the suits' marker as <see cref="SuitGlyphSource"/>.</summary>
+    private sealed class Loader(FontSystemSettings settings) : IFontLoader
+    {
+        private readonly StbTrueTypeSharpLoader _files = new(new StbTrueTypeSharpSettings
+        {
+            KernelWidth = settings.KernelWidth,
+            KernelHeight = settings.KernelHeight,
+            UseOldRasterizer = settings.StbTrueTypeUseOldRasterizer,
+            UseEmToPixelsScale = settings.UseEmToPixelsScale,
+        });
+
+        public IFontSource Load(byte[] data) => ReferenceEquals(data, SuitGlyphSource.Marker) ? new SuitGlyphSource() : _files.Load(data);
+    }
 }
