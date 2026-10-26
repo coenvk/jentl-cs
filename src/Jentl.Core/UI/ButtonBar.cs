@@ -86,7 +86,7 @@ public sealed class ButtonBar
             var bounds = new Rectangle(x, y, widths[i], height);
             _bounds[i] = bounds;
             var highlight = _buttons[i].Highlight;
-            batch.FillRectangle(bounds, highlight ? Palette.Accent : Palette.PanelLight);
+            Theme.Current.Control.Draw(batch, bounds, highlight ? Palette.Accent : Palette.PanelLight);
             batch.DrawText(font, _buttons[i].Label, bounds, highlight ? Palette.Ink : Palette.Text, shadow: false);
             x += widths[i] + gap;
         }

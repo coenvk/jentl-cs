@@ -256,7 +256,7 @@ public sealed class Form
             var bounds = new Rectangle(centerX - width / 2, top + i * height, width, height - 6);
             _bounds[i] = bounds;
             var focused = i == Focused;
-            batch.FillRectangle(bounds, focused ? Palette.Accent : Palette.PanelLight);
+            Theme.Current.Control.Draw(batch, bounds, focused ? Palette.Accent : Palette.PanelLight);
             var label = bounds;
             label.Inflate(-RowPadding * 2, 0);
             batch.DrawText(font, _rows[i].Label, label, focused ? Palette.Ink : Palette.Text, Align.Left, shadow: false);

@@ -60,8 +60,14 @@ public static class OverlayPanel
         var height = Chrome(fonts, lines.Count) + contentHeight;
         var width = Math.Min(viewport.Width - 2 * padding, fonts.Px(600));
         var panel = new Rectangle(viewport.Center.X - width / 2, viewport.Center.Y - height / 2, width, height);
-        batch.FillRectangle(panel, Palette.Panel);
-        batch.FillRectangle(new Rectangle(panel.X, panel.Y, panel.Width, AccentHeight), Palette.Accent);
+        var theme = Theme.Current;
+        theme.Panel.Draw(batch, panel, Palette.Panel);
+        if (theme.AccentBar)
+        {
+            // Inset by the corners' radius, so the bar sits on the panel's straight top edge.
+            var inset = theme.Panel.Scaled(Theme.Scale).Radius;
+            batch.FillRectangle(new Rectangle(panel.X + inset, panel.Y, panel.Width - 2 * inset, AccentHeight), Palette.Accent);
+        }
 
         var y = panel.Y + padding;
         batch.DrawText(fonts.Heading, title, new Vector2(panel.Center.X, y), Palette.Text, Align.Center);

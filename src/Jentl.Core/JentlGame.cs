@@ -66,10 +66,23 @@ public abstract class JentlGame : Game
         var (width, height) = (parameters.BackBufferWidth, parameters.BackBufferHeight);
         var pixels = new Color[width * height];
         GraphicsDevice.GetBackBufferData(pixels);
+        MakeOpaque(pixels);
         using var texture = new Texture2D(GraphicsDevice, width, height);
         texture.SetData(pixels);
         using var file = File.Create(path);
         texture.SaveAsPng(file, width, height);
+    }
+
+    /// <summary>
+    /// Sets every pixel's alpha to opaque: the screen shows the colours, but a translucent overlay leaves the back
+    /// buffer's alpha below 1, and a PNG saved as is looks see-through (grey) in viewers.
+    /// </summary>
+    internal static void MakeOpaque(Color[] pixels)
+    {
+        for (var i = 0; i < pixels.Length; i++)
+        {
+            pixels[i].A = 255;
+        }
     }
 
     /// <summary>The game's assets: loaded once, and reloaded as they change when <see cref="AssetStore.Watch"/> is on.</summary>

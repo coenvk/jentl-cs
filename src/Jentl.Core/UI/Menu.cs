@@ -130,7 +130,7 @@ public sealed class Menu
             var selected = i == Selected;
             if (selected)
             {
-                batch.FillRectangle(row, Palette.Accent);
+                Theme.Current.Control.Draw(batch, row, Palette.Accent);
             }
 
             batch.DrawText(font, _items[i].Label, row, selected ? Palette.Ink : Palette.Text, shadow: !selected);

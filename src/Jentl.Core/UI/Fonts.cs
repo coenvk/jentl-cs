@@ -55,6 +55,7 @@ public sealed class Fonts : IDisposable
             ? viewport.Width / (DesignHeight * 0.75f)
             : MathF.Min(viewport.Width / DesignWidth, viewport.Height / DesignHeight);
         Scale = Math.Clamp(fit, MinScale, MaxScale);
+        Theme.Scale = Scale;
     }
 
     /// <summary>A design-size length in pixels at the current scale.</summary>

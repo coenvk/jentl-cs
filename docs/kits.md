@@ -344,6 +344,8 @@ if (decided.Fault != Fault.None) { ShowNotice($"{seat.Name}: {decided.Fault}"); 
 | `Fonts` | A TrueType font in the UI's sizes (title, heading, body, small), scaled to the screen: 1 at 1280x800, smaller on phones (by width when upright). `FontTextDrawer` hands it to kits that only know `ITextDrawer` |
 | `TextExtensions` | `DrawText` with alignment and an optional shadow, and `Wrap` to break text into lines that fit |
 | `Palette` | The colours widgets draw with; set them at start-up to restyle everything |
+| `Theme`, `SurfaceStyle` | The rest of the look: how panels and controls (buttons, form rows, the selected menu item) are drawn — corner radius, a border in a colour, a drop shadow, in design pixels — and whether panels have their accent bar. Set `Theme.Current` at start-up; the default is the plain look. `SurfaceStyle.Draw` draws a surface of your own (a score box, a seat) the same way |
+| `RoundedRectangle` | `batch.FillRoundedRectangle(bounds, radius, color)`: soft-edged round corners, from one cached quarter circle per radius |
 | `Menu` | A vertical list of pill-shaped items: keys, taps, mouse hover. Taller than its space, it scrolls: the selection stays in view, arrows show there is more, and it can be dragged |
 | `ButtonBar` | A centred row of buttons that squeezes its gaps on narrow screens |
 | `Form` with `ToggleRow`, `SliderRow`, `ButtonRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider |
