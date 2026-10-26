@@ -14,6 +14,11 @@ namespace Jentl.Net;
 /// elsewhere" and closed. The agent stays the same instance throughout, so a match in progress keeps its seat. A runner
 /// that breaks the limits (<see cref="MaxLength"/>, <see cref="MaxPerSecond"/>) loses only its own connection, and
 /// <see cref="Drop"/> closes a bot's connection when its token no longer holds.
+/// <para>
+/// The run numbers of the agents' starts (<see cref="RelayStart"/>) begin at a random number for each host, so after a
+/// server restart a runner's process from the old server's match never passes for one of the new server's: the first
+/// start gets a fresh process, and the old process's late lines are ignored.
+/// </para>
 /// </remarks>
 public sealed class RelayHost(Func<string, string?> nameOfToken)
 {
@@ -22,6 +27,9 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
 
     private readonly Func<string, string?> _nameOfToken = nameOfToken ?? throw new ArgumentNullException(nameof(nameOfToken));
     private readonly ConcurrentDictionary<string, Seat> _seats = new(StringComparer.Ordinal);
+
+    // The run before every agent's first start: random for each host, with room for a billion starts before it wraps.
+    private readonly int _runBefore = Random.Shared.Next(1 << 30);
 
     // Each connection's way to end its own run, for when another connection takes over.
     private readonly ConcurrentDictionary<SocketLines, CancellationTokenSource> _runs = new();
@@ -81,7 +89,8 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     /// <summary>
     /// Serves one runner's connection until it closes: reads the hello (within 5 seconds), refuses an unknown token or
     /// another protocol version, else welcomes the runner, attaches the connection to the bot's agent (made on first
-    /// use) and passes the runner's messages to it. The bot is away as soon as the connection ends, before the closing
+    /// use) and passes the runner's messages to it. The token is looked up again once attached: a token replaced
+    /// meanwhile (its <see cref="Drop"/> may have come before the attach) is refused with "token replaced". The bot is away as soon as the connection ends, before the closing
     /// is done. Never throws for a socket that misbehaves or breaks; returns quietly when <paramref name="aborted"/> is
     /// cancelled. The socket belongs to the caller. Answers the limit the runner broke when that closed the connection
     /// (<see cref="SocketLines.Problem"/>, for the server's log), else null.
@@ -125,12 +134,14 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
                 return null;
             }
 
-            seat = _seats.GetOrAdd(name, n => new Seat(new RemoteAgent(n)));
+            seat = _seats.GetOrAdd(name, n => new Seat(new RemoteAgent(n, _runBefore)));
             _runs[lines] = ended;
             lines.Send(Relay.Write(new RelayWelcome(name)));
-            if (seat.Agent.Attach(lines) is { } previous)
+            if (!Join(seat, lines, hello!.Token))
             {
-                _ = EndAsync(previous, "connected elsewhere");
+                lines.Send(Relay.Write(new RelayRefused("token replaced")));
+                await lines.CloseAsync("token replaced").ConfigureAwait(false);
+                return null;
             }
 
             Report(seat);
@@ -164,10 +175,47 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     /// <summary>Detaches <paramref name="lines"/> from the seat's agent, and says so when the bot is away now.</summary>
     private void Leave(Seat seat, SocketLines lines)
     {
-        if (seat.Agent.Detach(lines))
+        lock (seat.Joining)
         {
-            Report(seat);
+            if (!seat.Agent.Detach(lines))
+            {
+                return;
+            }
         }
+
+        Report(seat);
+    }
+
+    /// <summary>
+    /// Attaches <paramref name="lines"/> to the seat's agent, taking over from the connection before, when
+    /// <paramref name="token"/> still names the bot once attached; false, and the connection before kept, when it no longer
+    /// does. A hello checked just before its token was replaced would otherwise attach just after the <see cref="Drop"/>
+    /// that came with it, and stay. Attaching, checking and handing the seat back are one step for the seat (as is
+    /// <see cref="Leave"/>), so the connection before cannot leave in between and be handed back after it went.
+    /// </summary>
+    private bool Join(Seat seat, SocketLines lines, string token)
+    {
+        SocketLines? previous;
+        lock (seat.Joining)
+        {
+            previous = seat.Agent.Attach(lines);
+            if (_nameOfToken(token) != seat.Agent.Name)
+            {
+                if (seat.Agent.Detach(lines) && previous is not null)
+                {
+                    seat.Agent.Attach(previous);
+                }
+
+                return false;
+            }
+        }
+
+        if (previous is not null)
+        {
+            _ = EndAsync(previous, "connected elsewhere");
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -214,6 +262,9 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
         public RemoteAgent Agent { get; } = agent;
 
         public Lock Gate { get; } = new();
+
+        /// <summary>Held while a connection joins the seat or leaves it: see <see cref="Join"/>.</summary>
+        public Lock Joining { get; } = new();
 
         public bool Present { get; set; }
     }

@@ -197,11 +197,11 @@ public sealed class RemoteAgentTests : IDisposable
         var agent = host.Agent("Bot")!;
         agent.Restart();
         (await read.MoveNextAsync()).Should().BeTrue();
-        Relay.Read(read.Current).Should().Be(new RelayStart(1));
+        var run = Relay.Read(read.Current).Should().BeOfType<RelayStart>().Which.Run;
 
         var answer = agent.ReadAsync(Limit);
-        client.Send(Relay.Write(new RelayLine("last words", 1)));
-        client.Send(Relay.Write(new RelayExited("exited with code 3", 1)));
+        client.Send(Relay.Write(new RelayLine("last words", run)));
+        client.Send(Relay.Write(new RelayExited("exited with code 3", run)));
 
         (await answer).Should().Be("last words");
         (await agent.ReadAsync(Limit)).Should().BeNull();
@@ -290,7 +290,7 @@ public sealed class RemoteAgentTests : IDisposable
         (await lines.MoveNextAsync()).Should().BeTrue();
         Relay.Read(lines.Current).Should().Be(new RelayWelcome("Bot"));
         (await lines.MoveNextAsync()).Should().BeTrue();
-        Relay.Read(lines.Current).Should().Be(new RelayStart(1));
+        Relay.Read(lines.Current).Should().BeOfType<RelayStart>();
     }
 
     [Fact]
@@ -334,12 +334,13 @@ public sealed class RemoteAgentTests : IDisposable
         Relay.Read(firstRead.Current).Should().Be(new RelayRefused("connected elsewhere"));
 
         var agent = host.Agent("Bot")!;
-        agent.Restart(); // run 1, on the second connection
-        await first.SendNowAsync(Relay.Write(new RelayLine("old", 1)));
-        await first.SendNowAsync(Relay.Write(new RelayExited("old", 1)));
+        agent.Restart(); // on the second connection
+        var run = (await NextMessage(secondRead)).Should().BeOfType<RelayStart>().Which.Run;
+        await first.SendNowAsync(Relay.Write(new RelayLine("old", run)));
+        await first.SendNowAsync(Relay.Write(new RelayExited("old", run)));
         (await agent.ReadAsync(TimeSpan.FromMilliseconds(500))).Should().BeNull();
         agent.HasExited.Should().BeFalse();
-        second.Send(Relay.Write(new RelayLine("new", 1)));
+        second.Send(Relay.Write(new RelayLine("new", run)));
         (await agent.ReadAsync(Limit)).Should().Be("new");
     }
 
@@ -519,7 +520,7 @@ public sealed class RemoteAgentTests : IDisposable
 
         var (_, _, read) = await RawRunner(host, "t");
 
-        (await NextMessage(read)).Should().Be(new RelayStart(1), "nothing came back since the start, so it may never have arrived");
+        (await NextMessage(read)).Should().BeOfType<RelayStart>("nothing came back since the start, so it may never have arrived");
     }
 
     [Fact]
@@ -529,8 +530,8 @@ public sealed class RemoteAgentTests : IDisposable
         var (_, first, firstRead) = await RawRunner(host, "t");
         var agent = host.Agent("Bot")!;
         agent.Restart();
-        (await NextMessage(firstRead)).Should().Be(new RelayStart(1));
-        first.Send(Relay.Write(new RelayLine("hi", 1)));
+        var run = (await NextMessage(firstRead)).Should().BeOfType<RelayStart>().Which.Run;
+        first.Send(Relay.Write(new RelayLine("hi", run)));
         (await agent.ReadAsync(Limit)).Should().Be("hi");
 
         var (_, _, read) = await RawRunner(host, "t");
@@ -546,14 +547,15 @@ public sealed class RemoteAgentTests : IDisposable
         var (_, client, read) = await RawRunner(host, "t");
         var agent = host.Agent("Bot")!;
         agent.Restart();
-        (await NextMessage(read)).Should().Be(new RelayStart(1));
+        var old = (await NextMessage(read)).Should().BeOfType<RelayStart>().Which.Run;
         agent.Restart();
-        (await NextMessage(read)).Should().Be(new RelayStart(2));
+        var run = (await NextMessage(read)).Should().BeOfType<RelayStart>().Which.Run;
+        run.Should().NotBe(old);
 
-        client.Send(Relay.Write(new RelayExited("exited with code 3", 1)));
-        client.Send(Relay.Write(new RelayLine("old", 1)));
+        client.Send(Relay.Write(new RelayExited("exited with code 3", old)));
+        client.Send(Relay.Write(new RelayLine("old", old)));
         client.Send(Relay.Write(new RelayLine("unnumbered")));
-        client.Send(Relay.Write(new RelayLine("new", 2)));
+        client.Send(Relay.Write(new RelayLine("new", run)));
 
         (await agent.ReadAsync(Limit)).Should().Be("new");
         agent.HasExited.Should().BeFalse();
@@ -615,5 +617,101 @@ public sealed class RemoteAgentTests : IDisposable
         {
             agent.IsAway.Should().BeTrue();
         }
+    }
+
+    [Fact]
+    public async Task AfterAServerRestart_TheFirstMatch_GetsAFreshProcess()
+    {
+        var before = Host();
+        var beforeEvents = Events(before);
+        var after = Host();
+        var afterEvents = Events(after);
+        var host = before;
+        var pairs = Channel.CreateUnbounded<SocketPair>();
+        var relay = new AgentRelay(_ =>
+        {
+            var pair = Serve(host);
+            pairs.Writer.TryWrite(pair);
+            return Task.FromResult(pair.Client);
+        }, "t", new AgentCommand("dotnet", [Path.Combine(AppContext.BaseDirectory, "TestAgent", "Jentl.Net.TestAgent.dll"), "count"]));
+        _owned.Add(relay);
+        _ = relay.RunAsync(Cancel);
+        (await beforeEvents.Reader.ReadAsync(Cancel)).Should().Be("+Bot");
+        var old = before.Agent("Bot")!;
+        old.Restart();
+        (await old.AskAsync("a", Limit)).Should().Be("1:a");
+
+        host = after; // the server restarts: the runner connects again, to a host that starts its runs afresh
+        (await pairs.Reader.ReadAsync(Cancel)).Server.Abort();
+        (await afterEvents.Reader.ReadAsync(Cancel)).Should().Be("+Bot");
+        var agent = after.Agent("Bot")!;
+        agent.Restart();
+
+        (await agent.AskAsync("b", Limit)).Should().Be("1:b", "the process of the old server's match is no process for the new one's");
+    }
+
+    [Fact]
+    public async Task AfterAServerRestart_TheOldRunsLines_DoNotCount()
+    {
+        var before = Host();
+        var (_, _, beforeRead) = await RawRunner(before, "t");
+        before.Agent("Bot")!.Restart();
+        var old = (await NextMessage(beforeRead)).Should().BeOfType<RelayStart>().Which.Run;
+
+        var after = Host();
+        var (_, client, read) = await RawRunner(after, "t");
+        var agent = after.Agent("Bot")!;
+        agent.Restart();
+        var run = (await NextMessage(read)).Should().BeOfType<RelayStart>().Which.Run;
+        run.Should().NotBe(old, "runs never repeat across hosts");
+
+        client.Send(Relay.Write(new RelayLine("old", old)));
+        client.Send(Relay.Write(new RelayExited("old", old)));
+        client.Send(Relay.Write(new RelayLine("new", run)));
+
+        (await agent.ReadAsync(Limit)).Should().Be("new");
+        agent.HasExited.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AHelloWhoseTokenIsReplacedMeanwhile_IsRefused()
+    {
+        // The token names the bot when the hello is checked, and no longer just after: New token swapped it meanwhile.
+        var calls = 0;
+        var host = new RelayHost(token => token == "t" && Interlocked.Increment(ref calls) == 1 ? "Bot" : null);
+        var events = Events(host);
+        var pair = Serve(host);
+        using var client = new SocketLines(pair.Client);
+        var read = client.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        client.Send(Relay.Write(new RelayHello("t", Relay.Version)));
+
+        (await read).Select(Relay.Read).Should().Contain(new RelayRefused("token replaced"));
+        await Task.WhenAll(_runs).WaitAsync(Cancel);
+        host.Agent("Bot")!.IsAway.Should().BeTrue();
+        events.Reader.TryRead(out var seen).Should().BeFalse($"the bot never came, but saw {seen}");
+    }
+
+    [Fact]
+    public async Task AHelloWithAReplacedToken_DoesNotTakeOverFromTheNewOne()
+    {
+        var oldHolds = 1; // the old token holds for one lookup: its hello's check, just before the swap
+        var host = new RelayHost(token => token switch
+        {
+            "new" => "Bot",
+            "old" when Interlocked.Exchange(ref oldHolds, 0) == 1 => "Bot",
+            _ => null,
+        });
+        var (_, _, read) = await RawRunner(host, "new");
+
+        var pair = Serve(host);
+        using var client = new SocketLines(pair.Client);
+        var oldRead = client.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        client.Send(Relay.Write(new RelayHello("old", Relay.Version)));
+        (await oldRead).Select(Relay.Read).Should().Contain(new RelayRefused("token replaced"));
+
+        var agent = host.Agent("Bot")!;
+        agent.IsAway.Should().BeFalse("the runner with the new token keeps its connection");
+        agent.Restart();
+        (await NextMessage(read)).Should().BeOfType<RelayStart>();
     }
 }

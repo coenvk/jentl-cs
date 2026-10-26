@@ -13,7 +13,8 @@ namespace Jentl.Net;
 /// answers null at once, so a table folds the seat without waiting. A <see cref="Restart"/> or <see cref="Stop"/> is
 /// sent again on the next connection until the runner answers, so one asked for while away, or sent into a connection
 /// that had broken unnoticed, still arrives. Each start has a run number that the runner sends back with the agent's
-/// lines and exit; messages from an earlier run, or from before the first start, are ignored. The lines that wait to be
+/// lines and exit; messages from an earlier run, or from before the first start, are ignored. The numbers start where
+/// the host says, which differs from one server run to the next (see <see cref="RelayHost"/>). The lines that wait to be
 /// read are bounded (<see cref="AgentProcess.MaxLines"/> lines and <see cref="MaxWaiting"/> characters in all, the oldest
 /// dropped first) and forgotten when the runner goes, so a bot that nobody asks cannot hold on to memory. Safe to use
 /// from any thread: sockets attach and detach on their own tasks while the game asks on others.
@@ -34,10 +35,16 @@ public sealed class RemoteAgent : IAgent
     private bool _heard; // whether the runner answered since the last order: then it surely arrived
     private TaskCompletionSource _changed = NewChanged(); // completed when the connection goes or the agent exits
     private int _run; // the number of the last start; the runner's lines and exit carry it
+    private bool _started; // whether there was a start: before the first, no run is current
     private volatile bool _exited;
     private volatile string? _problem;
 
-    internal RemoteAgent(string name) => Name = name;
+    /// <summary>
+    /// An agent for the bot <paramref name="name"/> whose first start has run number <paramref name="runBefore"/> + 1.
+    /// The host gives each of its lifetimes another base, so a runner's process from before a server restart never passes
+    /// for one of the new server's runs.
+    /// </summary>
+    internal RemoteAgent(string name, int runBefore = 0) => (Name, _run) = (name, runBefore);
 
     /// <summary>The bot's name, as the host's token lookup gave it.</summary>
     public string Name { get; }
@@ -149,7 +156,9 @@ public sealed class RemoteAgent : IAgent
             Forget();
             _exited = false;
             _problem = null;
-            Order(new RelayStart(++_run));
+            _run = _run == int.MaxValue ? 1 : _run + 1;
+            _started = true;
+            Order(new RelayStart(_run));
         }
     }
 
@@ -249,11 +258,11 @@ public sealed class RemoteAgent : IAgent
 
             switch (message)
             {
-                case RelayLine line when _run > 0 && line.Run == _run:
+                case RelayLine line when _started && line.Run == _run:
                     _heard = true;
                     Keep(line.Text);
                     break;
-                case RelayExited exited when _run > 0 && exited.Run == _run:
+                case RelayExited exited when _started && exited.Run == _run:
                     _heard = true;
                     _exited = true;
                     _problem = exited.Problem;
