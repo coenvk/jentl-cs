@@ -69,18 +69,20 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
             return false;
         }
 
-        // Another connection may take over meanwhile: then that one is closed.
-        while (seat.Agent.Connection is { } lines)
+        // One step with joining (see Join): no hello checked before the token changed can attach after this.
+        SocketLines? lines;
+        lock (seat.Joining)
         {
-            if (seat.Agent.Detach(lines))
+            lines = seat.Agent.Connection;
+            if (lines is null || !seat.Agent.Detach(lines))
             {
-                Report(seat);
-                _ = EndAsync(lines, reason);
-                return true;
+                return false;
             }
         }
 
-        return false;
+        Report(seat);
+        _ = EndAsync(lines, reason);
+        return true;
     }
 
     /// <summary>The bot's agent, or null when no runner has connected for it yet.</summary>
@@ -89,9 +91,9 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     /// <summary>
     /// Serves one runner's connection until it closes: reads the hello (within 5 seconds), refuses an unknown token or
     /// another protocol version, else welcomes the runner, attaches the connection to the bot's agent (made on first
-    /// use) and passes the runner's messages to it. The token is looked up again once attached: a token replaced
-    /// meanwhile (its <see cref="Drop"/> may have come before the attach) is refused with "token replaced". The bot is away as soon as the connection ends, before the closing
-    /// is done. Never throws for a socket that misbehaves or breaks; returns quietly when <paramref name="aborted"/> is
+    /// use) and passes the runner's messages to it. The token is looked up again just before the attach, in one step
+    /// with it that a <see cref="Drop"/> cannot come between: a token replaced meanwhile is refused with "token replaced",
+    /// and never takes the seat. The bot is away as soon as the connection ends, before the closing is done. Never throws for a socket that misbehaves or breaks; returns quietly when <paramref name="aborted"/> is
     /// cancelled. The socket belongs to the caller. Answers the limit the runner broke when that closed the connection
     /// (<see cref="SocketLines.Problem"/>, for the server's log), else null.
     /// </summary>
@@ -188,26 +190,22 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
 
     /// <summary>
     /// Attaches <paramref name="lines"/> to the seat's agent, taking over from the connection before, when
-    /// <paramref name="token"/> still names the bot once attached; false, and the connection before kept, when it no longer
-    /// does. A hello checked just before its token was replaced would otherwise attach just after the <see cref="Drop"/>
-    /// that came with it, and stay. Attaching, checking and handing the seat back are one step for the seat (as is
-    /// <see cref="Leave"/>), so the connection before cannot leave in between and be handed back after it went.
+    /// <paramref name="token"/> still names the bot; false, and nothing attached, when it no longer does. A hello checked
+    /// just before its token was replaced would otherwise attach just after the <see cref="Drop"/> that came with it, and
+    /// stay. Checking and attaching are one step for the seat, as are <see cref="Drop"/> and <see cref="Leave"/>: a drop
+    /// comes either before the check, which then fails, or after the attach, and then closes this connection.
     /// </summary>
     private bool Join(Seat seat, SocketLines lines, string token)
     {
         SocketLines? previous;
         lock (seat.Joining)
         {
-            previous = seat.Agent.Attach(lines);
             if (_nameOfToken(token) != seat.Agent.Name)
             {
-                if (seat.Agent.Detach(lines) && previous is not null)
-                {
-                    seat.Agent.Attach(previous);
-                }
-
                 return false;
             }
+
+            previous = seat.Agent.Attach(lines);
         }
 
         if (previous is not null)
@@ -263,7 +261,7 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
 
         public Lock Gate { get; } = new();
 
-        /// <summary>Held while a connection joins the seat or leaves it: see <see cref="Join"/>.</summary>
+        /// <summary>Held while a connection joins the seat, leaves it or is dropped: see <see cref="Join"/>.</summary>
         public Lock Joining { get; } = new();
 
         public bool Present { get; set; }

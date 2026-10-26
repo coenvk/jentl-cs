@@ -714,4 +714,60 @@ public sealed class RemoteAgentTests : IDisposable
         agent.Restart();
         (await NextMessage(read)).Should().BeOfType<RelayStart>();
     }
+
+    [Fact]
+    public async Task ADropRacingAHelloWithTheOldToken_LeavesNoConnectionWithoutASeat()
+    {
+        // The old token holds for the runner already connected (its two lookups) and for the new hello's first check;
+        // the new hello's second lookup waits until the test has started a Drop, and then finds the token replaced.
+        var calls = 0;
+        var looking = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replaced = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var host = new RelayHost(token =>
+        {
+            if (token != "old")
+            {
+                return null;
+            }
+
+            if (Interlocked.Increment(ref calls) < 4)
+            {
+                return "Bot";
+            }
+
+            looking.TrySetResult();
+            replaced.Task.Wait(Cancel);
+            return null;
+        });
+        var (_, _, firstRead) = await RawRunner(host, "old");
+
+        var pair = Serve(host);
+        using var second = new SocketLines(pair.Client);
+        var secondRead = second.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        second.Send(Relay.Write(new RelayHello("old", Relay.Version)));
+        await looking.Task.WaitAsync(Cancel);
+        var drop = Task.Run(() => host.Drop("Bot", "token replaced"), Cancel);
+        await Task.Delay(200, Cancel);
+        replaced.SetResult();
+        await drop.WaitAsync(Cancel);
+
+        (await secondRead).Select(Relay.Read).Should().Contain(new RelayRefused("token replaced"));
+        using var patience = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var told = new List<RelayMessage?>();
+        try
+        {
+            while (await firstRead.MoveNextAsync().AsTask().WaitAsync(patience.Token))
+            {
+                told.Add(Relay.Read(firstRead.Current));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Still open: the assertion below says so.
+        }
+
+        told.Should().ContainSingle(m => m is RelayRefused, "the connection that lost its seat is told so and closed, not left open");
+        host.Agent("Bot")!.IsAway.Should().BeTrue();
+        host.Agent("Bot")!.Connection.Should().BeNull();
+    }
 }
