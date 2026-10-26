@@ -80,7 +80,7 @@ public sealed class SocketLines : IDisposable
 
             if (times.Count >= _maxPerSecond)
             {
-                await ViolatedAsync($"too many messages (over {_maxPerSecond} a second)").ConfigureAwait(false);
+                Violated($"too many messages (over {_maxPerSecond} a second)");
                 yield break;
             }
 
@@ -125,26 +125,26 @@ public sealed class SocketLines : IDisposable
                 var result = await _socket.ReceiveAsync(buffer, cancel).ConfigureAwait(false);
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    await CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye").ConfigureAwait(false);
+                    _ = CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye"); // the reading ends now; the close goes when it can
                     return null;
                 }
 
                 if (result.MessageType != WebSocketMessageType.Text)
                 {
-                    await ViolatedAsync("binary message (only text is accepted)").ConfigureAwait(false);
+                    Violated("binary message (only text is accepted)");
                     return null;
                 }
 
                 if (++frames > MaxFrames)
                 {
-                    await ViolatedAsync($"message in too many frames (over {MaxFrames})").ConfigureAwait(false);
+                    Violated($"message in too many frames (over {MaxFrames})");
                     return null;
                 }
 
                 message.Write(buffer, 0, result.Count);
                 if (message.Length > _maxLength)
                 {
-                    await ViolatedAsync($"message too long (over {_maxLength} bytes)").ConfigureAwait(false);
+                    Violated($"message too long (over {_maxLength} bytes)");
                     return null;
                 }
 
@@ -170,11 +170,15 @@ public sealed class SocketLines : IDisposable
         return null;
     }
 
-    private async Task ViolatedAsync(string problem)
+    /// <summary>
+    /// Ends the connection for a peer that broke a limit. The reading ends at once; the close goes when it can (a send
+    /// stuck on a peer that does not read holds it up to a few seconds), so the owner learns of the end without waiting.
+    /// </summary>
+    private void Violated(string problem)
     {
         _problem = problem;
         _outgoing.Writer.TryComplete();
-        await CloseOutputAsync(WebSocketCloseStatus.PolicyViolation, problem).ConfigureAwait(false);
+        _ = CloseOutputAsync(WebSocketCloseStatus.PolicyViolation, problem);
     }
 
     /// <summary>Sends the close frame once, if the socket still may; a broken socket is closed already.</summary>

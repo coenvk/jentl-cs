@@ -10,9 +10,11 @@ namespace Jentl.Net;
 /// </summary>
 /// <remarks>
 /// While no runner is connected the agent is away (<see cref="IsAway"/>): sending drops the line and every read
-/// answers null at once, so a table folds the seat without waiting. A <see cref="Restart"/> or <see cref="Stop"/>
-/// while away is passed on when the runner comes back. Safe to use from any thread: sockets attach and detach on their
-/// own tasks while the game asks on others.
+/// answers null at once, so a table folds the seat without waiting. A <see cref="Restart"/> or <see cref="Stop"/> is
+/// sent again on the next connection until the runner answers, so one asked for while away, or sent into a connection
+/// that had broken unnoticed, still arrives. Each start has a run number that the runner sends back with the agent's
+/// lines and exit; messages from an earlier run are ignored. Safe to use from any thread: sockets attach and detach on
+/// their own tasks while the game asks on others.
 /// </remarks>
 public sealed class RemoteAgent : IAgent
 {
@@ -20,8 +22,10 @@ public sealed class RemoteAgent : IAgent
     private readonly Channel<string> _lines = Channel.CreateBounded<string>(
         new BoundedChannelOptions(AgentProcess.MaxLines) { FullMode = BoundedChannelFullMode.DropOldest });
     private SocketLines? _socket; // the runner's connection, or null while away
-    private RelayMessage? _owed; // a start or stop asked for while away, to send when the runner comes back
+    private RelayMessage? _order; // the last start or stop
+    private bool _heard; // whether the runner answered since the last order: then it surely arrived
     private TaskCompletionSource _changed = NewChanged(); // completed when the connection goes or the agent exits
+    private int _run; // the number of the last start; the runner's lines and exit carry it
     private volatile bool _exited;
     private volatile string? _problem;
 
@@ -139,7 +143,7 @@ public sealed class RemoteAgent : IAgent
 
             _exited = false;
             _problem = null;
-            Order(new RelayStart());
+            Order(new RelayStart(++_run));
         }
     }
 
@@ -176,8 +180,10 @@ public sealed class RemoteAgent : IAgent
     }
 
     /// <summary>
-    /// Makes <paramref name="socket"/> the runner's connection and sends a start or stop that was asked for while away.
-    /// Returns the connection it takes over from, or null when the bot was away.
+    /// Makes <paramref name="socket"/> the runner's connection. Sends the last start or stop again when the runner has
+    /// not answered since: it was asked for while away, or went into a connection that had broken without the server
+    /// noticing (the runner then comes back and takes its seat over). Returns the connection it takes over from, or null
+    /// when the bot was away.
     /// </summary>
     internal SocketLines? Attach(SocketLines socket)
     {
@@ -186,10 +192,9 @@ public sealed class RemoteAgent : IAgent
         lock (_lock)
         {
             (previous, _socket) = (_socket, socket);
-            if (_owed is { } owed)
+            if (_order is { } order && !_heard)
             {
-                socket.Send(Relay.Write(owed));
-                _owed = null;
+                socket.Send(Relay.Write(order));
             }
 
             changed = Change();
@@ -218,7 +223,10 @@ public sealed class RemoteAgent : IAgent
         return true;
     }
 
-    /// <summary>Takes a message the runner sent over <paramref name="socket"/>; ignored when that connection was taken over.</summary>
+    /// <summary>
+    /// Takes a message the runner sent over <paramref name="socket"/>. Ignored when that connection was taken over, and
+    /// when it comes from a process before the last start (its run is not the current one).
+    /// </summary>
     internal void Receive(SocketLines socket, RelayMessage message)
     {
         TaskCompletionSource? changed = null;
@@ -231,10 +239,12 @@ public sealed class RemoteAgent : IAgent
 
             switch (message)
             {
-                case RelayLine line:
+                case RelayLine line when line.Run == _run:
+                    _heard = true;
                     _lines.Writer.TryWrite(line.Text);
                     break;
-                case RelayExited exited:
+                case RelayExited exited when exited.Run == _run:
+                    _heard = true;
                     _exited = true;
                     _problem = exited.Problem;
                     changed = Change();
@@ -245,17 +255,15 @@ public sealed class RemoteAgent : IAgent
         changed?.TrySetResult();
     }
 
-    /// <summary>Sends <paramref name="message"/> to the runner, or keeps it for when the runner comes back. Call under the lock.</summary>
+    /// <summary>
+    /// Sends <paramref name="message"/> (a start or stop) to the runner, if one is connected, and keeps it to send again
+    /// on the next connection until the runner answers. Call under the lock.
+    /// </summary>
     private void Order(RelayMessage message)
     {
-        if (_socket is { } socket)
-        {
-            socket.Send(Relay.Write(message));
-        }
-        else
-        {
-            _owed = message;
-        }
+        _order = message;
+        _heard = false;
+        _socket?.Send(Relay.Write(message));
     }
 
     /// <summary>Swaps in a new change signal and returns the old one, to complete outside the lock. Call under the lock.</summary>

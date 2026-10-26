@@ -20,15 +20,19 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     private static readonly TimeSpan HelloWait = TimeSpan.FromSeconds(5);
 
     private readonly Func<string, string?> _nameOfToken = nameOfToken ?? throw new ArgumentNullException(nameof(nameOfToken));
-    private readonly ConcurrentDictionary<string, RemoteAgent> _agents = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Seat> _seats = new(StringComparer.Ordinal);
 
     // Each connection's way to end its own run, for when another connection takes over.
     private readonly ConcurrentDictionary<SocketLines, CancellationTokenSource> _runs = new();
 
-    /// <summary>Raised with the bot's name when its runner connects while the bot was away.</summary>
+    /// <summary>
+    /// Raised with the bot's name when the bot comes back from away: a runner connected for it. For each bot,
+    /// <see cref="Connected"/> and <see cref="Disconnected"/> are raised one at a time and in turn, and each says what
+    /// <see cref="RemoteAgent.IsAway"/> was when it was raised; after the last one, it still says so.
+    /// </summary>
     public event Action<string>? Connected;
 
-    /// <summary>Raised with the bot's name when its runner's connection ends and no other took over: the bot is away.</summary>
+    /// <summary>Raised with the bot's name when the bot is away: its runner's connection ended and no other took over. See <see cref="Connected"/>.</summary>
     public event Action<string>? Disconnected;
 
     /// <summary>The longest message a runner may send, in bytes; a longer one closes its connection.</summary>
@@ -38,13 +42,14 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     public int MaxPerSecond { get; init; } = 200;
 
     /// <summary>The bot's agent, or null when no runner has connected for it yet.</summary>
-    public RemoteAgent? Agent(string name) => _agents.TryGetValue(name, out var agent) ? agent : null;
+    public RemoteAgent? Agent(string name) => _seats.TryGetValue(name, out var seat) ? seat.Agent : null;
 
     /// <summary>
     /// Serves one runner's connection until it closes: reads the hello (within 5 seconds), refuses an unknown token or
     /// another protocol version, else welcomes the runner, attaches the connection to the bot's agent (made on first
-    /// use) and passes the runner's messages to it. Never throws for a socket that misbehaves or breaks; returns quietly
-    /// when <paramref name="aborted"/> is cancelled. The socket belongs to the caller.
+    /// use) and passes the runner's messages to it. The bot is away as soon as the connection ends, before the closing
+    /// is done. Never throws for a socket that misbehaves or breaks; returns quietly when <paramref name="aborted"/> is
+    /// cancelled. The socket belongs to the caller.
     /// </summary>
     public async Task RunAsync(WebSocket socket, CancellationToken aborted)
     {
@@ -52,7 +57,7 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
         using var lines = new SocketLines(socket, MaxLength, MaxPerSecond);
         using var ended = CancellationTokenSource.CreateLinkedTokenSource(aborted);
         ended.CancelAfter(HelloWait);
-        RemoteAgent? agent = null;
+        Seat? seat = null;
         try
         {
             await using var messages = lines.ReadAllAsync(ended.Token).GetAsyncEnumerator(ended.Token);
@@ -85,26 +90,24 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
                 return;
             }
 
-            agent = _agents.GetOrAdd(name, n => new RemoteAgent(n));
+            seat = _seats.GetOrAdd(name, n => new Seat(new RemoteAgent(n)));
             _runs[lines] = ended;
             lines.Send(Relay.Write(new RelayWelcome(name)));
-            if (agent.Attach(lines) is { } previous)
+            if (seat.Agent.Attach(lines) is { } previous)
             {
                 _ = TakeOverAsync(previous);
             }
-            else
-            {
-                Connected?.Invoke(name);
-            }
 
+            Report(seat);
             while (await messages.MoveNextAsync().ConfigureAwait(false))
             {
                 if (Relay.Read(messages.Current) is { } message)
                 {
-                    agent.Receive(lines, message);
+                    seat.Agent.Receive(lines, message);
                 }
             }
 
+            Leave(seat, lines); // away now: closing can take seconds when the runner stopped reading
             await lines.CloseAsync("bye").ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -114,10 +117,39 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
         finally
         {
             _runs.TryRemove(lines, out _);
-            if (agent is not null && agent.Detach(lines))
+            if (seat is not null)
             {
-                Disconnected?.Invoke(agent.Name);
+                Leave(seat, lines);
             }
+        }
+    }
+
+    /// <summary>Detaches <paramref name="lines"/> from the seat's agent, and says so when the bot is away now.</summary>
+    private void Leave(Seat seat, SocketLines lines)
+    {
+        if (seat.Agent.Detach(lines))
+        {
+            Report(seat);
+        }
+    }
+
+    /// <summary>
+    /// Raises <see cref="Connected"/> or <see cref="Disconnected"/> when whether the bot is away differs from what the
+    /// last event said. Called after every attach and detach, one at a time per bot, so the events come in turn and the
+    /// last one matches the bot, however attaching and detaching on other tasks interleave.
+    /// </summary>
+    private void Report(Seat seat)
+    {
+        lock (seat.Gate)
+        {
+            var present = !seat.Agent.IsAway;
+            if (present == seat.Present)
+            {
+                return;
+            }
+
+            seat.Present = present;
+            (present ? Connected : Disconnected)?.Invoke(seat.Agent.Name);
         }
     }
 
@@ -137,5 +169,15 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
                 // Its run ended meanwhile.
             }
         }
+    }
+
+    /// <summary>A bot's agent, and what the last <see cref="Connected"/> or <see cref="Disconnected"/> said of it.</summary>
+    private sealed class Seat(RemoteAgent agent)
+    {
+        public RemoteAgent Agent { get; } = agent;
+
+        public Lock Gate { get; } = new();
+
+        public bool Present { get; set; }
     }
 }

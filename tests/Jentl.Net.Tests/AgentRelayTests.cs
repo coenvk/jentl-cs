@@ -31,14 +31,18 @@ public sealed class AgentRelayTests : IDisposable
     [Fact]
     public void EveryMessage_RoundTrips_AsCamelCaseJson_WithItsType()
     {
-        RelayMessage[] messages = [new RelayHello("t", Relay.Version), new RelayLine("x"), new RelayExited("exited with code 3"),
-            new RelayExited(null), new RelayWelcome("Bot"), new RelayRefused("no"), new RelayStart(), new RelayStop()];
+        RelayMessage[] messages = [new RelayHello("t", Relay.Version), new RelayLine("x"), new RelayLine("x", 2), new RelayExited("exited with code 3", 4),
+            new RelayExited(null), new RelayWelcome("Bot"), new RelayRefused("no"), new RelayStart(1), new RelayStop()];
         foreach (var message in messages)
         {
             Relay.Read(Relay.Write(message)).Should().Be(message);
         }
 
         Relay.Write(new RelayHello("t", 1)).Should().Be("""{"type":"hello","token":"t","version":1}""");
+        Relay.Write(new RelayLine("x")).Should().Be("""{"type":"line","text":"x"}""", "a line for the agent needs no run");
+        Relay.Write(new RelayLine("x", 2)).Should().Be("""{"type":"line","text":"x","run":2}""");
+        Relay.Write(new RelayStart(3)).Should().Be("""{"type":"start","run":3}""");
+        Relay.Read("""{"type":"start"}""").Should().BeNull("a start says which run it begins");
         var status = (RelayStatus)Relay.Read("""{"type":"status","status":{"rank":3}}""")!;
         status.Status.GetProperty("rank").GetInt32().Should().Be(3);
     }
@@ -64,9 +68,9 @@ public sealed class AgentRelayTests : IDisposable
         var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
         (await Next(lines)).Should().Be(new RelayHello("token", 1));
         server.Send(Relay.Write(new RelayWelcome("Bot")));
-        server.Send(Relay.Write(new RelayStart()));
+        server.Send(Relay.Write(new RelayStart(1)));
         server.Send(Relay.Write(new RelayLine("ping")));
-        (await Next(lines)).Should().Be(new RelayLine("ping"), "the echo agent answers with the same line");
+        (await Next(lines)).Should().Be(new RelayLine("ping", 1), "the echo agent answers with the same line");
     }
 
     [Fact]
@@ -79,7 +83,7 @@ public sealed class AgentRelayTests : IDisposable
         var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
         await Next(lines);
         server.Send(Relay.Write(new RelayWelcome("Bot")));
-        server.Send(Relay.Write(new RelayStart()));
+        server.Send(Relay.Write(new RelayStart(1)));
         for (var i = 0; i < 100; i++)
         {
             server.Send(Relay.Write(new RelayLine($"{i}")));
@@ -87,7 +91,7 @@ public sealed class AgentRelayTests : IDisposable
 
         for (var i = 0; i < 100; i++)
         {
-            (await Next(lines)).Should().Be(new RelayLine($"{i}"));
+            (await Next(lines)).Should().Be(new RelayLine($"{i}", 1));
         }
     }
 
@@ -137,10 +141,10 @@ public sealed class AgentRelayTests : IDisposable
         var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
         await Next(lines);
         server.Send(Relay.Write(new RelayWelcome("Bot")));
-        server.Send(Relay.Write(new RelayStart()));
+        server.Send(Relay.Write(new RelayStart(1)));
         server.Send(Relay.Write(new RelayLine("x")));
 
-        (await Next(lines)).Should().Be(new RelayExited("exited with code 3"));
+        (await Next(lines)).Should().Be(new RelayExited("exited with code 3", 1));
     }
 
     [Fact]
@@ -153,16 +157,16 @@ public sealed class AgentRelayTests : IDisposable
         var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
         await Next(lines);
         server.Send(Relay.Write(new RelayWelcome("Bot")));
-        server.Send(Relay.Write(new RelayStart()));
+        server.Send(Relay.Write(new RelayStart(1)));
         server.Send(Relay.Write(new RelayLine("one")));
-        (await Next(lines)).Should().Be(new RelayLine("one"));
+        (await Next(lines)).Should().Be(new RelayLine("one", 1));
 
         server.Send(Relay.Write(new RelayStop()));
         server.Send(Relay.Write(new RelayLine("lost")));
-        server.Send(Relay.Write(new RelayStart()));
+        server.Send(Relay.Write(new RelayStart(2)));
         server.Send(Relay.Write(new RelayLine("two")));
 
-        (await Next(lines)).Should().Be(new RelayLine("two"), "a stopped agent sends nothing more, not even its exit");
+        (await Next(lines)).Should().Be(new RelayLine("two", 2), "a stopped agent sends nothing more, not even its exit");
     }
 
     [Fact]
@@ -190,9 +194,9 @@ public sealed class AgentRelayTests : IDisposable
         var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
         await Next(lines);
         server.Send(Relay.Write(new RelayWelcome("Bot")));
-        server.Send(Relay.Write(new RelayStart()));
+        server.Send(Relay.Write(new RelayStart(1)));
         server.Send(Relay.Write(new RelayLine("a")));
-        (await Next(lines)).Should().Be(new RelayLine("a"));
+        (await Next(lines)).Should().Be(new RelayLine("a", 1));
         first.Server.Abort();
 
         using var second = await pairs.Reader.ReadAsync(Cancel);
@@ -202,7 +206,7 @@ public sealed class AgentRelayTests : IDisposable
         again.Send(Relay.Write(new RelayWelcome("Bot")));
         again.Send(Relay.Write(new RelayLine("b")));
 
-        (await Next(moreLines)).Should().Be(new RelayLine("b"), "the agent kept running");
+        (await Next(moreLines)).Should().Be(new RelayLine("b", 1), "the agent kept running");
         status.Should().ContainInOrder("connected as Bot", "reconnecting in 1 s", "reconnecting in 2 s", "connected as Bot");
     }
 

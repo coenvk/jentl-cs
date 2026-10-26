@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Channels;
 
 namespace Jentl.Net.Tests;
@@ -196,11 +197,11 @@ public sealed class RemoteAgentTests : IDisposable
         var agent = host.Agent("Bot")!;
         agent.Restart();
         (await read.MoveNextAsync()).Should().BeTrue();
-        Relay.Read(read.Current).Should().Be(new RelayStart());
+        Relay.Read(read.Current).Should().Be(new RelayStart(1));
 
         var answer = agent.ReadAsync(Limit);
-        client.Send(Relay.Write(new RelayLine("last words")));
-        client.Send(Relay.Write(new RelayExited("exited with code 3")));
+        client.Send(Relay.Write(new RelayLine("last words", 1)));
+        client.Send(Relay.Write(new RelayExited("exited with code 3", 1)));
 
         (await answer).Should().Be("last words");
         (await agent.ReadAsync(Limit)).Should().BeNull();
@@ -289,7 +290,7 @@ public sealed class RemoteAgentTests : IDisposable
         (await lines.MoveNextAsync()).Should().BeTrue();
         Relay.Read(lines.Current).Should().Be(new RelayWelcome("Bot"));
         (await lines.MoveNextAsync()).Should().BeTrue();
-        Relay.Read(lines.Current).Should().Be(new RelayStart());
+        Relay.Read(lines.Current).Should().Be(new RelayStart(1));
     }
 
     [Fact]
@@ -333,11 +334,12 @@ public sealed class RemoteAgentTests : IDisposable
         Relay.Read(firstRead.Current).Should().Be(new RelayRefused("connected elsewhere"));
 
         var agent = host.Agent("Bot")!;
-        await first.SendNowAsync(Relay.Write(new RelayLine("old")));
-        await first.SendNowAsync(Relay.Write(new RelayExited("old")));
+        agent.Restart(); // run 1, on the second connection
+        await first.SendNowAsync(Relay.Write(new RelayLine("old", 1)));
+        await first.SendNowAsync(Relay.Write(new RelayExited("old", 1)));
         (await agent.ReadAsync(TimeSpan.FromMilliseconds(500))).Should().BeNull();
         agent.HasExited.Should().BeFalse();
-        second.Send(Relay.Write(new RelayLine("new")));
+        second.Send(Relay.Write(new RelayLine("new", 1)));
         (await agent.ReadAsync(Limit)).Should().Be("new");
     }
 
@@ -349,15 +351,16 @@ public sealed class RemoteAgentTests : IDisposable
         using var first = new SocketLines(firstPair.Server);
         using var second = new SocketLines(secondPair.Server);
         var agent = new RemoteAgent("Bot");
+        agent.Restart(); // run 1, sent when a connection attaches
         agent.Attach(first).Should().BeNull();
         agent.Attach(second).Should().BeSameAs(first);
 
-        agent.Receive(first, new RelayLine("old"));
-        agent.Receive(first, new RelayExited("old"));
+        agent.Receive(first, new RelayLine("old", 1));
+        agent.Receive(first, new RelayExited("old", 1));
         agent.Detach(first).Should().BeFalse();
         agent.IsAway.Should().BeFalse();
         agent.HasExited.Should().BeFalse();
-        agent.Receive(second, new RelayLine("new"));
+        agent.Receive(second, new RelayLine("new", 1));
         (await agent.ReadAsync(Limit)).Should().Be("new");
     }
 
@@ -409,5 +412,132 @@ public sealed class RemoteAgentTests : IDisposable
 
         await Task.WhenAll(_runs).WaitAsync(Cancel);
         (await events.Reader.ReadAsync(Cancel)).Should().Be("-Bot");
+    }
+
+    /// <summary>A runner played by the test: connects, says hello for <paramref name="token"/> and reads the welcome.</summary>
+    private async Task<(SocketPair Pair, SocketLines Lines, IAsyncEnumerator<string> Read)> RawRunner(RelayHost host, string token)
+    {
+        var pair = Serve(host);
+        var lines = new SocketLines(pair.Client);
+        _owned.Add(lines);
+        var read = lines.ReadAllAsync(Cancel).GetAsyncEnumerator(Cancel);
+        lines.Send(Relay.Write(new RelayHello(token, Relay.Version)));
+        (await NextMessage(read)).Should().BeOfType<RelayWelcome>();
+        return (pair, lines, read);
+    }
+
+    private static async Task<RelayMessage?> NextMessage(IAsyncEnumerator<string> read)
+    {
+        (await read.MoveNextAsync()).Should().BeTrue("a message was expected before the connection closed");
+        return Relay.Read(read.Current);
+    }
+
+    [Fact]
+    public async Task ARestartIntoAHalfOpenConnection_IsSentAgain_WhenTheRunnerTakesTheSeatBack()
+    {
+        var host = Host();
+        await RawRunner(host, "t"); // a connection that broke without the server noticing: it reads nothing more
+        var agent = host.Agent("Bot")!;
+        agent.Restart();
+        agent.IsAway.Should().BeFalse();
+
+        var (_, _, read) = await RawRunner(host, "t");
+
+        (await NextMessage(read)).Should().Be(new RelayStart(1), "nothing came back since the start, so it may never have arrived");
+    }
+
+    [Fact]
+    public async Task ATakeover_DoesNotRestartAnAgentThatAnswered()
+    {
+        var host = Host();
+        var (_, first, firstRead) = await RawRunner(host, "t");
+        var agent = host.Agent("Bot")!;
+        agent.Restart();
+        (await NextMessage(firstRead)).Should().Be(new RelayStart(1));
+        first.Send(Relay.Write(new RelayLine("hi", 1)));
+        (await agent.ReadAsync(Limit)).Should().Be("hi");
+
+        var (_, _, read) = await RawRunner(host, "t");
+        agent.Status(JsonSerializer.SerializeToElement(7));
+
+        (await NextMessage(read)).Should().BeOfType<RelayStatus>("the runner kept its agent, which had answered");
+    }
+
+    [Fact]
+    public async Task AStaleExit_AfterARestart_DoesNotEndTheNewRun()
+    {
+        var host = Host();
+        var (_, client, read) = await RawRunner(host, "t");
+        var agent = host.Agent("Bot")!;
+        agent.Restart();
+        (await NextMessage(read)).Should().Be(new RelayStart(1));
+        agent.Restart();
+        (await NextMessage(read)).Should().Be(new RelayStart(2));
+
+        client.Send(Relay.Write(new RelayExited("exited with code 3", 1)));
+        client.Send(Relay.Write(new RelayLine("old", 1)));
+        client.Send(Relay.Write(new RelayLine("unnumbered")));
+        client.Send(Relay.Write(new RelayLine("new", 2)));
+
+        (await agent.ReadAsync(Limit)).Should().Be("new");
+        agent.HasExited.Should().BeFalse();
+        agent.Problem.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ARunnerThatStopsReading_AndCloses_IsAwayAtOnce()
+    {
+        var host = Host();
+        var events = Events(host);
+        var (pair, _, _) = await RawRunner(host, "t");
+        (await events.Reader.ReadAsync(Cancel)).Should().Be("+Bot");
+        var agent = host.Agent("Bot")!;
+        agent.Restart();
+        var big = new string('x', 60_000);
+        for (var i = 0; i < 20; i++)
+        {
+            agent.Send(big); // more than the connection holds: the host's sending gets stuck
+        }
+
+        await Task.Delay(300, Cancel);
+        var watch = Stopwatch.StartNew();
+        await pair.Client.CloseOutputAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "bye", Cancel);
+
+        (await events.Reader.ReadAsync(Cancel)).Should().Be("-Bot");
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2), "the bot is away before the closing is done");
+        agent.IsAway.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task FastReconnects_RaiseConnectedAndDisconnected_InTurn()
+    {
+        var host = Host();
+        var events = new ConcurrentQueue<string>();
+        host.Connected += _ => events.Enqueue("+");
+        host.Disconnected += _ => events.Enqueue("-");
+        var aborts = new List<Task>();
+        for (var i = 0; i < 40; i++)
+        {
+            var pair = Serve(host);
+            var lines = new SocketLines(pair.Client);
+            _owned.Add(lines);
+            lines.Send(Relay.Write(new RelayHello("t", Relay.Version)));
+            var wait = i % 4;
+            aborts.Add(Task.Run(async () =>
+            {
+                await Task.Delay(wait, Cancel);
+                pair.Client.Abort();
+            }, Cancel));
+        }
+
+        await Task.WhenAll(aborts);
+        await Task.WhenAll(_runs).WaitAsync(Cancel);
+
+        var seen = string.Concat(events);
+        seen.Should().MatchRegex("^(\\+-)*$", "each connect is followed by its disconnect");
+        if (host.Agent("Bot") is { } agent)
+        {
+            agent.IsAway.Should().BeTrue();
+        }
     }
 }

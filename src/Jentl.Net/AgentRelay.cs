@@ -133,8 +133,8 @@ public sealed class AgentRelay(Func<CancellationToken, Task<WebSocket>> connect,
                             break;
                         case RelayRefused refused:
                             return (refused.Reason, welcomed);
-                        case RelayStart:
-                            StartAgent();
+                        case RelayStart start:
+                            StartAgent(start.Run);
                             break;
                         case RelayLine line:
                             lock (_lock)
@@ -167,7 +167,7 @@ public sealed class AgentRelay(Func<CancellationToken, Task<WebSocket>> connect,
         return (null, welcomed);
     }
 
-    private void StartAgent()
+    private void StartAgent(int run)
     {
         StopAgent(wait: false);
         var agent = AgentProcess.Start(_command);
@@ -176,7 +176,7 @@ public sealed class AgentRelay(Func<CancellationToken, Task<WebSocket>> connect,
             _agent = agent;
         }
 
-        _ = Task.Run(() => PumpAsync(agent));
+        _ = Task.Run(() => PumpAsync(agent, run));
     }
 
     /// <summary>Stops the agent, if one runs; it sends nothing more, not even its exit. Waits for it to end only when asked.</summary>
@@ -203,21 +203,21 @@ public sealed class AgentRelay(Func<CancellationToken, Task<WebSocket>> connect,
         }
     }
 
-    /// <summary>Sends the agent's lines to the server as it writes them, then its exit, for as long as it is the current agent.</summary>
-    private async Task PumpAsync(AgentProcess agent)
+    /// <summary>Sends the agent's lines to the server as it writes them, then its exit, each with the run that started it, for as long as it is the current agent.</summary>
+    private async Task PumpAsync(AgentProcess agent, int run)
     {
         while (true)
         {
             if (await agent.ReadAsync(ReadLimit).ConfigureAwait(false) is { } line)
             {
-                if (!await SendAsync(agent, new RelayLine(line)).ConfigureAwait(false))
+                if (!await SendAsync(agent, new RelayLine(line, run)).ConfigureAwait(false))
                 {
                     return;
                 }
             }
             else if (agent.HasExited)
             {
-                await SendAsync(agent, new RelayExited(agent.Problem)).ConfigureAwait(false);
+                await SendAsync(agent, new RelayExited(agent.Problem, run)).ConfigureAwait(false);
                 return;
             }
         }

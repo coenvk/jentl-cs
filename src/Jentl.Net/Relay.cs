@@ -21,11 +21,17 @@ public abstract record RelayMessage;
 /// <summary>Runner to server, first: the bot's secret token and the <see cref="Relay.Version"/> the runner speaks.</summary>
 public sealed record RelayHello(string Token, int Version) : RelayMessage;
 
-/// <summary>Either way: one line the agent wrote (runner to server), or one line for the agent (server to runner).</summary>
-public sealed record RelayLine(string Text) : RelayMessage;
+/// <summary>
+/// Either way: one line the agent wrote (runner to server, with the <paramref name="Run"/> of the
+/// <see cref="RelayStart"/> that started the agent), or one line for the agent (server to runner, without a run).
+/// </summary>
+public sealed record RelayLine(string Text, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Run = null) : RelayMessage;
 
-/// <summary>Runner to server: the agent ended by itself; <paramref name="Problem"/> is its <see cref="IAgent.Problem"/>.</summary>
-public sealed record RelayExited(string? Problem) : RelayMessage;
+/// <summary>
+/// Runner to server: the agent ended by itself; <paramref name="Problem"/> is its <see cref="IAgent.Problem"/> and
+/// <paramref name="Run"/> the run of the <see cref="RelayStart"/> that started it.
+/// </summary>
+public sealed record RelayExited(string? Problem, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Run = null) : RelayMessage;
 
 /// <summary>Server to runner: the token is good; the bot plays as <paramref name="Name"/>.</summary>
 public sealed record RelayWelcome(string Name) : RelayMessage;
@@ -33,8 +39,12 @@ public sealed record RelayWelcome(string Name) : RelayMessage;
 /// <summary>Server to runner: the hello was turned away, and why; the server then closes the connection.</summary>
 public sealed record RelayRefused(string Reason) : RelayMessage;
 
-/// <summary>Server to runner: start a fresh agent process (stopping one that still runs).</summary>
-public sealed record RelayStart : RelayMessage;
+/// <summary>
+/// Server to runner: start a fresh agent process (stopping one that still runs). <paramref name="Run"/> numbers the
+/// starts; the runner sends it back with the agent's lines and exit, so the server can tell a late message from the
+/// process before from one of the new process.
+/// </summary>
+public sealed record RelayStart(int Run) : RelayMessage;
 
 /// <summary>Server to runner: stop the agent.</summary>
 #pragma warning disable CA1716 // Stop is the protocol's word; it is only a keyword in Visual Basic.
