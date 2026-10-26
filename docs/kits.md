@@ -661,6 +661,7 @@ dropped first, and a line is cut at `MaxLineLength` (1 MiB) characters.
 | `AskAsync(line, limit)` | Throws away the lines the agent sent before (late answers to earlier questions), sends `line`, and returns its answer, or null when none came in time |
 | `Send`, `ReadAsync(limit)` | Sends a line without ever blocking; reads the next line with a time limit |
 | `Problem`, `ErrorOutput`, `Stop` | What is wrong (or null), the last stderr lines, and killing the agent with everything it started |
+| `IAgent` | What a game asks of a bot, wherever it runs: `Send`, `ReadAsync`, `AskAsync`, `HasExited`, `Problem`, `ErrorOutput`, `Dispose`. `AgentProcess` and `RemoteAgent` implement it. `IsAway` (false unless an implementation says otherwise) is true while a remote bot's connection is down, so a table can fold its seat at once |
 
 ```csharp
 using var agent = AgentProcess.Start(new AgentCommand("python3", ["bots/random_bot.py"], WorkingDirectory: botsDir));
@@ -675,9 +676,11 @@ the order it wrote them, and its exit.
 
 | Part | What it does |
 |---|---|
-| `Relay` | The JSON messages, one per text frame with a `type`: `RelayHello` (token and `Relay.Version`), `RelayLine` and `RelayExited` up; `RelayWelcome`, `RelayRefused`, `RelayStart`, `RelayLine`, `RelayStop` and `RelayStatus` (the game's own JSON, for the runner to show) down. `Read` gives null for anything it does not know |
+| `Relay` | The JSON messages (all a `RelayMessage`), one per text frame with a `type`: `RelayHello` (token and `Relay.Version`), `RelayLine` and `RelayExited` up; `RelayWelcome`, `RelayRefused`, `RelayStart`, `RelayLine`, `RelayStop` and `RelayStatus` (the game's own JSON, for the runner to show) down. `RelayStart` carries a run number, which the runner echoes in the `RelayLine` and `RelayExited` it sends, so the server can drop what a stopped process wrote late. `Write`, and `Read`, which gives null for anything it does not know |
 | `SocketLines` | A WebSocket as lines: `Send` queues without blocking, `ReadAllAsync` reads until the socket closes, `CloseAsync` sends what is queued and closes. A message over `maxLength` bytes (64 KiB) or in more than `MaxFrames` (1,024) frames, more than `maxPerSecond` (200) in a second, or a binary message closes the socket with a policy violation, and `Problem` says which |
 | `AgentRelay` | The runner: `RunAsync` connects, says hello and does what the server asks; a dropped connection is tried again after 1, 2, 4 … 30 seconds while the agent keeps running, and only `RelayRefused` (or cancelling) ends it. `Status` tells the owner what happens ("connected as Bot", "reconnecting in 4 s") |
+| `RelayHost` | The server: `RunAsync(socket, aborted)` serves one runner's connection (hello within 5 seconds, token checked through the `nameOfToken` function you give it) and ends when it closes. `Agent(name)` is the bot's `RemoteAgent`, null until its runner first connects. One connection per bot: a second takes over and the first is told "connected elsewhere". `Connected` and `Disconnected` say when a bot comes or goes. A runner that breaks `MaxLength` or `MaxPerSecond` loses only its own connection |
+| `RemoteAgent` | A bot on another computer, as an `IAgent`. While no runner is connected it is away: `Send` drops the line and reads answer null at once. `Restart` has the runner start a fresh process for a new match; `Stop` stops it; either is sent again on reconnect until answered. The same instance stays the bot's throughout, so a reconnecting runner keeps its seat. `ErrorOutput` is always empty: stderr stays with the owner. `Status(json)` shows the owner something |
 
 ```csharp
 using var relay = new AgentRelay(async cancel =>
@@ -688,6 +691,19 @@ using var relay = new AgentRelay(async cancel =>
 }, token, new AgentCommand("python3", ["my_bot.py"]));
 relay.Status += Console.WriteLine;
 await relay.RunAsync(cancel);
+```
+
+On the server, the host takes the sockets and the game asks the bot as it would a local agent:
+
+```csharp
+var host = new RelayHost(token => tokens.GetValueOrDefault(token));   // the bot's name, or null for an unknown token
+// in the endpoint for "/bots": await host.RunAsync(await context.WebSockets.AcceptWebSocketAsync(), context.RequestAborted);
+
+if (host.Agent("Bot") is { IsAway: false } bot)
+{
+    bot.Restart();                                                    // a fresh process for a new match
+    var answer = await bot.AskAsync(StateJson(game, seat), TimeSpan.FromSeconds(2));   // null when late, gone or away
+}
 ```
 
 ## Leaderboards
@@ -783,6 +799,7 @@ Paddock (a car collecting game) is built on these.
 | `Jentl.Collect.StableSeed` | A `Random` seed from text that is the same on every platform and run (FNV-1a), for seeding by an id |
 | `Jentl.Collect.Rotation` | Equal periods from an epoch, for things on a calendar (this week's events): `PeriodAt(time)` and `Pick(items, time, offset)` give every device the same answer without a server |
 | `Jentl.Collect.RunningStats` | The mean, standard deviation and 95% margin of a series of numbers, updated one value at a time (`Add`): `Count`, `Mean`, `StandardDeviation`, `Margin95` (how far the mean may be off). For comparing results of simulated runs |
+| `Jentl.Collect.Glicko2` | Ratings for players of uneven strength, after Glickman's "Example of the Glicko-2 system". A `GlickoRating` is a strength (1500 is average), how unsure that is (`Deviation`, at most 350) and `Volatility`; `GlickoRating.New` is a player nobody has seen. `Glicko2.Update(player, results, tau)` rates one rating period from a list of `GlickoResult` (the opponent's rating and a score of 1, 0.5 or 0); without results only the deviation grows |
 | `Jentl.Collect.KeyedRandom` | A `Random` from a secret key and a label (HMAC-SHA256 of the label and a counter): the same numbers on every platform and run, every label its own, and neither the key nor another label's numbers can be worked out from them. For deals and seeds that players must not be able to predict |
 | `Jentl.Tracks.TrackPath` | A path built from `Straight` and `Arc` pieces (positive degrees turn left on a screen whose y points down): `At(distance)` gives position and heading, `CurvatureAt` the bend, `Polyline` points for drawing. A path whose end meets its start is a circuit and wraps |
 | `Jentl.Assets.PixelCanvas` | Pixel art drawn in code: rectangles, lines, ellipses, outlines, mirroring; `ToImage()` for `AtlasBuilder`, `ToPng()` for a file |
