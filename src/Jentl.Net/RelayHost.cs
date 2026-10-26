@@ -38,7 +38,11 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     /// <summary>The longest message a runner may send, in bytes; a longer one closes its connection.</summary>
     public int MaxLength { get; init; } = 65536;
 
-    /// <summary>The most messages a runner may send in one second; more close its connection.</summary>
+    /// <summary>
+    /// The most messages a runner may send in one second besides its answers; more close its connection. Every line the
+    /// server sends lets the runner send one more, so a fast bot that answers each line is never cut off (see
+    /// <see cref="SocketLines"/>).
+    /// </summary>
     public int MaxPerSecond { get; init; } = 200;
 
     /// <summary>The bot's agent, or null when no runner has connected for it yet.</summary>
@@ -49,9 +53,10 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     /// another protocol version, else welcomes the runner, attaches the connection to the bot's agent (made on first
     /// use) and passes the runner's messages to it. The bot is away as soon as the connection ends, before the closing
     /// is done. Never throws for a socket that misbehaves or breaks; returns quietly when <paramref name="aborted"/> is
-    /// cancelled. The socket belongs to the caller.
+    /// cancelled. The socket belongs to the caller. Answers the limit the runner broke when that closed the connection
+    /// (<see cref="SocketLines.Problem"/>, for the server's log), else null.
     /// </summary>
-    public async Task RunAsync(WebSocket socket, CancellationToken aborted)
+    public async Task<string?> RunAsync(WebSocket socket, CancellationToken aborted)
     {
         ArgumentNullException.ThrowIfNull(socket);
         using var lines = new SocketLines(socket, MaxLength, MaxPerSecond);
@@ -69,12 +74,12 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
             catch (OperationCanceledException) when (!aborted.IsCancellationRequested)
             {
                 await lines.CloseAsync("no hello in time").ConfigureAwait(false);
-                return;
+                return null;
             }
 
             if (!any)
             {
-                return;
+                return lines.Problem;
             }
 
             ended.CancelAfter(Timeout.InfiniteTimeSpan);
@@ -87,7 +92,7 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
                     : "unknown token";
                 lines.Send(Relay.Write(new RelayRefused(refusal)));
                 await lines.CloseAsync("refused").ConfigureAwait(false);
-                return;
+                return null;
             }
 
             seat = _seats.GetOrAdd(name, n => new Seat(new RemoteAgent(n)));
@@ -122,6 +127,8 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
                 Leave(seat, lines);
             }
         }
+
+        return lines.Problem;
     }
 
     /// <summary>Detaches <paramref name="lines"/> from the seat's agent, and says so when the bot is away now.</summary>

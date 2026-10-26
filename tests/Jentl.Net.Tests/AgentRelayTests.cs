@@ -241,6 +241,79 @@ public sealed class AgentRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task APeerThatAnswersEveryLine_IsNeverTooFast()
+    {
+        // A runner at full speed answers each line the server sends: far more than maxPerSecond a second, all allowed.
+        using var pair = SocketPair.Create();
+        using var server = new SocketLines(pair.Server, maxPerSecond: 10);
+        var read = server.ReadAllAsync(Cancel).GetAsyncEnumerator(Cancel);
+        using var client = new SocketLines(pair.Client);
+        var clientRead = client.ReadAllAsync(Cancel).GetAsyncEnumerator(Cancel);
+        for (var i = 0; i < 100; i++)
+        {
+            server.Send($"{i}");
+            (await clientRead.MoveNextAsync()).Should().BeTrue();
+            client.Send(clientRead.Current);
+            (await read.MoveNextAsync()).Should().BeTrue($"answer {i} should come through");
+            read.Current.Should().Be($"{i}");
+        }
+
+        server.Problem.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UnaskedMessages_BeyondTheAnswers_StillCloseTheSocket()
+    {
+        using var pair = SocketPair.Create();
+        using var server = new SocketLines(pair.Server, maxPerSecond: 10);
+        var read = server.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        using var client = new SocketLines(pair.Client);
+        var clientRead = client.ReadAllAsync(Cancel).ToListAsync(Cancel);
+        for (var i = 0; i < 5; i++)
+        {
+            server.Send($"{i}");
+        }
+
+        await Task.Delay(100, Cancel); // the five lines are on their way first: they allow five answers
+        for (var i = 0; i < 16; i++)
+        {
+            client.Send($"{i}");
+        }
+
+        (await read).Should().HaveCount(15);
+        server.Problem.Should().Contain("too many");
+        await clientRead;
+    }
+
+    [Fact]
+    public async Task AServerAtFullSpeed_KeepsTheRunnerConnected()
+    {
+        // A match between fast bots: the server sends hundreds of lines a second, and the runner must take them all.
+        using var pair = SocketPair.Create();
+        using var relay = new AgentRelay(_ => Task.FromResult(pair.Client), "token", EchoAgent());
+        var status = new ConcurrentQueue<string>();
+        relay.Status += status.Enqueue;
+        _ = relay.RunAsync(Cancel);
+        using var server = new SocketLines(pair.Server);
+        var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
+        await Next(lines);
+        server.Send(Relay.Write(new RelayWelcome("Bot")));
+        server.Send(Relay.Write(new RelayStart(1)));
+        for (var i = 0; i < 600; i++)
+        {
+            server.Send(Relay.Write(new RelayLine($"{i}")));
+        }
+
+        for (var i = 0; i < 600; i++)
+        {
+            (await Next(lines)).Should().Be(new RelayLine($"{i}", 1));
+        }
+
+        status.Should().NotContain(s => s.StartsWith("reconnecting", StringComparison.Ordinal));
+        server.Problem.Should().BeNull();
+    }
+
+    [Fact]
     public async Task BinaryMessages_CloseTheSocket()
     {
         using var pair = SocketPair.Create();

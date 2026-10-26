@@ -11,6 +11,8 @@ namespace Jentl.Net;
 /// <remarks>
 /// Lines the agent writes while the connection is down wait in its own queue (see <see cref="AgentProcess.MaxLines"/>)
 /// and go once the server has welcomed the runner again. A line that was on its way when the connection broke is lost.
+/// The server's messages are not limited in rate (only in length): it sets the pace of the game, and a match between
+/// fast bots sends hundreds of lines a second.
 /// </remarks>
 public sealed class AgentRelay(Func<CancellationToken, Task<WebSocket>> connect, string token, AgentCommand command) : IDisposable
 {
@@ -113,7 +115,7 @@ public sealed class AgentRelay(Func<CancellationToken, Task<WebSocket>> connect,
 
         var welcomed = false;
         using (socket)
-        using (var lines = new SocketLines(socket))
+        using (var lines = new SocketLines(socket, maxPerSecond: int.MaxValue)) // the server sets the pace: a fast match sends hundreds of lines a second
         {
             lines.Send(Relay.Write(new RelayHello(_token, Relay.Version)));
             try

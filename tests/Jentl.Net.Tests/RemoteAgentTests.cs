@@ -372,7 +372,8 @@ public sealed class RemoteAgentTests : IDisposable
         Runner(host, "b");
         (await events.Reader.ReadAsync(Cancel)).Should().Be("+B");
 
-        var pair = Serve(host);
+        using var pair = SocketPair.Create();
+        var run = host.RunAsync(pair.Server, Cancel);
         using var flood = new SocketLines(pair.Client);
         var floodRead = flood.ReadAllAsync(Cancel).GetAsyncEnumerator();
         flood.Send(Relay.Write(new RelayHello("a", Relay.Version)));
@@ -391,6 +392,7 @@ public sealed class RemoteAgentTests : IDisposable
         }
 
         (await events.Reader.ReadAsync(Cancel)).Should().Be("-A");
+        (await run).Should().Contain("too many", "the run says why it closed the connection, for the server's log");
         host.Agent("A")!.IsAway.Should().BeTrue();
         var b = host.Agent("B")!;
         b.Restart();

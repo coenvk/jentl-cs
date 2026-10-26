@@ -7,13 +7,21 @@ namespace Jentl.Net;
 
 /// <summary>
 /// A WebSocket as lines of text, one text frame each, with limits for a peer that misbehaves: a message longer than
-/// <c>maxLength</c> bytes or in more than <see cref="MaxFrames"/> frames, more than <c>maxPerSecond</c> messages within
-/// one second, or any binary message closes the socket with a policy-violation status, and <see cref="Problem"/> says
-/// which. Sending never blocks: lines are queued and written in the background.
+/// <c>maxLength</c> bytes or in more than <see cref="MaxFrames"/> frames, more than <c>maxPerSecond</c> messages a second
+/// besides its answers (see below), or any binary message closes the socket with a policy-violation status, and
+/// <see cref="Problem"/> says which. Sending never blocks: lines are queued and written in the background.
 /// </summary>
 /// <remarks>
+/// <para>
 /// At most <see cref="MaxQueued"/> lines wait to be sent; when more come (the peer stopped reading), the oldest are
 /// dropped. Read with one <see cref="ReadAllAsync"/> at a time, as a WebSocket allows one receive at a time.
+/// </para>
+/// <para>
+/// The rate counts what the peer sends beyond what it was sent: every line sent lets the peer send one more (its
+/// answer), so a peer that answers each line is never too fast, however fast the two of them go. What it sends besides
+/// is allowed at <c>maxPerSecond</c> messages a second, in bursts of as many (a token bucket). Pass
+/// <see cref="int.MaxValue"/> for a peer whose pace is not to be limited, such as the server a runner chose to connect to.
+/// </para>
 /// </remarks>
 public sealed class SocketLines : IDisposable
 {
@@ -37,7 +45,9 @@ public sealed class SocketLines : IDisposable
     private readonly SemaphoreSlim _sending = new(1, 1);
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _writing;
+    private readonly Lock _answersGate = new();
     private volatile string? _problem;
+    private int _answers; // lines sent that the peer may still answer, at most MaxQueued
 
     public SocketLines(WebSocket socket, int maxLength = 65536, int maxPerSecond = 200)
     {
@@ -54,11 +64,20 @@ public sealed class SocketLines : IDisposable
     /// <summary>The socket underneath, for tests that need to write to it directly.</summary>
     internal WebSocket Socket => _socket;
 
-    /// <summary>Queues <paramref name="text"/> to go as one text frame. Never blocks; does nothing once the socket is closed.</summary>
+    /// <summary>
+    /// Queues <paramref name="text"/> to go as one text frame, and lets the peer send one more message (its answer).
+    /// Never blocks; does nothing once the socket is closed.
+    /// </summary>
     public void Send(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        _outgoing.Writer.TryWrite(text);
+        if (_outgoing.Writer.TryWrite(text))
+        {
+            lock (_answersGate)
+            {
+                _answers = Math.Min(_answers + 1, MaxQueued);
+            }
+        }
     }
 
     /// <summary>
@@ -69,22 +88,24 @@ public sealed class SocketLines : IDisposable
     {
         var buffer = new byte[4096];
         using var message = new MemoryStream();
-        var times = new Queue<long>(); // when each of the last messages came, within the last second
+        double allowance = _maxPerSecond; // what the peer may still send besides its answers; refills at maxPerSecond a second
+        var last = Environment.TickCount64;
         while (await ReceiveAsync(buffer, message, cancel).ConfigureAwait(false) is { } text)
         {
             var now = Environment.TickCount64;
-            while (times.Count > 0 && now - times.Peek() >= 1000)
+            allowance = Math.Min(_maxPerSecond, allowance + ((now - last) * (double)_maxPerSecond / 1000));
+            last = now;
+            if (!TakeAnswer())
             {
-                times.Dequeue();
+                if (allowance < 1)
+                {
+                    Violated($"too many messages (over {_maxPerSecond} a second)");
+                    yield break;
+                }
+
+                allowance--;
             }
 
-            if (times.Count >= _maxPerSecond)
-            {
-                Violated($"too many messages (over {_maxPerSecond} a second)");
-                yield break;
-            }
-
-            times.Enqueue(now);
             yield return text;
         }
     }
@@ -168,6 +189,21 @@ public sealed class SocketLines : IDisposable
         }
 
         return null;
+    }
+
+    /// <summary>Counts a message as the answer to a line sent, when one is left to answer.</summary>
+    private bool TakeAnswer()
+    {
+        lock (_answersGate)
+        {
+            if (_answers == 0)
+            {
+                return false;
+            }
+
+            _answers--;
+            return true;
+        }
     }
 
     /// <summary>
