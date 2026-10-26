@@ -348,6 +348,7 @@ if (decided.Fault != Fault.None) { ShowNotice($"{seat.Name}: {decided.Fault}"); 
 | `ButtonBar` | A centred row of buttons that squeezes its gaps on narrow screens |
 | `Form` with `ToggleRow`, `SliderRow`, `ButtonRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider |
 | `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen |
+| `Input.Clipboard` | `TrySetText` puts text on the system clipboard on the desktop (through SDL2, which MonoGame loads); false where there is none (the browser), so the game shows the text instead |
 
 Widgets take an `ActionMap<UiAction>` for their keys and buttons (`UiKeys.Default` has arrows/WASD, Enter/Space and
 Escape, and the D-pad/left stick, A and B/Start) and
