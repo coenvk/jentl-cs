@@ -1,4 +1,5 @@
-﻿// Modes: echo, slow:<ms>, crash, deaf, silent, chatty, flood.
+﻿// Modes: echo, slow:<ms>, crash, deaf, silent, chatty, flood, count (answers "<n>:<line>", n counting the lines this
+// process read, so a test can tell a process that kept running from a fresh one).
 var mode = args.Length > 0 ? args[0] : "echo";
 var delay = 0;
 if (mode.StartsWith("slow:", StringComparison.Ordinal))
@@ -37,6 +38,14 @@ switch (mode)
         while (Console.In.ReadLine() is { } echoed)
         {
             Console.Out.WriteLine(echoed);
+        }
+
+        return 0;
+    case "count":
+        var count = 0;
+        while (Console.In.ReadLine() is { } counted)
+        {
+            Console.Out.WriteLine($"{++count}:{counted}");
         }
 
         return 0;

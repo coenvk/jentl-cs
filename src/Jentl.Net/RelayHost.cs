@@ -12,7 +12,8 @@ namespace Jentl.Net;
 /// A bot has one connection at a time: a second one for the same bot takes over (a runner that reconnected before the
 /// server noticed its old connection broke, or the same bot started elsewhere), and the first is told "connected
 /// elsewhere" and closed. The agent stays the same instance throughout, so a match in progress keeps its seat. A runner
-/// that breaks the limits (<see cref="MaxLength"/>, <see cref="MaxPerSecond"/>) loses only its own connection.
+/// that breaks the limits (<see cref="MaxLength"/>, <see cref="MaxPerSecond"/>) loses only its own connection, and
+/// <see cref="Drop"/> closes a bot's connection when its token no longer holds.
 /// </remarks>
 public sealed class RelayHost(Func<string, string?> nameOfToken)
 {
@@ -44,6 +45,35 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
     /// <see cref="SocketLines"/>).
     /// </summary>
     public int MaxPerSecond { get; init; } = 200;
+
+    /// <summary>
+    /// Closes the bot's connection, if it has one: the runner is refused with <paramref name="reason"/>, so it does not
+    /// connect again by itself, and the bot is away at once. For a bot whose token was replaced or that was banned, as the
+    /// token is checked only at hello: a runner still connected with the old token would otherwise play on. True when
+    /// there was a connection to close.
+    /// </summary>
+    public bool Drop(string name, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(reason);
+        if (!_seats.TryGetValue(name, out var seat))
+        {
+            return false;
+        }
+
+        // Another connection may take over meanwhile: then that one is closed.
+        while (seat.Agent.Connection is { } lines)
+        {
+            if (seat.Agent.Detach(lines))
+            {
+                Report(seat);
+                _ = EndAsync(lines, reason);
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>The bot's agent, or null when no runner has connected for it yet.</summary>
     public RemoteAgent? Agent(string name) => _seats.TryGetValue(name, out var seat) ? seat.Agent : null;
@@ -100,7 +130,7 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
             lines.Send(Relay.Write(new RelayWelcome(name)));
             if (seat.Agent.Attach(lines) is { } previous)
             {
-                _ = TakeOverAsync(previous);
+                _ = EndAsync(previous, "connected elsewhere");
             }
 
             Report(seat);
@@ -160,12 +190,12 @@ public sealed class RelayHost(Func<string, string?> nameOfToken)
         }
     }
 
-    /// <summary>Tells the connection that was taken over why, closes it, and ends its run.</summary>
-    private async Task TakeOverAsync(SocketLines previous)
+    /// <summary>Tells a connection that was taken over or dropped why, closes it, and ends its run.</summary>
+    private async Task EndAsync(SocketLines lines, string reason)
     {
-        previous.Send(Relay.Write(new RelayRefused("connected elsewhere")));
-        await previous.CloseAsync("connected elsewhere").ConfigureAwait(false);
-        if (_runs.TryRemove(previous, out var run))
+        lines.Send(Relay.Write(new RelayRefused(reason)));
+        await lines.CloseAsync(reason).ConfigureAwait(false);
+        if (_runs.TryRemove(lines, out var run))
         {
             try
             {

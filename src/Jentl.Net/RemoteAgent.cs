@@ -13,14 +13,22 @@ namespace Jentl.Net;
 /// answers null at once, so a table folds the seat without waiting. A <see cref="Restart"/> or <see cref="Stop"/> is
 /// sent again on the next connection until the runner answers, so one asked for while away, or sent into a connection
 /// that had broken unnoticed, still arrives. Each start has a run number that the runner sends back with the agent's
-/// lines and exit; messages from an earlier run are ignored. Safe to use from any thread: sockets attach and detach on
-/// their own tasks while the game asks on others.
+/// lines and exit; messages from an earlier run, or from before the first start, are ignored. The lines that wait to be
+/// read are bounded (<see cref="AgentProcess.MaxLines"/> lines and <see cref="MaxWaiting"/> characters in all, the oldest
+/// dropped first) and forgotten when the runner goes, so a bot that nobody asks cannot hold on to memory. Safe to use
+/// from any thread: sockets attach and detach on their own tasks while the game asks on others.
 /// </remarks>
 public sealed class RemoteAgent : IAgent
 {
+    /// <summary>
+    /// How many characters of the agent's lines wait to be read at most, all lines together; when more come, the oldest
+    /// lines are dropped. Real answers are short, so this only bites a runner that sends what nobody asked for.
+    /// </summary>
+    public const int MaxWaiting = 1 << 18;
+
     private readonly Lock _lock = new();
-    private readonly Channel<string> _lines = Channel.CreateBounded<string>(
-        new BoundedChannelOptions(AgentProcess.MaxLines) { FullMode = BoundedChannelFullMode.DropOldest });
+    private readonly Channel<string> _lines = Channel.CreateUnbounded<string>(); // bounded by Keep, under the lock
+    private int _waiting; // the characters of the lines in _lines
     private SocketLines? _socket; // the runner's connection, or null while away
     private RelayMessage? _order; // the last start or stop
     private bool _heard; // whether the runner answered since the last order: then it surely arrived
@@ -88,7 +96,7 @@ public sealed class RemoteAgent : IAgent
                     }
 
                     // Lines that came before the exit are still read, as with AgentProcess.
-                    if (_lines.Reader.TryRead(out var line))
+                    if (Take() is { } line)
                     {
                         return line;
                     }
@@ -121,8 +129,9 @@ public sealed class RemoteAgent : IAgent
     /// <inheritdoc/>
     public Task<string?> AskAsync(string line, TimeSpan limit)
     {
-        while (_lines.Reader.TryRead(out _))
+        lock (_lock)
         {
+            Forget();
         }
 
         Send(line);
@@ -137,10 +146,7 @@ public sealed class RemoteAgent : IAgent
     {
         lock (_lock)
         {
-            while (_lines.Reader.TryRead(out _))
-            {
-            }
-
+            Forget();
             _exited = false;
             _problem = null;
             Order(new RelayStart(++_run));
@@ -204,7 +210,10 @@ public sealed class RemoteAgent : IAgent
         return previous;
     }
 
-    /// <summary>Forgets <paramref name="socket"/> when it is still the runner's connection (the bot is away then); true if it was.</summary>
+    /// <summary>
+    /// Forgets <paramref name="socket"/> when it is still the runner's connection (the bot is away then), and the lines that
+    /// wait, which nobody reads while away; true if it was.
+    /// </summary>
     internal bool Detach(SocketLines socket)
     {
         TaskCompletionSource changed;
@@ -216,6 +225,7 @@ public sealed class RemoteAgent : IAgent
             }
 
             _socket = null;
+            Forget();
             changed = Change();
         }
 
@@ -225,7 +235,7 @@ public sealed class RemoteAgent : IAgent
 
     /// <summary>
     /// Takes a message the runner sent over <paramref name="socket"/>. Ignored when that connection was taken over, and
-    /// when it comes from a process before the last start (its run is not the current one).
+    /// when it comes from a process before the last start (its run is not the current one) or before the first start.
     /// </summary>
     internal void Receive(SocketLines socket, RelayMessage message)
     {
@@ -239,11 +249,11 @@ public sealed class RemoteAgent : IAgent
 
             switch (message)
             {
-                case RelayLine line when line.Run == _run:
+                case RelayLine line when _run > 0 && line.Run == _run:
                     _heard = true;
-                    _lines.Writer.TryWrite(line.Text);
+                    Keep(line.Text);
                     break;
-                case RelayExited exited when exited.Run == _run:
+                case RelayExited exited when _run > 0 && exited.Run == _run:
                     _heard = true;
                     _exited = true;
                     _problem = exited.Problem;
@@ -253,6 +263,52 @@ public sealed class RemoteAgent : IAgent
         }
 
         changed?.TrySetResult();
+    }
+
+    /// <summary>The runner's connection, or null while the bot is away.</summary>
+    internal SocketLines? Connection
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _socket;
+            }
+        }
+    }
+
+    /// <summary>Queues a line to be read, first dropping the oldest while there would be too many or too long. Call under the lock.</summary>
+    private void Keep(string text)
+    {
+        while (_lines.Reader.Count > 0 && (_lines.Reader.Count >= AgentProcess.MaxLines || _waiting + text.Length > MaxWaiting))
+        {
+            Take();
+        }
+
+        if (_lines.Writer.TryWrite(text))
+        {
+            _waiting += text.Length;
+        }
+    }
+
+    /// <summary>The oldest line that waits, or null when none does. Call under the lock.</summary>
+    private string? Take()
+    {
+        if (!_lines.Reader.TryRead(out var line))
+        {
+            return null;
+        }
+
+        _waiting -= line.Length;
+        return line;
+    }
+
+    /// <summary>Drops every line that waits. Call under the lock.</summary>
+    private void Forget()
+    {
+        while (Take() is not null)
+        {
+        }
     }
 
     /// <summary>

@@ -211,6 +211,106 @@ public sealed class AgentRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task AStartSentAgainAfterAReconnect_KeepsTheAgentOfThatRun()
+    {
+        // The server sends a start again on a new connection when it heard nothing since: a bot still starting up, say.
+        var pairs = Channel.CreateUnbounded<SocketPair>();
+        using var relay = new AgentRelay(_ =>
+        {
+            var pair = SocketPair.Create();
+            pairs.Writer.TryWrite(pair);
+            return Task.FromResult(pair.Client);
+        }, "token", Agent("count"));
+        _ = relay.RunAsync(Cancel);
+
+        using var first = await pairs.Reader.ReadAsync(Cancel);
+        using var server = new SocketLines(first.Server);
+        var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
+        await Next(lines);
+        server.Send(Relay.Write(new RelayWelcome("Bot")));
+        server.Send(Relay.Write(new RelayStart(1)));
+        server.Send(Relay.Write(new RelayLine("a")));
+        (await Next(lines)).Should().Be(new RelayLine("1:a", 1));
+        first.Server.Abort();
+
+        using var second = await pairs.Reader.ReadAsync(Cancel);
+        using var again = new SocketLines(second.Server);
+        var moreLines = again.ReadAllAsync(Cancel).GetAsyncEnumerator();
+        (await Next(moreLines)).Should().Be(new RelayHello("token", 1));
+        again.Send(Relay.Write(new RelayWelcome("Bot")));
+        again.Send(Relay.Write(new RelayStart(1)));
+        again.Send(Relay.Write(new RelayLine("b")));
+
+        (await Next(moreLines)).Should().Be(new RelayLine("2:b", 1), "the process of run 1 kept running: it read its second line");
+    }
+
+    [Fact]
+    public async Task ALineTooLongForTheServer_IsDropped_AndTheConnectionStays()
+    {
+        using var pair = SocketPair.Create();
+        using var relay = new AgentRelay(_ => Task.FromResult(pair.Client), "token", EchoAgent()) { MaxLength = 300 };
+        var status = new ConcurrentQueue<string>();
+        relay.Status += status.Enqueue;
+        _ = relay.RunAsync(Cancel);
+        using var server = new SocketLines(pair.Server, maxLength: 300);
+        var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
+        await Next(lines);
+        server.Send(Relay.Write(new RelayWelcome("Bot")));
+        server.Send(Relay.Write(new RelayStart(1)));
+        server.Send(Relay.Write(new RelayLine(new string('x', 400)))); // echoed: too long to send
+        server.Send(Relay.Write(new RelayLine("short")));
+
+        (await Next(lines)).Should().Be(new RelayLine("short", 1));
+        server.Problem.Should().BeNull();
+        status.Should().Contain(s => s.Contains("longer than 300 bytes", StringComparison.Ordinal), "the owner learns why a line went missing");
+    }
+
+    [Fact]
+    public async Task ExtraLines_BeyondWhatTheServerAllows_AreDropped_AndTheConnectionStays()
+    {
+        // The flood agent writes 20,000 lines unasked after the first line, then one far too long, then echoes.
+        using var pair = SocketPair.Create();
+        using var relay = new AgentRelay(_ => Task.FromResult(pair.Client), "token", Agent("flood")) { ExtraPerSecond = 10 };
+        var status = new ConcurrentQueue<string>();
+        relay.Status += status.Enqueue;
+        _ = relay.RunAsync(Cancel);
+        using var server = new SocketLines(pair.Server, maxPerSecond: 20);
+        var lines = server.ReadAllAsync(Cancel).GetAsyncEnumerator();
+        await Next(lines);
+        server.Send(Relay.Write(new RelayWelcome("Bot")));
+        server.Send(Relay.Write(new RelayStart(1)));
+        server.Send(Relay.Write(new RelayLine("go")));
+
+        // Asks until the echo comes back: each line asked for lets one through, once the flood is over.
+        var received = 0;
+        using var asking = new CancellationTokenSource();
+        var ask = Task.Run(async () =>
+        {
+            while (!asking.IsCancellationRequested)
+            {
+                server.Send(Relay.Write(new RelayLine("after")));
+                await Task.Delay(100, CancellationToken.None);
+            }
+        }, Cancel);
+        while (true)
+        {
+            var message = await Next(lines);
+            if (message is RelayLine { Text: "after" })
+            {
+                break;
+            }
+
+            received++;
+        }
+
+        await asking.CancelAsync();
+        await ask;
+        server.Problem.Should().BeNull("the runner kept within the server's limit");
+        received.Should().BeLessThan(1000, "most of the flood was dropped on the owner's computer");
+        status.Should().Contain(s => s.Contains("10 a second", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AFlood_ClosesTheSocket()
     {
         using var pair = SocketPair.Create();

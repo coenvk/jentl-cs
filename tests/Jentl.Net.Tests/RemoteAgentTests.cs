@@ -400,6 +400,80 @@ public sealed class RemoteAgentTests : IDisposable
     }
 
     [Fact]
+    public async Task LinesBeforeTheFirstStart_AreIgnored()
+    {
+        using var pair = SocketPair.Create();
+        using var lines = new SocketLines(pair.Server);
+        var agent = new RemoteAgent("Bot");
+        agent.Attach(lines);
+
+        agent.Receive(lines, new RelayLine("unasked", 0));
+
+        (await agent.ReadAsync(TimeSpan.FromMilliseconds(200))).Should().BeNull("no run has started, so no line belongs to one");
+    }
+
+    [Fact]
+    public async Task TheLinesThatWait_AreForgotten_WhenTheRunnerGoes()
+    {
+        using var firstPair = SocketPair.Create();
+        using var secondPair = SocketPair.Create();
+        using var first = new SocketLines(firstPair.Server);
+        using var second = new SocketLines(secondPair.Server);
+        var agent = new RemoteAgent("Bot");
+        agent.Restart();
+        agent.Attach(first);
+        agent.Receive(first, new RelayLine("unread", 1));
+
+        agent.Detach(first).Should().BeTrue();
+        agent.Attach(second);
+
+        (await agent.ReadAsync(TimeSpan.FromMilliseconds(200))).Should().BeNull("an away bot keeps nothing that nobody reads");
+    }
+
+    [Fact]
+    public async Task TheLinesThatWait_AreBoundedInLength_TheOldestDroppedFirst()
+    {
+        using var pair = SocketPair.Create();
+        using var lines = new SocketLines(pair.Server);
+        var agent = new RemoteAgent("Bot");
+        agent.Restart();
+        agent.Attach(lines);
+        var big = new string('x', 60_000);
+        for (var i = 0; i < 100; i++)
+        {
+            agent.Receive(lines, new RelayLine($"{i}:{big}", 1));
+        }
+
+        var kept = new List<string>();
+        while (await agent.ReadAsync(TimeSpan.Zero) is { } line)
+        {
+            kept.Add(line);
+        }
+
+        kept.Sum(l => l.Length).Should().BeLessThanOrEqualTo(RemoteAgent.MaxWaiting);
+        kept.Should().NotBeEmpty().And.Subject.Last().Should().StartWith("99:", "the newest lines are kept");
+    }
+
+    [Fact]
+    public async Task Drop_ClosesTheBotsConnection_AndTellsTheRunnerWhy()
+    {
+        var host = Host();
+        var events = Events(host);
+        var (_, _, status) = Runner(host, "t");
+        (await events.Reader.ReadAsync(Cancel)).Should().Be("+Bot");
+        var agent = host.Agent("Bot")!;
+
+        host.Drop("Bot", "token replaced").Should().BeTrue();
+
+        agent.IsAway.Should().BeTrue("the bot is away at once");
+        (await events.Reader.ReadAsync(Cancel)).Should().Be("-Bot");
+        (await NextStatus(status, s => s.StartsWith("refused", StringComparison.Ordinal))).Should().Be("refused: token replaced");
+        await Task.WhenAll(_runs).WaitAsync(Cancel);
+        host.Drop("Bot", "token replaced").Should().BeFalse("the bot is away already");
+        host.Drop("Nobody", "token replaced").Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ABrokenSocket_EndsTheRun_WithoutThrowing()
     {
         var host = Host();
