@@ -64,4 +64,23 @@ public sealed record Theme
 
     /// <summary>The UI scale surfaces are drawn at: kept up to date by <see cref="Fonts.Fit"/>.</summary>
     public static float Scale { get; internal set; } = 1;
+
+    /// <summary>The accent bar's height in design pixels.</summary>
+    private const int AccentBarHeight = 6;
+
+    /// <summary>
+    /// Draws a panel of the current theme filling <paramref name="bounds"/>: <see cref="Palette.Panel"/> in the
+    /// <see cref="Panel"/> style, with the accent bar along its top when the theme has one.
+    /// </summary>
+    public static void DrawPanel(SpriteBatch batch, Rectangle bounds)
+    {
+        var theme = Current;
+        theme.Panel.Draw(batch, bounds, Palette.Panel);
+        if (theme.AccentBar)
+        {
+            // Inset by the corners' radius, so the bar sits on the panel's straight top edge.
+            var inset = theme.Panel.Scaled(Scale).Radius;
+            batch.FillRectangle(new Rectangle(bounds.X + inset, bounds.Y, bounds.Width - 2 * inset, AccentBarHeight), Palette.Accent);
+        }
+    }
 }
