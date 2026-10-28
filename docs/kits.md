@@ -426,6 +426,19 @@ screen can simply name its music in `OnEnter`. Effects and music each have a swi
 every frame for the fades. In a browser, music that could not start yet (pages may only make sound after the
 first touch) is retried until it plays.
 
+`SoundPlayer.Mixer` holds the buses sounds play on, under a `Master`: `effects`, `music`, `voice`, `ui`, and any other
+a game names (`Mixer["engines"]`). Each has a `Volume` and `Muted`, so players can get a slider per bus; the old
+`Volume`, `Enabled`, `MusicVolume` and `MusicEnabled` are the effects' and music's. `Play` takes a pan, a pitch and the
+bus; `PlayAt` places a sound in the world, fainter with distance from the listener and panned to its side. Ducking
+rules turn one bus down while another plays, fading back after:
+
+```csharp
+sounds.Mixer.AddDucking(AudioMixer.Voice, AudioMixer.Music, level: 0.3f);  // music under the words
+sounds.Play("greeting", bus: AudioMixer.Voice);
+sounds.PlayAt("explosion", blast, camera.Position, range: 900);
+sounds.Play("coin", pitch: 0.2f * combo);                                  // higher with each coin in a row
+```
+
 ## Particles and animation
 
 `Jentl.Core.Graphics` has a pooled `ParticleSystem` and ready-made `ParticleEffects`: `Confetti` (tumbling paper

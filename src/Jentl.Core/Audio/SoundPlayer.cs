@@ -1,4 +1,5 @@
 ﻿using Jentl.Core.Content;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 
 namespace Jentl.Core.Audio;
@@ -21,42 +22,52 @@ public sealed class SoundPlayer : IDisposable
     private Playing? _music;
     private Playing? _fading;
     private TimeSpan _retry;
-    private float _musicVolume = 0.6f;
-    private bool _musicEnabled = true;
 
     private SoundPlayer(Dictionary<string, SoundEffect> sounds, bool isAvailable)
     {
         _sounds = sounds;
         IsAvailable = isAvailable;
+        Mixer[AudioMixer.Music].Volume = 0.6f;
     }
 
     /// <summary>False when audio could not be initialised; sounds are then silently skipped.</summary>
     public bool IsAvailable { get; }
 
-    /// <summary>Whether sound effects play.</summary>
-    public bool Enabled { get; set; } = true;
+    /// <summary>The buses sounds play on, with their volumes, mutes and ducking.</summary>
+    public AudioMixer Mixer { get; } = new();
 
-    /// <summary>Sound effects volume, 0 to 1.</summary>
-    public float Volume { get; set; } = 1f;
+    /// <summary>Whether sound effects play: the effects bus not muted.</summary>
+    public bool Enabled
+    {
+        get => !Mixer[AudioMixer.Effects].Muted;
+        set => Mixer[AudioMixer.Effects].Muted = !value;
+    }
+
+    /// <summary>Sound effects volume, 0 to 1: the effects bus's.</summary>
+    public float Volume
+    {
+        get => Mixer[AudioMixer.Effects].Volume;
+        set => Mixer[AudioMixer.Effects].Volume = value;
+    }
 
     /// <summary>Whether music plays; turning it off silences the current track at once.</summary>
     public bool MusicEnabled
     {
-        get => _musicEnabled;
+        get => !Mixer[AudioMixer.Music].Muted;
         set
         {
-            _musicEnabled = value;
+            Mixer[AudioMixer.Music].Muted = !value;
             ApplyMusicVolume();
         }
     }
 
-    /// <summary>Music volume, 0 to 1.</summary>
+    /// <summary>Music volume, 0 to 1: the music bus's.</summary>
     public float MusicVolume
     {
-        get => _musicVolume;
+        get => Mixer[AudioMixer.Music].Volume;
         set
         {
-            _musicVolume = Math.Clamp(value, 0, 1);
+            Mixer[AudioMixer.Music].Volume = value;
             ApplyMusicVolume();
         }
     }
@@ -120,20 +131,41 @@ public sealed class SoundPlayer : IDisposable
     /// <summary>Whether an effect or a track of that name exists.</summary>
     public bool Has(string name) => _sounds.ContainsKey(name) || _tracks.ContainsKey(name);
 
-    public void Play(string name, float volume = 1f)
+    /// <summary>
+    /// Plays effect <paramref name="name"/> on <paramref name="bus"/> at <paramref name="volume"/> times the bus's gain,
+    /// <paramref name="pan"/> from -1 (left) to 1 (right) and <paramref name="pitch"/> from -1 (an octave down) to 1
+    /// (an octave up). The bus's ducking rules start with it.
+    /// </summary>
+    public void Play(string name, float volume = 1f, float pan = 0, float pitch = 0, string bus = AudioMixer.Effects)
     {
-        if (!Enabled || !_sounds.TryGetValue(name, out var sound))
+        var gain = Mixer.GainOf(bus);
+        if (gain <= 0 || !_sounds.TryGetValue(name, out var sound))
         {
             return;
         }
 
         try
         {
-            sound.Play(Math.Clamp(volume * Volume, 0f, 1f), 0f, 0f);
+            sound.Play(Math.Clamp(volume * gain, 0f, 1f), Math.Clamp(pitch, -1, 1), Math.Clamp(pan, -1, 1));
+            Mixer.Played(bus, sound.Duration);
         }
         catch (InstancePlayLimitException)
         {
             // Too many sounds at once; dropping one is fine.
+        }
+    }
+
+    /// <summary>
+    /// Plays effect <paramref name="name"/> as heard from <paramref name="listener"/>: fainter the further
+    /// <paramref name="source"/> is, silent from <paramref name="range"/> away, and panned to its side
+    /// (<see cref="AudioMixer.Place"/>).
+    /// </summary>
+    public void PlayAt(string name, Vector2 source, Vector2 listener, float range, float volume = 1f, string bus = AudioMixer.Effects)
+    {
+        var (near, pan) = AudioMixer.Place(source, listener, range);
+        if (near > 0)
+        {
+            Play(name, volume * near, pan, bus: bus);
         }
     }
 
@@ -173,6 +205,7 @@ public sealed class SoundPlayer : IDisposable
     /// <summary>Moves fades on; call once per frame.</summary>
     public void Update(TimeSpan elapsed)
     {
+        Mixer.Update(elapsed);
         var seconds = (float)elapsed.TotalSeconds;
         if (_music is { } music)
         {
@@ -236,7 +269,7 @@ public sealed class SoundPlayer : IDisposable
 
     private void ApplyMusicVolume()
     {
-        var volume = _musicEnabled ? _musicVolume : 0;
+        var volume = Mixer.GainOf(AudioMixer.Music);
         if (_music is { } music)
         {
             music.Instance.Volume = Math.Clamp(music.Level * volume, 0, 1);
