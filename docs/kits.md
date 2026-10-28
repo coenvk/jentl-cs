@@ -608,6 +608,22 @@ waits (or `Every`) stays exact however the frames fall, and a long frame catches
 time down for slow motion. The code lock's win (sparks, then the end panel) and the second confetti wave are
 coroutine timers.
 
+## Pools
+
+Things made and dropped many times a second (bullets, sparks, floating damage numbers, lists for a path search)
+feed the garbage collector, whose pauses show as hitches. A `Pool<T>` keeps them for reuse: `Get` takes one (making
+it when none is free), `Return` gives it back, cleaned by the reset you gave; returning one twice throws, since it
+would then be handed out twice. `Prewarm` makes them up front, behind a loading screen, and `Created` growing for
+ever means something is never returned. An `ActivePool<T>` also keeps the live ones: `Spawn`, then `DespawnWhere`
+once a frame lets go of the finished, and enumerating gives the rest:
+
+```csharp
+var bullets = new ActivePool<Bullet>(() => new Bullet(), b => b.Age = 0);
+bullets.Spawn().Fire(muzzle, aim);
+foreach (var b in bullets) b.Move(elapsed);
+bullets.DespawnWhere(b => b.Age > b.Life || !arena.Contains(b.Position));
+```
+
 ## Debug overlay
 
 F3 (or the game's own switch; the app has one in Options) shows `SceneManager.Debug`, a panel over everything:
