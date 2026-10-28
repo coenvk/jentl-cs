@@ -38,6 +38,9 @@ public sealed class DebugOverlay
 
     public FrameStats Stats { get; } = new();
 
+    /// <summary>Named timings of the frame's parts, listed under "Profile" (update and draw, and any the game measures).</summary>
+    public Profiler Profiler { get; } = new();
+
     /// <summary>Shows <paramref name="name"/>: <paramref name="value"/> on the panel, read each time it draws; a second watch of the same name replaces the first.</summary>
     public void Watch(string name, Func<object?> value)
     {
@@ -114,6 +117,20 @@ public sealed class DebugOverlay
             lines.Add("");
             lines.Add("# " + top.GetType().Name);
             lines.AddRange(info);
+        }
+
+        if (Profiler.Entries is { Count: > 0 } profile)
+        {
+            lines.Add("");
+            lines.Add("# Profile");
+            lines.AddRange(profile.Select(e => string.Format(
+                c,
+                "{0}{1} {2:0.00} ms (worst {3:0.00}){4}",
+                new string(' ', e.Depth * 2),
+                e.Name,
+                e.Average.TotalMilliseconds,
+                e.Worst.TotalMilliseconds,
+                Math.Abs(e.CallsPerFrame - 1) < 0.05 ? "" : string.Format(c, "  x{0:0.#}", e.CallsPerFrame))));
         }
 
         if (_watches.Count > 0)

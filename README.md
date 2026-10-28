@@ -9,7 +9,7 @@ draws them.
 
 | Package | What it is |
 |---|---|
-| `Jentl.Core` | The screen layer for MonoGame: game loop and scenes, input (keyboard, pointer, gamepad), UI widgets, audio and a synthesizer, particles and sprite animation, camera and virtual resolution, render layers, lighting and post effects, timers and coroutines, a debug overlay, localization, and an asset store with hot reload |
+| `Jentl.Core` | The screen layer for MonoGame: game loop and scenes, input (keyboard, pointer, gamepad), UI widgets, audio and a synthesizer, particles and sprite animation, camera and virtual resolution, render layers, lighting and post effects, timers and coroutines, a debug overlay with a profiler, object pools, an audio mixer, rumble, accessibility settings, input recording and replay, localization, and an asset store with hot reload |
 | `Jentl.Core.Kni` | The same, built against KNI for the browser |
 | `Jentl.Puzzle` | Grid puzzles: boards, rules through recorded turns, exact undo and redo, level files |
 | `Jentl.Cards` | Card games: cards, piles, tables, rules, undo and redo, hints, chips |

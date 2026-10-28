@@ -188,7 +188,11 @@ public abstract class JentlGame : Game
         _assets?.Update();
         Scenes.Debug.Update(elapsed, Input);
         var started = _clock.Elapsed;
-        Scenes.Update(elapsed, Input);
+        using (Scenes.Debug.Profiler.Measure("update"))
+        {
+            Scenes.Update(elapsed, Input);
+        }
+
         Rumble.Update(elapsed, quiet: !IsActive);
         _updateTime += _clock.Elapsed - started;
         if (Scenes.IsEmpty)
@@ -259,17 +263,20 @@ public abstract class JentlGame : Game
         var started = _clock.Elapsed;
         var window = GraphicsDevice.Viewport.Bounds;
         VirtualScreen?.Fit(window);
-        Scenes.DrawLayers(_batch!, ScreenBounds);
-        if (VirtualScreen is not null || Scenes.Post.IsActive)
+        using (Scenes.Debug.Profiler.Measure("draw"))
         {
-            DrawOffscreen(window);
-        }
-        else
-        {
-            GraphicsDevice.Clear(ClearColor);
-            Begin(SamplerState.LinearClamp);
-            Scenes.Draw(_batch!, window);
-            _batch!.End();
+            Scenes.DrawLayers(_batch!, ScreenBounds);
+            if (VirtualScreen is not null || Scenes.Post.IsActive)
+            {
+                DrawOffscreen(window);
+            }
+            else
+            {
+                GraphicsDevice.Clear(ClearColor);
+                Begin(SamplerState.LinearClamp);
+                Scenes.Draw(_batch!, window);
+                _batch!.End();
+            }
         }
 
         var drawTime = _clock.Elapsed - started;
@@ -281,6 +288,7 @@ public abstract class JentlGame : Game
         _batch!.End();
 
         Scenes.Debug.Stats.Record(started - _lastDraw, _updateTime, drawTime);
+        Scenes.Debug.Profiler.EndFrame();
         _lastDraw = started;
         _updateTime = TimeSpan.Zero;
 

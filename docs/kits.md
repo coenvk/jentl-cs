@@ -649,6 +649,16 @@ marks portals, unfired triggers and the cell under the pointer. For values that 
 watches and a log: `Debug.Watch("Seed", () => seed)` is read every time the panel draws, and `Debug.Log("Saved")`
 adds a line that fades after a few seconds. `JentlGame.DebugInfo` can be overridden to add game-wide lines.
 
+Where the frame's time goes shows under "Profile": `Debug.Profiler` times named scopes, averaged and at their worst
+over the last 60 frames. `JentlGame` measures `update` and `draw`; measure the parts of your own inside them, and
+scopes inside scopes nest (`update/physics/contacts`, indented). A scope run several times a frame adds up and says
+how often (`x3`):
+
+```csharp
+using (Scenes.Debug.Profiler.Measure("physics")) world.Update(elapsed);
+using (Scenes.Debug.Profiler.Measure("ai")) foreach (var m in monsters) m.Mind.Tick(m, elapsed);
+```
+
 ## Render targets, lighting and post effects
 
 `RenderLayer` is an offscreen picture: `Render(batch, size, clear, draw)` switches to its target (made and resized
