@@ -44,6 +44,15 @@ public static class UiText
     public static string On { get; set; } = "On";
 
     public static string Off { get; set; } = "Off";
+
+    /// <summary>A key binding waiting for its key.</summary>
+    public static string PressKey { get; set; } = "Press a key";
+
+    /// <summary>A button binding waiting for its button.</summary>
+    public static string PressButton { get; set; } = "Press a button";
+
+    /// <summary>A binding slot with nothing in it.</summary>
+    public static string Unbound { get; set; } = "-";
 }
 
 /// <summary>Sounds the widgets play through a <see cref="Audio.SoundPlayer"/>, by name.</summary>

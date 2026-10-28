@@ -25,6 +25,14 @@ public abstract class FormRow(string label)
     /// <summary>The pointer pressed or dragged at <paramref name="x"/> on the row; true if the row used it.</summary>
     internal virtual bool Point(float x, Rectangle control) => false;
 
+    /// <summary>The row has the keyboard and gamepad to itself (waiting for a key to bind, taking typed text).</summary>
+    internal virtual bool IsEditing => false;
+
+    /// <summary>Takes this frame's input while <see cref="IsEditing"/>.</summary>
+    internal virtual void Edit(InputState input)
+    {
+    }
+
     internal abstract string Value { get; }
 
     /// <summary>Draws the control into <paramref name="control"/>, the right part of the row.</summary>
@@ -161,6 +169,7 @@ public sealed class Form
         UiAction.Right);
 
     private int? _dragging;
+    private bool _edited;
 
     public Form(SoundPlayer sounds, params FormRow[] rows)
     {
@@ -178,10 +187,24 @@ public sealed class Form
 
     public int Focused { get; set; }
 
+    /// <summary>
+    /// A row has the keys to itself, or had them this frame (the Escape that ended a key capture): the screen skips
+    /// its own keys, such as Back closing it, while this is true.
+    /// </summary>
+    public bool IsEditing => _edited || _rows[Focused].IsEditing;
+
     public void Update(InputState input, ActionMap<UiAction> keys, TimeSpan elapsed)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(keys);
+        _edited = _rows[Focused].IsEditing;
+        if (_edited)
+        {
+            _rows[Focused].Edit(input);
+            _repeater.Reset();
+            return;
+        }
+
         switch (_repeater.Update(input, keys, elapsed))
         {
             case UiAction.Up:

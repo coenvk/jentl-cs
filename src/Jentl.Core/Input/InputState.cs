@@ -60,6 +60,12 @@ public sealed class InputState
 
     public bool WasPressed(Buttons button) => _pad.IsButtonDown(button) && _previousPad.IsButtonUp(button);
 
+    /// <summary>A key pressed this frame (the first, if several were), or null: what to bind when rebinding.</summary>
+    public Keys? PressedKey() => _current.GetPressedKeys().Where(WasPressed).Cast<Keys?>().FirstOrDefault();
+
+    /// <summary>A gamepad button (or stick direction or trigger) pressed this frame, or null.</summary>
+    public Buttons? PressedButton() => Enum.GetValues<Buttons>().Where(WasPressed).Cast<Buttons?>().FirstOrDefault();
+
     /// <summary>A tap landed inside <paramref name="bounds"/> this frame.</summary>
     public bool Tapped(Rectangle bounds) => Tap is { } at && bounds.Contains(at);
 }

@@ -350,7 +350,7 @@ if (decided.Fault != Fault.None) { ShowNotice($"{seat.Name}: {decided.Fault}"); 
 | `RoundedRectangle` | `batch.FillRoundedRectangle(bounds, radius, color)`: soft-edged round corners, from one cached quarter circle per radius. `batch.FillEllipse(centre, radii, color)` (and `FillCircle`) draws soft-edged ellipses |
 | `Menu` | A vertical list of pill-shaped items: keys, taps, mouse hover. Taller than its space, it scrolls: the selection stays in view, arrows show there is more, and it can be dragged |
 | `ButtonBar` | A centred row of buttons that squeezes its gaps on narrow screens |
-| `Form` with `ToggleRow`, `SliderRow`, `ButtonRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider |
+| `Form` with `ToggleRow`, `SliderRow`, `ButtonRow`, `BindingRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider. A `BindingRow` rebinds a control (see [Gamepad](#gamepad)) |
 | `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen; a line too wide for the panel wraps, and a title too wide is drawn in the body font |
 | `Input.Clipboard` | `TrySetText` puts text on the system clipboard on the desktop (through SDL2, which MonoGame loads); false where there is none (the browser), so the game shows the text instead |
 
@@ -431,6 +431,26 @@ var map = new ActionMap<Move>(
     new Dictionary<Move, Buttons[]> { [Move.Up] = [Buttons.DPadUp, Buttons.LeftThumbstickUp], [Move.Jump] = [Buttons.A] });
 
 if (map.WasPressed(input, Move.Jump)) { ... }
+```
+
+Players can rebind a map. `Bind(action, key, slot)` puts a key (or button) in one of an action's slots (0 is the main
+key, 1 the alternative), and takes it from any other action that had it, so one key never does two things; `Reset`
+goes back to the bindings the map was made with. `Save` writes only the actions that differ from those as JSON, and
+`Load` reads them back, skipping actions and keys the game no longer has. Rebind a `Copy()` of a shared map, not the
+map itself. In a settings `Form`, a `BindingRow` shows the key in one slot and, chosen, waits for the next one
+pressed (Escape cancels, Backspace clears); `InputNames` gives keys and buttons short names ("Left Shift", "LB"):
+
+```csharp
+var controls = Controls.Default.Copy();
+if (store.ReadText("controls.json") is { } saved) controls.Load(saved);
+void Save() => store.WriteText("controls.json", controls.Save());
+
+var form = new Form(sounds,
+    new BindingRow<Move>("Jump", controls, Move.Jump, changed: Save),
+    new BindingRow<Move>("Jump (pad)", controls, Move.Jump, device: BindingDevice.GamePad, changed: Save),
+    new ButtonRow("Reset", () => { controls.Reset(); Save(); }));
+
+// While a row waits for a key, form.IsEditing is true: skip the screen's own Back then.
 ```
 
 Screens made for the mouse or touch (dragging cards, tapping the map) work with `PadCursor`: the right stick moves an
