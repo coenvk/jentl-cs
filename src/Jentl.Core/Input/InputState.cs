@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System.Text;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
 namespace Jentl.Core.Input;
@@ -12,6 +13,7 @@ public sealed class InputState
     private PointerState _previousPointer;
     private GamePadState _pad;
     private GamePadState _previousPad;
+    private readonly StringBuilder _typing = new();
 
     public GestureTracker Gestures { get; } = new();
 
@@ -36,9 +38,30 @@ public sealed class InputState
     /// <summary>Advances to a gamepad state with no keys and the pointer released; lets tests feed input without a window.</summary>
     public void Update(GamePadState pad) => Update(default, _pointer with { IsDown = false }, pad);
 
-    /// <summary>Advances one frame. Call once per frame.</summary>
-    public void Update(KeyboardState keyboard, PointerState cursor, GamePadState pad = default)
+    /// <summary>The text typed this frame, as the system's keyboard layout makes it (no control characters).</summary>
+    public string Typed { get; private set; } = "";
+
+    /// <summary>Mouse wheel steps this frame: positive turned up (away from the player), negative down.</summary>
+    public int Wheel { get; private set; }
+
+    /// <summary>
+    /// A character typed (from the window's text input), for <see cref="Typed"/> on the next <see cref="Update(KeyboardState, PointerState, GamePadState, int)"/>.
+    /// Control characters (Backspace, Enter, Tab) are skipped: those are keys.
+    /// </summary>
+    public void Type(char character)
     {
+        if (!char.IsControl(character))
+        {
+            _typing.Append(character);
+        }
+    }
+
+    /// <summary>Advances one frame. Call once per frame.</summary>
+    public void Update(KeyboardState keyboard, PointerState cursor, GamePadState pad = default, int wheel = 0)
+    {
+        Typed = _typing.ToString();
+        _typing.Clear();
+        Wheel = wheel;
         _previous = _current;
         _current = keyboard;
         _previousPointer = _pointer;

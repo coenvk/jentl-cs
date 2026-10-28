@@ -348,11 +348,17 @@ if (decided.Fault != Fault.None) { ShowNotice($"{seat.Name}: {decided.Fault}"); 
 | `Palette` | The colours widgets draw with; set them at start-up to restyle everything |
 | `Theme`, `SurfaceStyle` | The rest of the look: how panels and controls (buttons, form rows, the selected menu item) are drawn — corner radius, a border in a colour, a drop shadow, in design pixels — and whether panels have their accent bar. Set `Theme.Current` at start-up; the default is the plain look. `Theme.DrawPanel` draws a panel of your own screen the way the theme does, and `SurfaceStyle.Draw` any other surface (a score box, a seat) |
 | `RoundedRectangle` | `batch.FillRoundedRectangle(bounds, radius, color)`: soft-edged round corners, from one cached quarter circle per radius. `batch.FillEllipse(centre, radii, color)` (and `FillCircle`) draws soft-edged ellipses |
-| `Menu` | A vertical list of pill-shaped items: keys, taps, mouse hover. Taller than its space, it scrolls: the selection stays in view, arrows show there is more, and it can be dragged |
+| `Menu` | A vertical list of pill-shaped items: keys, taps, mouse hover. Taller than its space, it scrolls: the selection stays in view, arrows show there is more, and it can be dragged or scrolled with the mouse wheel |
 | `ButtonBar` | A centred row of buttons that squeezes its gaps on narrow screens |
-| `Form` with `ToggleRow`, `SliderRow`, `ButtonRow`, `BindingRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider. A `BindingRow` rebinds a control (see [Gamepad](#gamepad)) |
+| `Form` with `ToggleRow`, `SliderRow`, `ButtonRow`, `TextRow`, `BindingRow` | Settings panels: up/down move the focus, left/right change values, confirm toggles or presses; tap a row, or drag a slider. A `TextRow` takes typed text (a name, a room code): chosen, it has the keyboard until Enter keeps the text or Escape drops it, with a length limit and an optional filter (`allow: char.IsDigit`). A `BindingRow` rebinds a control (see [Gamepad](#gamepad)). While a row has the keys, `IsEditing` tells the screen to skip its own Back. Given a `maxHeight`, a form scrolls like a menu. A row's `Hint` shows below the form in an `OverlayPanel` while it has the focus |
+| `Tooltip` | A small panel of text beside a target rectangle: below it, or above when there is no room, and kept on screen |
+| `NineSlice` | A frame cut from a picture that stretches without stretching its corners. Set it as a `SurfaceStyle`'s `Art` to draw panels and controls with it, tinted with the palette (art drawn in white and greys) or, with `TintArt = false`, in its own colours |
 | `OverlayPanel` | Dims the screen and draws a panel with a title, lines of text and a `Menu` or `Form`, fitting the menu to the screen; a line too wide for the panel wraps, and a title too wide is drawn in the body font |
 | `Input.Clipboard` | `TrySetText` puts text on the system clipboard on the desktop (through SDL2, which MonoGame loads); false where there is none (the browser), so the game shows the text instead |
+
+`JentlGame` feeds the window's text input to `InputState.Typed` (the characters typed this frame, as the keyboard
+layout makes them) and the mouse wheel to `InputState.Wheel` (steps, positive up); override `ReadWheel` for scripted
+input, or call `Input.Type(c)` in tests.
 
 Widgets take an `ActionMap<UiAction>` for their keys and buttons (`UiKeys.Default` has arrows/WASD, Enter/Space and
 Escape, and the D-pad/left stick, A and B/Start) and

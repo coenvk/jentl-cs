@@ -12,7 +12,7 @@ public sealed record MenuItem(string Label, Action Select);
 /// <summary>
 /// A vertical list of options: up/down and confirm, or tap/click an item. A mouse hovering over an item
 /// selects it. When the list is taller than the space it is given, it scrolls: the selection stays in view,
-/// arrows show there is more, and the list can be dragged. Hit areas are the rows as last drawn, which is
+/// arrows show there is more, and the list can be dragged or scrolled with the mouse wheel. Hit areas are the rows as last drawn, which is
 /// the frame the player is looking at.
 /// </summary>
 public sealed class Menu
@@ -65,6 +65,21 @@ public sealed class Menu
         return Math.Clamp(first, 0, count - visible);
     }
 
+    /// <summary>
+    /// A list scrolled by <paramref name="wheel"/> steps (positive up): the new first row, and the selection, moved
+    /// along only as far as it must to stay in view.
+    /// </summary>
+    public static (int First, int Selected) WheelScroll(int first, int selected, int count, int visible, int wheel)
+    {
+        if (visible >= count)
+        {
+            return (first, selected);
+        }
+
+        first = Math.Clamp(first - wheel, 0, count - visible);
+        return (first, Math.Clamp(selected, first, first + visible - 1));
+    }
+
     public void Update(InputState input, ActionMap<UiAction> keys, TimeSpan elapsed)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -82,6 +97,11 @@ public sealed class Menu
         if (Dragged(input))
         {
             return;
+        }
+
+        if (input.Wheel != 0 && _area.Contains(input.Cursor.Position))
+        {
+            (FirstVisible, Selected) = WheelScroll(FirstVisible, Selected, _items.Length, _visible, input.Wheel);
         }
 
         for (var i = 0; i < _rows.Length; i++)

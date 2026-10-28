@@ -12,6 +12,18 @@ namespace Jentl.Core.UI;
 /// </summary>
 public sealed record SurfaceStyle(int Radius = 0, int Border = 0, Color? BorderColor = null, int Shadow = 0)
 {
+    /// <summary>
+    /// A picture to draw the surface with instead (a wooden frame, a parchment panel), its corners at the UI's scale.
+    /// The radius and border are then the art's business; a shadow is still drawn under it.
+    /// </summary>
+    public NineSlice? Art { get; init; }
+
+    /// <summary>
+    /// Whether <see cref="Art"/> is tinted with the surface's colour, so art drawn in white and greys takes the
+    /// palette (and a focused row its accent); false draws it in its own colours.
+    /// </summary>
+    public bool TintArt { get; init; } = true;
+
     /// <summary>This style in screen pixels at <paramref name="scale"/>; a border or shadow never scales away.</summary>
     public SurfaceStyle Scaled(float scale) => this with
     {
@@ -28,6 +40,12 @@ public sealed record SurfaceStyle(int Radius = 0, int Border = 0, Color? BorderC
         if (style.Shadow > 0)
         {
             batch.FillRoundedRectangle(bounds with { X = bounds.X + style.Shadow, Y = bounds.Y + style.Shadow }, style.Radius, Palette.Shadow);
+        }
+
+        if (Art is { } art)
+        {
+            art.Draw(batch, bounds, TintArt ? fill : Color.White, Theme.Scale);
+            return;
         }
 
         if (style.Border > 0 && style.BorderColor is { } border)

@@ -23,6 +23,7 @@ public abstract class JentlGame : Game
     private TimeSpan _lastTouch = TimeSpan.MinValue / 2;
     private PointerState _lastPointer;
     private PointerState _realPointer;
+    private int _lastWheel;
     private RenderTarget2D? _target;
     private AssetStore? _assets;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -92,6 +93,7 @@ public abstract class JentlGame : Game
     {
         _batch = new SpriteBatch(GraphicsDevice);
         _assets = new AssetStore(GraphicsDevice);
+        Window.TextInput += (_, e) => Input.Type(e.Character);
     }
 
     /// <summary>The keyboard state for this frame. Override to feed scripted input.</summary>
@@ -121,6 +123,19 @@ public abstract class JentlGame : Game
         var mouse = Mouse.GetState();
         _lastPointer = new PointerState(mouse.LeftButton == ButtonState.Pressed, new Vector2(mouse.X, mouse.Y));
         return _lastPointer;
+    }
+
+    /// <summary>
+    /// Mouse wheel steps since the last frame, positive turned up. A step is 120 wheel units; a turn of less (a
+    /// touchpad, or a browser's own units) still counts as one, so slow scrolling is never lost.
+    /// </summary>
+    protected virtual int ReadWheel()
+    {
+        var value = Mouse.GetState().ScrollWheelValue;
+        var turned = value - _lastWheel;
+        _lastWheel = value;
+        var steps = turned / 120;
+        return steps != 0 ? steps : Math.Sign(turned);
     }
 
     /// <summary>The first connected gamepad's state, or the disconnected default. Override to feed scripted input.</summary>
@@ -161,7 +176,7 @@ public abstract class JentlGame : Game
             cursor = cursor with { Position = screen.ToVirtual(cursor.Position) };
         }
 
-        Input.Update(keyboard, cursor, pad);
+        Input.Update(keyboard, cursor, pad, ReadWheel());
         _assets?.Update();
         Scenes.Debug.Update(gameTime.ElapsedGameTime, Input);
         var started = _clock.Elapsed;

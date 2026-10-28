@@ -61,7 +61,7 @@ public sealed class BindingRow<TAction>(
 
     internal override void Activate() => IsCapturing = true;
 
-    internal override void Edit(InputState input)
+    internal override void Edit(InputState input, TimeSpan elapsed)
     {
         if (input.WasPressed(Keys.Escape) || input.WasPressed(Buttons.Back) || input.Tap is not null)
         {

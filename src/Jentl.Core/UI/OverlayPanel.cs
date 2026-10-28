@@ -40,9 +40,26 @@ public static class OverlayPanel
     {
         ArgumentNullException.ThrowIfNull(fonts);
         ArgumentNullException.ThrowIfNull(form);
-        lines = Fit(lines, fonts, TextWidth(viewport, fonts));
-        var (panel, top) = Frame(batch, viewport, fonts, title, lines, form.Height(fonts.Body));
-        form.Draw(batch, fonts.Body, panel.Center.X, top, panel.Width - 2 * fonts.Px(DesignPadding) / 2);
+        var textWidth = TextWidth(viewport, fonts);
+        lines = Fit(lines, fonts, textWidth);
+
+        // Room below the rows for the longest hint, so the panel keeps its size as the focus moves.
+        var hintLine = (int)fonts.Small.LineHeight + LineGap;
+        var hintLines = form.Rows.Max(r => r.Hint is { } hint ? fonts.Small.Wrap(hint, textWidth).Count : 0);
+        var hintHeight = hintLines == 0 ? 0 : LineGap * 2 + hintLines * hintLine;
+        var room = viewport.Height - Chrome(fonts, lines.Count) - hintHeight - 2 * fonts.Px(12);
+        var height = form.Height(fonts.Body, room);
+        var (panel, top) = Frame(batch, viewport, fonts, title, lines, height + hintHeight);
+        form.Draw(batch, fonts.Body, panel.Center.X, top, panel.Width - 2 * fonts.Px(DesignPadding) / 2, height);
+        if (form.Hint is { } focusedHint)
+        {
+            var y = top + height + LineGap * 2;
+            foreach (var line in fonts.Small.Wrap(focusedHint, textWidth))
+            {
+                batch.DrawText(fonts.Small, line, new Vector2(panel.Center.X, y), Palette.Muted, Align.Center, shadow: false);
+                y += hintLine;
+            }
+        }
     }
 
     /// <summary>The lines as drawn: each one wider than <paramref name="width"/> wrapped onto as many as it needs.</summary>

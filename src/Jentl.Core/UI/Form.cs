@@ -29,9 +29,12 @@ public abstract class FormRow(string label)
     internal virtual bool IsEditing => false;
 
     /// <summary>Takes this frame's input while <see cref="IsEditing"/>.</summary>
-    internal virtual void Edit(InputState input)
+    internal virtual void Edit(InputState input, TimeSpan elapsed)
     {
     }
+
+    /// <summary>A line about the row, shown while it has the focus: what a setting does, why a button is greyed.</summary>
+    public string? Hint { get; set; }
 
     internal abstract string Value { get; }
 
@@ -151,8 +154,10 @@ public sealed class ButtonRow : FormRow
 }
 
 /// <summary>
-/// A settings panel: rows of toggles, sliders and buttons. Up and down move the focus, left and right change
-/// the focused value, confirm toggles or presses. Tapping a row does the same, and a slider can be dragged.
+/// A settings panel: rows of toggles, sliders, buttons, text and key bindings. Up and down move the focus, left and
+/// right change the focused value, confirm toggles or presses. Tapping a row does the same, and a slider can be
+/// dragged. Given less height than its rows need, it scrolls: the focus stays in view, arrows show there is more, and
+/// the mouse wheel scrolls it.
 /// </summary>
 public sealed class Form
 {
@@ -170,6 +175,8 @@ public sealed class Form
 
     private int? _dragging;
     private bool _edited;
+    private int _visible = int.MaxValue;
+    private Rectangle _area;
 
     public Form(SoundPlayer sounds, params FormRow[] rows)
     {
@@ -187,6 +194,15 @@ public sealed class Form
 
     public int Focused { get; set; }
 
+    /// <summary>The first row shown when the form scrolls.</summary>
+    public int FirstVisible { get; private set; }
+
+    /// <summary>The focused row's hint, for the screen to show (an <see cref="OverlayPanel"/> does), or null.</summary>
+    public string? Hint => _rows[Focused].Hint;
+
+    /// <summary>Whether any row has a hint, so a screen can keep room for one.</summary>
+    public bool HasHints => _rows.Any(r => r.Hint is not null);
+
     /// <summary>
     /// A row has the keys to itself, or had them this frame (the Escape that ended a key capture): the screen skips
     /// its own keys, such as Back closing it, while this is true.
@@ -200,9 +216,14 @@ public sealed class Form
         _edited = _rows[Focused].IsEditing;
         if (_edited)
         {
-            _rows[Focused].Edit(input);
+            _rows[Focused].Edit(input, elapsed);
             _repeater.Reset();
             return;
+        }
+
+        if (input.Wheel != 0 && _area.Contains(input.Cursor.Position))
+        {
+            (FirstVisible, Focused) = Menu.WheelScroll(FirstVisible, Focused, _rows.Length, _visible, input.Wheel);
         }
 
         switch (_repeater.Update(input, keys, elapsed))
@@ -266,17 +287,26 @@ public sealed class Form
         }
     }
 
-    public int Height(SpriteFontBase font) => _rows.Length * RowHeight(font);
+    /// <summary>How tall the form is drawn at most <paramref name="maxHeight"/> tall: whole rows, at least one.</summary>
+    public int Height(SpriteFontBase font, int maxHeight = int.MaxValue) =>
+        Math.Min(_rows.Length, Math.Max(1, maxHeight / RowHeight(font))) * RowHeight(font);
 
-    /// <summary>Draws the rows <paramref name="width"/> wide, centred on <paramref name="centerX"/>, from <paramref name="top"/>.</summary>
-    public void Draw(SpriteBatch batch, SpriteFontBase font, int centerX, int top, int width)
+    /// <summary>
+    /// Draws the rows <paramref name="width"/> wide, centred on <paramref name="centerX"/>, from <paramref name="top"/>,
+    /// at most <paramref name="maxHeight"/> tall: more rows than fit scroll, keeping the focused one in view.
+    /// </summary>
+    public void Draw(SpriteBatch batch, SpriteFontBase font, int centerX, int top, int width, int maxHeight = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(batch);
         ArgumentNullException.ThrowIfNull(font);
         var height = RowHeight(font);
-        for (var i = 0; i < _rows.Length; i++)
+        _visible = Math.Max(1, Math.Min(_rows.Length, maxHeight / height));
+        FirstVisible = Menu.Scroll(FirstVisible, Focused, _rows.Length, _visible);
+        _area = new Rectangle(centerX - width / 2, top, width, _visible * height);
+        Array.Clear(_bounds);
+        for (var i = FirstVisible; i < FirstVisible + _visible; i++)
         {
-            var bounds = new Rectangle(centerX - width / 2, top + i * height, width, height - 6);
+            var bounds = new Rectangle(centerX - width / 2, top + (i - FirstVisible) * height, width, height - 6);
             _bounds[i] = bounds;
             var focused = i == Focused;
             Theme.Current.Control.Draw(batch, bounds, focused ? Palette.Accent : Palette.PanelLight);
@@ -284,6 +314,18 @@ public sealed class Form
             label.Inflate(-RowPadding * 2, 0);
             batch.DrawText(font, _rows[i].Label, label, focused ? Palette.Ink : Palette.Text, Align.Left, shadow: false);
             _rows[i].DrawControl(batch, font, Control(bounds), focused);
+        }
+
+        // Arrows beside the first and last rows when there is more to scroll to.
+        var arrow = new Point(height / 3, height / 4);
+        if (FirstVisible > 0)
+        {
+            batch.FillTriangle(new Rectangle(_area.Right + 8, top + height / 2 - arrow.Y, arrow.X, arrow.Y), pointsUp: true, Palette.Muted);
+        }
+
+        if (FirstVisible + _visible < _rows.Length)
+        {
+            batch.FillTriangle(new Rectangle(_area.Right + 8, _area.Bottom - height / 2, arrow.X, arrow.Y), pointsUp: false, Palette.Muted);
         }
     }
 
