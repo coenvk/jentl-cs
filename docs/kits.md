@@ -829,6 +829,121 @@ var mind = new BehaviourTree<Goblin>(Bt.Selector(
 mind.Tick(goblin, elapsed);
 ```
 
+## Scripting
+
+`Jentl.Script` is a small language for the parts of a game that are content rather than engine: cutscenes, dialogue,
+events, level logic, tuning. Scripts are text the game loads at run time (from an asset, a level file, a JSON field),
+so they change without a rebuild, and with `Reload` while the game runs. It is framework-free and runs in the browser
+too: an interpreter, nothing generated at run time.
+
+```
+# A cutscene. Comments start with #.
+let elder = actors.elder
+
+fn walk(who, x)
+  while who.x < x do
+    who.x += 2
+    wait()                          # a frame
+  end
+end
+
+say(elder, "You came back, {player.name}.")
+walk(elder, 120)
+if has("amulet") then
+  say(elder, "And you found it!")
+  gold += 50
+elif chance(0.5) then
+  say(elder, "Still nothing?")
+else
+  let answer = ask("Keep looking?", ["Yes", "No"])
+  if answer == "No" then return end
+end
+for i, line in ["Off you go.", "Mind the bridge."] do
+  say(elder, line)
+  wait(0.5)
+end
+```
+
+- **Values**: `nil`, `true`/`false`, numbers (all doubles; `1_000`, `2.5e3`), text in `"double"` or `'single'`
+  quotes (double ones fill in `{expressions}`; `\n`, `\{` and kin escape), lists `[1, 2]` (from 0; `list[-1]` is the
+  last), maps `{name: "Ash", "max hp": 20, [key]: value}` (`map.name` or `map["max hp"]`; a missing key is nil, and
+  setting nil removes it), functions, and the game's objects.
+- **Statements**: `let name = value` (a new variable), `name = value` and `+= -= *= /=`, `if ... then ... elif ...
+  else ... end`, `while ... do ... end`, `for item in list do ... end` (or `for i, item in`; over a map, `for key in`
+  or `for key, value in`; also text and `range(stop)`, `range(start, stop, step)`), `break`, `continue`, `fn name(a,
+  b) ... end`, `return`. A statement is a call or an assignment, so `x == 1` alone is a mistake, not a no-op.
+- **Operators**: `+ - * / %` (`%` takes the sign of the divisor, so `-1 % 4` is 3; dividing by zero is an error),
+  `+` also joins text (with anything) and lists, `== != < <= > >=` (numbers and text), `and or not` (`and` and `or`
+  give one of their operands: `name or "stranger"`). Only nil and false are false.
+- **Functions** are values: `fn(x) return x * 2 end`, closing over the variables around them. Functions made in a
+  loop share its variable, so pass it as an argument instead (`spawn(fn(n) ... end, i)`).
+- **Scope**: `let` and `fn` at the top level of a script make the script's globals, which the game reads and calls;
+  inside a block they are local to it. Any other name is a global: the script's, then the engine's. Assigning to a
+  name nobody declared is an error, so typos don't make new variables.
+
+The standard functions: `print`, `str`, `num`, `type`; `upper`, `lower`, `trim`, `split`, `join`, `replace`,
+`startsWith`, `endsWith`; `floor`, `ceil`, `round(x, digits)`, `abs`, `sqrt`, `sin`, `cos`, `atan2`, `sign`, `min`,
+`max` (of numbers or a list), `clamp`, `lerp`, `pi`; `random()` (0 to 1), `random(n)` (0 to n - 1), `random(a, b)`
+(a to b), `chance(p)`, `pick(list)`, `shuffle(list)` (by the engine's `Random`, seeded for repeatable runs); `len`,
+`range`, `list(anything a for loop goes through)`, `push(list, items...)`, `pop`, `insert(list, at, item)`,
+`remove(list, at)` or `remove(map, key)`, `contains`, `indexOf`, `keys`, `values`, `copy`, `slice(list, from, to)`,
+`sort(list, key)`, `map(list, fn)`, `filter(list, fn)`; `wait(seconds)` (no seconds: one frame), `waitUntil(fn)`,
+`spawn(fn, args...)`, `stop(thread)`, and `error(message)`.
+
+The game hosts scripts in a `ScriptEngine`. `Define` gives scripts a function (reading arguments from the
+`ScriptCall`, which says what was wrong with a wrong one), `Expose` one of the game's objects (its public properties,
+fields and methods, by name in any case: `player.health` is `Health`; enums by name; its lists index and its
+dictionaries with text keys read like maps; a struct comes back as a copy, so set it whole), and the indexer a shared
+value the game and scripts both read and change.
+
+```csharp
+var scripts = new ScriptEngine();
+scripts.Expose("player", player);
+scripts["gold"] = 10;
+scripts.Define("has", call => inventory.Contains(call.Text(0)));
+scripts.Define("say", call =>
+{
+    dialogue.Show(call.Host<Actor>(0), call.Text(1));
+    call.WaitUntil(() => dialogue.IsClosed);           // the script carries on when the box is closed
+});
+scripts.Define("ask", call =>
+{
+    var choosing = call.Suspend();                     // ask returns what the player picks
+    menu.Open(call.Text(0), call.List(1).Items.Select(item => item.ToString()), choice => choosing.Resolve(choice));
+    return ScriptValue.Nil;
+});
+
+var level = scripts.Run(File.ReadAllText("level1.script"), "level1");   // runs the top level: lets, fns
+level.Call("on_enter");                                                 // at once; may not wait
+level.Start("intro");                                                   // as a thread; may wait
+if (scripts.Evaluate("gold >= 10 and player.health > 0").IsTruthy) ...  // a condition in a level file
+
+// Once a frame, so waiting threads carry on:
+scripts.Update(gameTime.ElapsedGameTime);
+```
+
+A thread is a script function running on its own stack: when it calls `wait`, or a game function that waits
+(`call.Wait`, `call.WaitUntil`, or `call.Suspend` until the game resolves the promise with the call's answer), it
+stops there and carries on in a later `Update` while the game and other threads go on. Threads start in the next
+`Update`; `ScriptThread` has the status, the result and `Stop`. A function the game calls directly (`Call`,
+`Evaluate`, `Run`) needs its answer at once, so waiting there is an error.
+
+Mistakes say where they are. One in the text (`level1:12: expected 'end' to close 'if', got the end of the script`)
+is a `ScriptSyntaxException` from `Load`, with the line and column; one while running (`level1:30: can't add number 3
+and nil`) is a `ScriptException` with the calls it was in (`Trace`). A thread that fails in `Update` raises `Failed`,
+or, with no handler, `Update` throws. A thread that runs more than `InstructionLimit` steps without waiting (an endless
+loop) fails rather than freezing the game, as do calls deeper than `MaxDepth`.
+
+The RPG kit's content files run scripts through a custom effect, `{"run": "gold += 5"}`:
+
+```csharp
+state.CustomEffect = effect =>
+{
+    if (effect.Name == "run")
+        scripts.Load(effect.Arguments.GetProperty("run").GetString()!, "content").Run();
+};
+```
+
 ## Online multiplayer
 
 `Jentl.Net` (framework-free) plays turn-based games over the internet through a room server. Players connect with

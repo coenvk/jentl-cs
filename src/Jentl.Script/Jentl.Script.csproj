@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's scripting language: a small language for cutscenes, dialogue, events and level logic that the game loads at run time, with functions that wait without stopping the game. Framework-free, and fine in the browser.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Script.Tests" />
+  </ItemGroup>
+
+</Project>

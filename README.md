@@ -17,6 +17,7 @@ draws them.
 | `Jentl.Multiplayer` | Turn-based games for humans and bots at one table, with timed decisions and duplicate seatings |
 | `Jentl.Net` | Online play: a JSON protocol, an authoritative room server, online leaderboards, a WebSocket client, agents in their own process or on their owners' computers |
 | `Jentl.Ai` | Game AI: steering (seek, arrive, pursue, wander, avoid, flocking) and behaviour trees with utility choices |
+| `Jentl.Script` | A scripting language for cutscenes, dialogue and level logic, loaded at run time: functions that wait across frames without stopping the game, the game's objects and functions at hand, mistakes reported with their line |
 | `Jentl.Ecs` | An entity component system |
 | `Jentl.Physics` | 2D rigid-body physics: circles and boxes, contacts, rods, ropes and springs, and fast bodies that never pass through walls |
 | `Jentl.Collect` | Collecting games: weighted draws (packs, loot), counters that recharge on the wall clock (tickets, energy), calendar rotations, running statistics, Glicko-2 ratings, keyed random numbers that cannot be predicted; leaderboards and made-up player names |
