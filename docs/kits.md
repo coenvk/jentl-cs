@@ -723,6 +723,40 @@ A body moving further in one step than a wall is thick jumps right through it. M
 their every move is swept against the other solid bodies, stopping (or bouncing, by their restitution) at the first
 one in the way. A circle meeting a box treats the box's corners as square, so it stops a hair early there.
 
+## AI: steering and behaviour trees
+
+`Jentl.Ai` is framework-free, on `System.Numerics`. A `Vehicle` steers itself, Reynolds style: each behaviour returns
+the force that would turn its velocity towards what it wants (reaching it in about 1 / `Responsiveness` seconds, as
+far as `MaxForce` allows), the game adds up the ones that matter, weighted, and `Move` applies the sum. `Seek`, `Flee`
+(within a panic distance), `Arrive` (slowing to stop on the spot), `Pursue` and `Evade` (aiming where a mover will
+be), `Wander` (a smooth amble), `Avoid` (round obstacles ahead), and for crowds `Separation`, `Alignment`, `Cohesion`
+and all three as `Flock`. To steer a physics body, copy its position and velocity in and apply the force to the body.
+
+```csharp
+foreach (var sheep in flock)
+    sheep.Move(sheep.Flock(flock, radius: 80) + sheep.Flee(dog.Position, panicDistance: 120) * 2, seconds);
+```
+
+A `BehaviourTree<T>` is a mind over a game's own `T` (the monster and what it sees), ticked once a frame. `Bt` builds
+it: a `Selector` tries its children in order and takes the first that doesn't fail, checking the higher priorities
+again every tick (so attacking takes over from a running patrol); a `Sequence` runs steps in order, picking up where
+it was while one runs; `While` drops a running plan the moment its reason stops holding. `If` and `Do` are the leaves,
+`Wait`, `Not`, `Try`, `Repeat` and `Cooldown` (by the tree's own time, so it runs out while its branch isn't reached)
+the rest. `Best` is utility AI: it scores each option every tick and runs the highest, with a stickiness so a running
+choice isn't dropped for one barely better.
+
+```csharp
+var mind = new BehaviourTree<Goblin>(Bt.Selector(
+    Bt.While<Goblin>(g => g.SeesPlayer, Bt.Sequence(
+        Bt.Cooldown(TimeSpan.FromSeconds(3), Bt.Do<Goblin>(g => g.Throw())),
+        Bt.Do<Goblin>((g, elapsed) => g.Chase(elapsed)))),
+    Bt.Best<Goblin>(0.1f,
+        (g => g.Hunger, Bt.Do<Goblin>((g, elapsed) => g.Forage(elapsed))),
+        (g => 0.3f, Bt.Do<Goblin>((g, elapsed) => g.Patrol(elapsed))))));
+
+mind.Tick(goblin, elapsed);
+```
+
 ## Online multiplayer
 
 `Jentl.Net` (framework-free) plays turn-based games over the internet through a room server. Players connect with

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's game AI: steering (seek, flee, arrive, pursue, wander, flocking) and behaviour trees with utility choices. Framework-free.</Description>
+  </PropertyGroup>
+
+  <!-- On System.Numerics, framework-free like the other kits. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Ai.Tests" />
+  </ItemGroup>
+
+</Project>

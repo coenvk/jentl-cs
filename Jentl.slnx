@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Fluffy/Fluffy.csproj" />
+    <Project Path="src/Jentl.Ai/Jentl.Ai.csproj" />
     <Project Path="src/Jentl.Assets/Jentl.Assets.csproj" />
     <Project Path="src/Jentl.Cards/Jentl.Cards.csproj" />
     <Project Path="src/Jentl.Collect/Jentl.Collect.csproj" />
@@ -18,6 +19,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Fluffy.Tests/Fluffy.Tests.csproj" />
+    <Project Path="tests/Jentl.Ai.Tests/Jentl.Ai.Tests.csproj" />
     <Project Path="tests/Jentl.Assets.Tests/Jentl.Assets.Tests.csproj" />
     <Project Path="tests/Jentl.Cards.Tests/Jentl.Cards.Tests.csproj" />
     <Project Path="tests/Jentl.Collect.Tests/Jentl.Collect.Tests.csproj" />
