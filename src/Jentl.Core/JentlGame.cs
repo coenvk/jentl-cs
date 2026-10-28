@@ -24,6 +24,7 @@ public abstract class JentlGame : Game
     private PointerState _lastPointer;
     private PointerState _realPointer;
     private int _lastWheel;
+    private PlayerIndex _padIndex = PlayerIndex.One;
     private RenderTarget2D? _target;
     private AssetStore? _assets;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -37,9 +38,13 @@ public abstract class JentlGame : Game
             PreferredBackBufferWidth = width,
             PreferredBackBufferHeight = height,
         };
+        Rumble = new Rumble((low, high) => GamePad.SetVibration(_padIndex, low, high));
     }
 
     public InputState Input { get; } = new();
+
+    /// <summary>Vibration for the gamepad being read; quiet while the window is in the background.</summary>
+    public Rumble Rumble { get; }
 
     public SceneManager Scenes { get; } = new();
 
@@ -146,6 +151,7 @@ public abstract class JentlGame : Game
             var state = GamePad.GetState(player);
             if (state.IsConnected)
             {
+                _padIndex = player;
                 return state;
             }
         }
@@ -181,6 +187,7 @@ public abstract class JentlGame : Game
         Scenes.Debug.Update(gameTime.ElapsedGameTime, Input);
         var started = _clock.Elapsed;
         Scenes.Update(gameTime.ElapsedGameTime, Input);
+        Rumble.Update(gameTime.ElapsedGameTime, quiet: !IsActive);
         _updateTime += _clock.Elapsed - started;
         if (Scenes.IsEmpty)
         {
@@ -281,6 +288,9 @@ public abstract class JentlGame : Game
     {
         if (disposing)
         {
+            // A pad left shaking would go on after the game has gone.
+            Rumble.Stop();
+            Rumble.Update(TimeSpan.Zero);
             _batch?.Dispose();
             _assets?.Dispose();
             _target?.Dispose();

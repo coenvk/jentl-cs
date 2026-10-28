@@ -465,6 +465,16 @@ active it *is* the pointer, so taps, drags, hover and gestures need no extra cod
 steps aside the moment the mouse or a finger moves. `JentlGame.PadCursor` draws it above everything. Override
 `ReadGamePad` to feed scripted pad input.
 
+`JentlGame.Rumble` shakes the controller being read. `Play` starts a `RumbleEffect` (the heavy and light motors from
+0 to 1, for a time, dying away unless `fade: false`); overlapping effects take the strongest of each motor, and the
+motors stay off while the window is in the background. `RumbleEffect.Tap`, `Bump`, `Hit` and `Crash` are ready-made.
+Give players `Enabled` and `Strength` in the options: some find it uncomfortable.
+
+```csharp
+game.Rumble.Play(RumbleEffect.Bump);                                // a crate lands on its target
+game.Rumble.Play(0.6f, 0.2f, TimeSpan.FromSeconds(1), fade: false); // an engine running
+```
+
 ## Camera and resolution independence
 
 `Camera2D` decides which part of a world shows in a screen viewport: `Position` is the world point in the middle,
