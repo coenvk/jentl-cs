@@ -38,6 +38,9 @@ public sealed class InputState
     /// <summary>Advances to a gamepad state with no keys and the pointer released; lets tests feed input without a window.</summary>
     public void Update(GamePadState pad) => Update(default, _pointer with { IsDown = false }, pad);
 
+    /// <summary>How many frames this state has advanced: tells one frame from the next.</summary>
+    public long Frame { get; private set; }
+
     /// <summary>The text typed this frame, as the system's keyboard layout makes it (no control characters).</summary>
     public string Typed { get; private set; } = "";
 
@@ -59,6 +62,7 @@ public sealed class InputState
     /// <summary>Advances one frame. Call once per frame.</summary>
     public void Update(KeyboardState keyboard, PointerState cursor, GamePadState pad = default, int wheel = 0)
     {
+        Frame++;
         Typed = _typing.ToString();
         _typing.Clear();
         Wheel = wheel;

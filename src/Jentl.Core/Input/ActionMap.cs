@@ -17,6 +17,8 @@ public sealed class ActionMap<TAction>
     private readonly Dictionary<TAction, Buttons[]> _defaultButtons;
     private readonly Dictionary<TAction, Keys[]> _keys;
     private readonly Dictionary<TAction, Buttons[]> _buttons;
+    private readonly HashSet<TAction> _toggles = [];
+    private readonly Dictionary<TAction, (bool On, long Frame)> _latched = [];
 
     public ActionMap(IReadOnlyDictionary<TAction, Keys[]> keys, IReadOnlyDictionary<TAction, Buttons[]>? buttons = null)
     {
@@ -33,6 +35,7 @@ public sealed class ActionMap<TAction>
         _defaultButtons = Copy(other._defaultButtons);
         _keys = Copy(other._keys);
         _buttons = Copy(other._buttons);
+        _toggles.UnionWith(other._toggles);
     }
 
     public IReadOnlyList<Keys> KeysFor(TAction action) =>
@@ -42,13 +45,51 @@ public sealed class ActionMap<TAction>
         _buttons.TryGetValue(action, out var buttons) ? buttons : [];
 
     /// <summary>Whether any binding differs from the ones the map was made with.</summary>
-    public bool IsChanged => Enum.GetValues<TAction>().Any(a => KeysChanged(a) || ButtonsChanged(a));
+    public bool IsChanged => _toggles.Count > 0 || Enum.GetValues<TAction>().Any(a => KeysChanged(a) || ButtonsChanged(a));
 
+    /// <summary>
+    /// Whether the action is held; for a toggle (<see cref="SetToggle"/>), whether it is switched on. A toggle flips
+    /// when its key is pressed in a frame this is asked, so ask every frame, as for a held action.
+    /// </summary>
     public bool IsDown(InputState input, TAction action)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return KeysFor(action).Any(input.IsDown) || ButtonsFor(action).Any(input.IsDown);
+        if (!_toggles.Contains(action))
+        {
+            return KeysFor(action).Any(input.IsDown) || ButtonsFor(action).Any(input.IsDown);
+        }
+
+        var (on, frame) = _latched.GetValueOrDefault(action);
+        if (frame != input.Frame)
+        {
+            on ^= WasPressed(input, action);
+            _latched[action] = (on, input.Frame);
+        }
+
+        return on;
     }
+
+    /// <summary>
+    /// Makes a held action (run, aim, crouch) a toggle, or a held one again: pressed once it stays down until pressed
+    /// again, for players who cannot hold a key or button for long.
+    /// </summary>
+    public void SetToggle(TAction action, bool toggle)
+    {
+        _latched.Remove(action);
+        if (toggle)
+        {
+            _toggles.Add(action);
+        }
+        else
+        {
+            _toggles.Remove(action);
+        }
+    }
+
+    public bool IsToggle(TAction action) => _toggles.Contains(action);
+
+    /// <summary>Switches every toggled action off, as when a level restarts.</summary>
+    public void ReleaseToggles() => _latched.Clear();
 
     public bool WasPressed(InputState input, TAction action)
     {
@@ -79,11 +120,13 @@ public sealed class ActionMap<TAction>
     /// <summary>Removes the button in <paramref name="slot"/> of <paramref name="action"/>, if there is one.</summary>
     public void UnbindButton(TAction action, int slot) => Unbind(_buttons, action, slot);
 
-    /// <summary>Goes back to the bindings the map was made with.</summary>
+    /// <summary>Goes back to the bindings the map was made with, every action held rather than toggled.</summary>
     public void Reset()
     {
         _keys.Clear();
         _buttons.Clear();
+        _toggles.Clear();
+        _latched.Clear();
         foreach (var (action, keys) in _defaultKeys)
         {
             _keys[action] = keys.ToArray();
@@ -116,7 +159,13 @@ public sealed class ActionMap<TAction>
             }
         }
 
-        return new JsonObject { ["keys"] = keys, ["buttons"] = buttons }.ToJsonString();
+        var root = new JsonObject { ["keys"] = keys, ["buttons"] = buttons };
+        if (_toggles.Count > 0)
+        {
+            root["toggles"] = new JsonArray([.. _toggles.Order().Select(a => JsonValue.Create(a.ToString()))]);
+        }
+
+        return root.ToJsonString();
     }
 
     /// <summary>
@@ -140,6 +189,16 @@ public sealed class ActionMap<TAction>
         Reset();
         Apply(root["keys"], _keys);
         Apply(root["buttons"], _buttons);
+        if (root["toggles"] is JsonArray toggles)
+        {
+            foreach (var item in toggles)
+            {
+                if (item is JsonValue v && v.TryGetValue<string>(out var name) && Enum.TryParse<TAction>(name, out var action))
+                {
+                    _toggles.Add(action);
+                }
+            }
+        }
     }
 
     private static void Apply<T>(JsonNode? node, Dictionary<TAction, T[]> bindings)

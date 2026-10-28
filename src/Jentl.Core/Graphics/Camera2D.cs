@@ -134,9 +134,17 @@ public sealed class Camera2D
         Position = target - new Vector2((fromCentre.X * cos) - (fromCentre.Y * sin), (fromCentre.X * sin) + (fromCentre.Y * cos));
     }
 
-    /// <summary>Shakes the view up to <paramref name="strength"/> screen pixels, dying away over <paramref name="duration"/>.</summary>
+    /// <summary>
+    /// Shakes the view up to <paramref name="strength"/> screen pixels, dying away over <paramref name="duration"/>;
+    /// not at all while <see cref="Accessibility.ReduceMotion"/> is on.
+    /// </summary>
     public void Shake(float strength, TimeSpan duration)
     {
+        if (Accessibility.ReduceMotion)
+        {
+            return;
+        }
+
         // A stronger shake takes over; a weaker one never cuts a big one short.
         if (strength >= _shakeStrength * Fraction(_shakeLeft, _shakeTime))
         {

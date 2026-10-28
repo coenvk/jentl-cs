@@ -375,6 +375,30 @@ var form = new Form(sounds,
 // Draw:    OverlayPanel.Draw(batch, viewport, fonts, "Options", [], form);
 ```
 
+## Accessibility
+
+Settings for players who need the game to behave differently. Each lives with what it changes, so offer them in the
+options and save them with the rest:
+
+| Setting | What it does |
+|---|---|
+| `Accessibility.ReduceMotion` | Less movement: `Camera2D.Shake` does nothing and a `WipeTransition` fades instead. Check `Accessibility.Motion(amount)` for the game's own motion (screen flashes, bouncing, parallax): it gives the amount, or 0 while motion is reduced |
+| `Fonts.TextScale` | Bigger text, from 1 to 2: the title, heading, body and small fonts grow, and menus, forms and panels with them (they lay out by their font). `Px` lengths and `Sized` fonts stay as they are |
+| `PaletteColors` | `Palette.Capture()` takes the game's colours at start-up; `WithHighContrast()` pushes text and surfaces apart (white or black text, whichever stands out more), and `WithColorBlindSafe()` shows success in blue rather than green. `Apply()` puts a set in place, so switching the setting off applies the captured one again. `PaletteColors.Contrast(a, b)` gives the WCAG ratio (4.5 is enough for text, 7 good), to check a game's own colours |
+| `ActionMap.SetToggle(action, true)` | A held action (run, aim) becomes a toggle: pressed once it stays down until pressed again. Saved with the bindings |
+| `Rumble.Enabled`, `Rumble.Strength` | Vibration off, or softer (see [Gamepad](#gamepad)) |
+
+```csharp
+var colors = Palette.Capture();
+void ApplyAccessibility(Settings s)
+{
+    Accessibility.ReduceMotion = s.ReduceMotion;
+    fonts.TextScale = s.TextScale;
+    var palette = s.HighContrast ? colors.WithHighContrast() : colors;
+    (s.ColorBlind ? palette.WithColorBlindSafe() : palette).Apply();
+}
+```
+
 ## Audio
 
 `Jentl.Core.Audio` plays sound effects and music, and can make both in code.

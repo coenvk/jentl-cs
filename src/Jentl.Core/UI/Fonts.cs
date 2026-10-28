@@ -22,6 +22,7 @@ public sealed class Fonts : IDisposable
     private const int MinSmallSize = 15;
 
     private readonly FontSystem _system;
+    private float _textScale = 1;
 
     /// <param name="font">A TrueType or OpenType font file's bytes.</param>
     public Fonts(byte[] font)
@@ -40,13 +41,13 @@ public sealed class Fonts : IDisposable
     /// <summary>A screen noticeably taller than wide, such as a phone held upright.</summary>
     public bool IsPortrait { get; private set; }
 
-    public SpriteFontBase Title => _system.GetFont(Px(112));
+    public SpriteFontBase Title => _system.GetFont(Text(112));
 
-    public SpriteFontBase Heading => _system.GetFont(Px(52));
+    public SpriteFontBase Heading => _system.GetFont(Text(52));
 
-    public SpriteFontBase Body => _system.GetFont(Px(34));
+    public SpriteFontBase Body => _system.GetFont(Text(34));
 
-    public SpriteFontBase Small => _system.GetFont(Math.Max(MinSmallSize, Px(22)));
+    public SpriteFontBase Small => _system.GetFont(Math.Max((int)MathF.Round(MinSmallSize * TextScale), Text(22)));
 
     /// <summary>The font at any pixel size, for text that scales with something other than the UI (such as cards).</summary>
     public SpriteFontBase Sized(float pixels) => _system.GetFont(Math.Max(6, (int)MathF.Round(pixels)));
@@ -66,6 +67,19 @@ public sealed class Fonts : IDisposable
 
     /// <summary>A design-size length in pixels at the current scale.</summary>
     public int Px(float designPixels) => (int)MathF.Round(designPixels * Scale);
+
+    /// <summary>
+    /// How much bigger the UI's text is than designed, from 1 to 2, for players who need larger text: the title,
+    /// heading, body and small fonts grow by it, and widgets laid out by their font (menus, forms, panels) with them.
+    /// <see cref="Px"/> lengths and <see cref="Sized"/> fonts do not change.
+    /// </summary>
+    public float TextScale
+    {
+        get => _textScale;
+        set => _textScale = Math.Clamp(value, 1, 2);
+    }
+
+    private int Text(float designPixels) => (int)MathF.Round(designPixels * Scale * TextScale);
 
     public void Dispose() => _system.Dispose();
 

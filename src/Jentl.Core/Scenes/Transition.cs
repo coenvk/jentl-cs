@@ -38,13 +38,24 @@ public sealed class FadeTransition(TimeSpan duration, Color? color = null) : Tra
         batch.FillRectangle(viewport, new Color(_color, coverage));
 }
 
-/// <summary>A curtain sliding in from the left and back out, after Jentl's original SceneTransition.</summary>
+/// <summary>
+/// A curtain sliding in from the left and back out, after Jentl's original SceneTransition. While
+/// <see cref="Accessibility.ReduceMotion"/> is on it fades instead.
+/// </summary>
 public sealed class WipeTransition(TimeSpan duration, Color? color = null) : Transition(duration)
 {
     private readonly Color _color = color ?? Color.Black;
 
-    public override void Draw(SpriteBatch batch, Rectangle viewport, float coverage) =>
+    public override void Draw(SpriteBatch batch, Rectangle viewport, float coverage)
+    {
+        if (Accessibility.ReduceMotion)
+        {
+            batch.FillRectangle(viewport, new Color(_color, coverage));
+            return;
+        }
+
         batch.FillRectangle(
             new Rectangle(viewport.X, viewport.Y, (int)MathF.Ceiling(viewport.Width * coverage), viewport.Height),
             _color);
+    }
 }
