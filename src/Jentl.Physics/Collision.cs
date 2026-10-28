@@ -35,6 +35,21 @@ internal static class Collision
         _ => throw new NotSupportedException($"No ray test for {body.Shape.GetType().Name}."),
     };
 
+    /// <summary>
+    /// How far <paramref name="moving"/> can travel along <paramref name="direction"/> before it touches
+    /// <paramref name="other"/> (0 when it already does), and the normal it meets, pointing out of <paramref name="other"/>.
+    /// A ray from its centre against the other shape grown by its own; a circle against a box, either way, counts the
+    /// box's corners as square, so it stops a little early there.
+    /// </summary>
+    public static float? Sweep(Body moving, Body other, Vector2 direction, out Vector2 normal) => (moving.Shape, other.Shape) switch
+    {
+        (Circle c, Circle o) => RayCircle(moving.Position, direction, other.Position, c.Radius + o.Radius, out normal),
+        (Circle c, Box o) => RayBox(moving.Position, direction, Aabb.FromCenter(other.Position, o.HalfSize + new Vector2(c.Radius)), out normal),
+        (Box b, Box o) => RayBox(moving.Position, direction, Aabb.FromCenter(other.Position, o.HalfSize + b.HalfSize), out normal),
+        (Box b, Circle o) => RayBox(moving.Position, direction, Aabb.FromCenter(other.Position, b.HalfSize + new Vector2(o.Radius)), out normal),
+        _ => throw new NotSupportedException($"No sweep for {moving.Shape.GetType().Name} and {other.Shape.GetType().Name}."),
+    };
+
     public static bool Contains(Body body, Vector2 point) => body.Shape switch
     {
         Circle circle => Vector2.DistanceSquared(point, body.Position) <= circle.Radius * circle.Radius,

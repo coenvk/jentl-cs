@@ -13,6 +13,7 @@ public sealed class PhysicsWorld
     private readonly List<Body> _bodies = [];
     private readonly List<Contact> _contacts = [];
     private readonly List<float> _bounces = [];
+    private readonly List<Joint> _joints = [];
     private HashSet<(int, int)> _touching = [];
     private TimeSpan _pending;
     private int _nextId;
@@ -61,7 +62,23 @@ public sealed class PhysicsWorld
         return body;
     }
 
-    /// <summary>Takes the body out. Its contacts go quietly, without ended events.</summary>
+    public IReadOnlyList<Joint> Joints => _joints;
+
+    public Joint Add(Joint joint)
+    {
+        ArgumentNullException.ThrowIfNull(joint);
+        if (joint.A.Id < 0 || joint.B is { Id: < 0 })
+        {
+            throw new InvalidOperationException("Add a joint's bodies to the world first.");
+        }
+
+        _joints.Add(joint);
+        return joint;
+    }
+
+    public bool Remove(Joint joint) => _joints.Remove(joint);
+
+    /// <summary>Takes the body out, with its joints. Its contacts go quietly, without ended events.</summary>
     public bool Remove(Body body)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -69,6 +86,8 @@ public sealed class PhysicsWorld
         {
             return false;
         }
+
+        _joints.RemoveAll(j => ReferenceEquals(j.A, body) || ReferenceEquals(j.B, body));
 
         _touching.RemoveWhere(p => p.Item1 == body.Id || p.Item2 == body.Id);
         _contacts.RemoveAll(c => ReferenceEquals(c.A, body) || ReferenceEquals(c.B, body));
@@ -99,6 +118,11 @@ public sealed class PhysicsWorld
     /// <summary>Runs one step of <paramref name="seconds"/>.</summary>
     public void Step(float seconds)
     {
+        foreach (var joint in _joints)
+        {
+            joint.ApplyForces();
+        }
+
         foreach (var body in _bodies.Where(b => b.Type == BodyType.Dynamic))
         {
             var velocity = body.Velocity + (Gravity * body.GravityScale + body.Force * body.InverseMass) * seconds;
@@ -123,16 +147,33 @@ public sealed class PhysicsWorld
                     Resolve(_contacts[c], _bounces[c]);
                 }
             }
+
+            foreach (var joint in _joints)
+            {
+                joint.SolveVelocity(seconds);
+            }
         }
 
         foreach (var body in _bodies.Where(b => b.Type != BodyType.Static))
         {
-            body.Position += body.Velocity * seconds;
+            if (body.IsBullet && !body.IsSensor)
+            {
+                Sweep(body, seconds);
+            }
+            else
+            {
+                body.Position += body.Velocity * seconds;
+            }
         }
 
         foreach (var contact in _contacts.Where(c => !c.A.IsSensor && !c.B.IsSensor))
         {
             Separate(contact);
+        }
+
+        foreach (var joint in _joints)
+        {
+            joint.SolvePosition();
         }
 
         ReportContacts();
@@ -195,6 +236,52 @@ public sealed class PhysicsWorld
                     _contacts.Add(contact);
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Moves a bullet along its velocity only as far as the first solid body in the way, and takes away (or bounces)
+    /// its speed into that body. A body it already overlaps is left to the contacts.
+    /// </summary>
+    private void Sweep(Body body, float seconds)
+    {
+        var motion = body.Velocity * seconds;
+        var length = motion.Length();
+        if (length < 1e-6f)
+        {
+            return;
+        }
+
+        var direction = motion / length;
+        (Body Other, float Distance, Vector2 Normal)? first = null;
+        foreach (var other in _bodies)
+        {
+            if (ReferenceEquals(other, body) || other.IsSensor || !body.CollidesWith(other)
+                || Collision.Sweep(body, other, direction, out var normal) is not { } distance
+                || distance <= 0 || distance > length)
+            {
+                continue;
+            }
+
+            if (first is null || distance < first.Value.Distance)
+            {
+                first = (other, distance, normal);
+            }
+        }
+
+        if (first is not { } stop)
+        {
+            body.Position += motion;
+            return;
+        }
+
+        // Stop a hair short, so the next step's contact sees the bodies touching rather than overlapping.
+        body.Position += direction * MathF.Max(0, stop.Distance - 0.01f);
+        var into = Vector2.Dot(body.Velocity - stop.Other.Velocity, stop.Normal);
+        if (into < 0)
+        {
+            var bounce = -into > BounceThreshold ? MathF.Max(body.Restitution, stop.Other.Restitution) : 0;
+            body.Velocity -= stop.Normal * into * (1 + bounce);
         }
     }
 

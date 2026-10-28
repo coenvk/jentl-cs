@@ -704,6 +704,25 @@ angle the ball off the paddle), keep balls at speed and move on when a wall is c
 turns into sounds and sparks. Balls float (gravity scale 0) while power-ups fall. `PhysicsDebug.Draw` outlines
 every body and contact for a scene's `DrawDebug`.
 
+### Joints and fast bodies
+
+Bodies don't rotate, so joints hold distances between body centres, or between a body and a fixed point (the
+`Anchor`, movable): `DistanceJoint` is a rigid rod, `RopeJoint` lets the ends come together but never further apart
+than its length (`IsTaut` says when it is pulled straight), and `SpringJoint` pulls towards its rest length with a
+stiffness and a damping that lets it settle. Leave the length out and a joint keeps the distance its ends have when
+made. Joints are solved with the contacts, then their lengths corrected; removing a body removes its joints, and
+`PhysicsDebug` draws them in violet.
+
+```csharp
+var ball = world.Add(new Body(new Circle(12), new Vector2(200, 80)) { Mass = 20 });
+world.Add(new RopeJoint(ball, anchor: new Vector2(200, 0)));          // a wrecking ball on a chain
+world.Add(new SpringJoint(car, trailer, stiffness: 400, damping: 30));  // a springy tow bar
+```
+
+A body moving further in one step than a wall is thick jumps right through it. Mark the few fast ones `IsBullet`:
+their every move is swept against the other solid bodies, stopping (or bouncing, by their restitution) at the first
+one in the way. A circle meeting a box treats the box's corners as square, so it stops a hair early there.
+
 ## Online multiplayer
 
 `Jentl.Net` (framework-free) plays turn-based games over the internet through a room server. Players connect with

@@ -64,6 +64,13 @@ public sealed class Body
     /// <summary>A sensor reports contacts but doesn't push or get pushed: pickups, trigger zones.</summary>
     public bool IsSensor { get; set; }
 
+    /// <summary>
+    /// A fast body (a bullet, a ball off a bat) whose every move is swept against the other solid bodies, so it
+    /// stops at a thin wall it would otherwise jump right through in one step. It costs a test against every body,
+    /// so keep it for the few that need it.
+    /// </summary>
+    public bool IsBullet { get; set; }
+
     /// <summary>The collision layers the body is on (bits).</summary>
     public uint Layer { get; set; } = 1;
 

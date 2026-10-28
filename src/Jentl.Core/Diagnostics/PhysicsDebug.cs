@@ -59,6 +59,19 @@ public static class PhysicsDebug
             }
         }
 
+        // Joints in violet: a rod solid, a slack rope faint, a spring thin.
+        foreach (var joint in world.Joints)
+        {
+            var violet = new Color(200, 130, 255);
+            var (color, thickness) = joint switch
+            {
+                RopeJoint { IsTaut: false } => (violet * 0.45f, 1.5f),
+                SpringJoint => (violet, 1f),
+                _ => (violet, 2f),
+            };
+            batch.DrawLine(Screen(joint.A.Position), Screen(joint.End), color, thickness);
+        }
+
         foreach (var contact in world.Contacts)
         {
             var point = Screen(contact.Point);
