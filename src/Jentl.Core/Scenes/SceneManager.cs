@@ -31,6 +31,9 @@ public sealed class SceneManager
     /// <summary>The debug panel (F3), and whether scenes draw their debug shapes.</summary>
     public DebugOverlay Debug { get; } = new();
 
+    /// <summary>The inspector (F4): looks inside the top scene and changes it, with the game paused.</summary>
+    public Inspector Inspector { get; } = new();
+
     /// <summary>Every scene on the stack, bottom first.</summary>
     public IReadOnlyList<Scene> Stack => _scenes;
 
@@ -102,6 +105,18 @@ public sealed class SceneManager
 
     public void Update(TimeSpan elapsed, InputState input)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        if (!Inspector.Update(input, Top?.Inspectables ?? []))
+        {
+            return;
+        }
+
+        // While the inspector has the keys, the game runs (or steps) without them.
+        if (Inspector.IsOpen)
+        {
+            input = Inspector.IdleInput;
+        }
+
         Effects.Update(elapsed);
         Post.Update(elapsed);
         Timers.Update(elapsed);
@@ -145,6 +160,7 @@ public sealed class SceneManager
 
         Effects.Draw(batch);
         _transition?.Draw(batch, viewport);
+        Inspector.Draw(batch, viewport, Debug.Text, Debug.TextSize);
     }
 
     /// <summary>The top scene plus every overlay chain below it, bottom first.</summary>

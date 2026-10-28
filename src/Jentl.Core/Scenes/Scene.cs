@@ -1,4 +1,5 @@
 ﻿using Jentl.Core.Input;
+using Jentl.Core.Diagnostics;
 using Jentl.Core.Timing;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -46,6 +47,13 @@ public abstract class Scene : IDisposable
     public virtual void DrawDebug(SpriteBatch batch, Rectangle viewport)
     {
     }
+
+    /// <summary>
+    /// What the inspector (F4) shows while this scene is on top: by default the scene itself, so its fields can be
+    /// looked at and changed with no work at all. Offer the things in it too (the player, the enemies, a physics
+    /// world's bodies with <see cref="Inspectable.Bodies"/>), with bounds so they can be clicked and dragged.
+    /// </summary>
+    public virtual IEnumerable<Inspectable> Inspectables => [new Inspectable(GetType().Name, this)];
 
     /// <summary>Called when the scene is put on the stack.</summary>
     protected internal virtual void OnEnter()

@@ -659,6 +659,39 @@ using (Scenes.Debug.Profiler.Measure("physics")) world.Update(elapsed);
 using (Scenes.Debug.Profiler.Measure("ai")) foreach (var m in monsters) m.Mind.Tick(m, elapsed);
 ```
 
+## Inspector
+
+F4 opens the inspector: a panel on the right that looks inside the top scene and changes it while the game is
+paused. It lists what the scene offers in `Scene.Inspectables`, by default the scene itself, so every scene can be
+inspected with no work: its public properties and all its fields, private ones too (`_speed` shows as `speed`;
+a field behind a property that can be set is left to the property).
+
+| Keys and pointer | What they do |
+|---|---|
+| Up, Down, PageUp, PageDown | Choose a value |
+| Left, Right (Shift ×10, Ctrl ÷10), or the wheel over it | Change it: a number by a tenth of its size (10 for 420), a whole number by one, a switch flips, an enum steps, a time by a tenth of a second |
+| Enter | Open an object, a struct or a list; flip a switch; or type a new value (Enter sets it, Escape drops it) |
+| Backspace, Escape | Back up a level; Escape at the top closes the panel |
+| Click, drag | Click a thing in the scene to inspect it; drag it to move it |
+| P, N | Run the game with the panel open, or step it one frame while paused |
+| C | Copy the change log (`Paddle.Speed: 300 → 420`) to put the tuned values in the code |
+
+A member of a struct writes the whole struct back (a vector's `X`, a colour's `G`). While the panel is open the game
+gets no keys of its own, so they never do two things. Offer the things in a scene with bounds, in the scene's
+coordinates, to outline them and make them clickable, and a move to make them draggable; `Inspectable.Bodies` does
+that for every body of a physics world:
+
+```csharp
+public override IEnumerable<Inspectable> Inspectables =>
+[
+    new(nameof(LevelScene), this),
+    new("Player", player, () => player.Bounds, delta => player.Position += delta),
+    .. Inspectable.Bodies(world, ToScreen, scale),
+];
+```
+
+It edits the running game, not files: the change log is how a tuned value finds its way back into the code.
+
 ## Render targets, lighting and post effects
 
 `RenderLayer` is an offscreen picture: `Render(batch, size, clear, draw)` switches to its target (made and resized
