@@ -782,6 +782,30 @@ can't slip through untranslated. Whole sentences are translated, never pieced to
 can change ("You play" and "Ruby plays" are separate texts). Adding a language means adding its file and a line in
 `Tr.Languages`. The adventure's story (dialogue, quests, items) lives in its content files and stays in English.
 
+## Saves
+
+`Jentl.Core.Storage` keeps small save files: `SaveStore` in a folder on the desktop (`SaveStore.ForApp(name)` for
+the user's application data), writing through a temporary file so a crash never leaves half a save, and
+`Quarantine` to move an unreadable file aside. A browser game gives its own `ISaveStore` over local storage.
+
+A save outlives the version of the game that wrote it. `SaveMigrations` brings an old JSON save up to date: the save
+carries its version in a property (`"version"`, or a name you choose; none means 0), and each step turns the JSON of
+one version into the next, so a save from any older version passes through every step after it. `Stamp` writes the
+current version into a save; `Upgrade` runs the steps before the game parses it and throws `InvalidDataException`
+for a save from a newer version, one with a missing step, or one a step could not change:
+
+```csharp
+static readonly SaveMigrations Migrations = new SaveMigrations(2)
+    .Add(0, save => { save["coins"] = save["gold"]?.DeepClone(); save.Remove("gold"); })   // 0 → 1: renamed
+    .Add(1, save => save["level"] = new JsonObject { ["number"] = save["level"]?.DeepClone() });  // 1 → 2
+
+store.WriteText("progress.json", Migrations.Stamp(JsonSerializer.Serialize(progress)));
+var progress = JsonSerializer.Deserialize<Progress>(Migrations.Upgrade(store.ReadText("progress.json")!));
+```
+
+The RPG kit's `RpgWorld.Save` has a `"version"` of its own, for its format; give the game's migrations another
+property (`new SaveMigrations(3, "game")`) so the two never mix.
+
 ## Asset tooling
 
 `Jentl.Assets` (framework-free) and the `tools/Assets` command line look after the files a game ships.
