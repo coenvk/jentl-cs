@@ -956,6 +956,18 @@ var average = $"{payouts.Mean:F1} ± {payouts.Margin95:F1}";  // the mean, with 
 
 ## Geometry: shapes, tests and meshes
 
+`Noise` is Perlin noise: a smooth random field that wanders between about -1 and 1 over a unit, the same for a seed
+on every machine (it shuffles with its own generator, not `System.Random`). `At(x)`, `At(x, y)` and `At(x, y, z)`
+sample a line, the plane or space (the third coordinate as time animates a 2D field); `Fractal` layers octaves for
+detail, `Ridged` makes crests for mountains, cracks and rivers, and `Map` fills a grid from 0 to 1:
+
+```csharp
+var noise = new Noise(world.Seed);
+var height = noise.Fractal(x / 64f, y / 64f);           // rolling terrain
+var wobble = noise.At(time * 3f) * 4;                    // a hand-held camera
+var clouds = noise.Map(256, 256, scale: 40, octaves: 6); // a cloud texture
+```
+
 `Jentl.Geometry` is the maths a renderer (or a game) needs on top of `System.Numerics`, which already has vectors,
 matrices, quaternions and `Plane`. Right-handed, y up; a triangle's front is the side its corners run
 counter-clockwise; `System.Numerics` projection conventions (row vectors, depth 0 to 1).
