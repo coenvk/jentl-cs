@@ -25,6 +25,7 @@ public abstract class JentlGame : Game
     private PointerState _realPointer;
     private int _lastWheel;
     private PlayerIndex _padIndex = PlayerIndex.One;
+    private InputPlayback? _playback;
     private RenderTarget2D? _target;
     private AssetStore? _assets;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -162,6 +163,74 @@ public abstract class JentlGame : Game
     protected override void Update(GameTime gameTime)
     {
         ArgumentNullException.ThrowIfNull(gameTime);
+        var elapsed = gameTime.ElapsedGameTime;
+        if (_playback?.Next() is { } frame)
+        {
+            // The recording stands in for the devices and the clock; the wheel is still read, so turns made meanwhile
+            // do not all arrive at once afterwards.
+            ReadWheel();
+            VirtualScreen?.Fit(GraphicsDevice.Viewport.Bounds);
+            elapsed = frame.Elapsed;
+            Input.Apply(frame);
+        }
+        else
+        {
+            if (_playback is not null)
+            {
+                _playback = null;
+                ReplayFinished?.Invoke();
+            }
+
+            ReadInput(gameTime);
+        }
+
+        Recording?.Add(Input.Capture(elapsed));
+        _assets?.Update();
+        Scenes.Debug.Update(elapsed, Input);
+        var started = _clock.Elapsed;
+        Scenes.Update(elapsed, Input);
+        Rumble.Update(elapsed, quiet: !IsActive);
+        _updateTime += _clock.Elapsed - started;
+        if (Scenes.IsEmpty)
+        {
+            Exit();
+        }
+
+        base.Update(gameTime);
+    }
+
+    /// <summary>Starts recording every frame's input (and how long it lasted) from the next update on.</summary>
+    public InputRecording StartRecording() => Recording = new InputRecording();
+
+    /// <summary>Stops recording and returns what was recorded, or null when nothing was.</summary>
+    public InputRecording? StopRecording()
+    {
+        var recording = Recording;
+        Recording = null;
+        return recording;
+    }
+
+    /// <summary>The recording going on, if any.</summary>
+    public InputRecording? Recording { get; private set; }
+
+    /// <summary>
+    /// Plays <paramref name="recording"/> back from the next update on: its frames stand in for the keyboard, pointer,
+    /// gamepad and elapsed time, one a frame, and the devices take over again when it ends (<see cref="ReplayFinished"/>).
+    /// Start the game in the state the recording started from (the same scene, the same seed).
+    /// </summary>
+    public void Replay(InputRecording recording) => _playback = new InputPlayback(recording);
+
+    /// <summary>Stops a replay; the devices take over from the next update.</summary>
+    public void StopReplay() => _playback = null;
+
+    public bool IsReplaying => _playback is not null;
+
+    /// <summary>A replay has played its last frame.</summary>
+    public event Action? ReplayFinished;
+
+    /// <summary>Reads this frame's keyboard, pointer, gamepad and wheel into <see cref="Input"/>.</summary>
+    private void ReadInput(GameTime gameTime)
+    {
         var keyboard = ReadKeyboard();
         var pointer = ReadPointer(gameTime.TotalGameTime);
         var pad = ReadGamePad();
@@ -183,18 +252,6 @@ public abstract class JentlGame : Game
         }
 
         Input.Update(keyboard, cursor, pad, ReadWheel());
-        _assets?.Update();
-        Scenes.Debug.Update(gameTime.ElapsedGameTime, Input);
-        var started = _clock.Elapsed;
-        Scenes.Update(gameTime.ElapsedGameTime, Input);
-        Rumble.Update(gameTime.ElapsedGameTime, quiet: !IsActive);
-        _updateTime += _clock.Elapsed - started;
-        if (Scenes.IsEmpty)
-        {
-            Exit();
-        }
-
-        base.Update(gameTime);
     }
 
     protected override void Draw(GameTime gameTime)

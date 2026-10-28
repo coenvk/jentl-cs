@@ -93,6 +93,22 @@ public sealed class InputState
     /// <summary>A gamepad button (or stick direction or trigger) pressed this frame, or null.</summary>
     public Buttons? PressedButton() => Enum.GetValues<Buttons>().Where(WasPressed).Cast<Buttons?>().FirstOrDefault();
 
+    /// <summary>This frame's input, lasting <paramref name="elapsed"/>, to record.</summary>
+    public InputFrame Capture(TimeSpan elapsed) =>
+        new(elapsed, _current.GetPressedKeys(), _pointer, PadFrame.Of(_pad), Wheel, Typed);
+
+    /// <summary>
+    /// Advances one frame to a recorded one (see <see cref="Capture"/>): text typed meanwhile is dropped, so only the
+    /// recording's reaches the game.
+    /// </summary>
+    public void Apply(InputFrame frame)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        _typing.Clear();
+        _typing.Append(frame.Typed);
+        Update(new KeyboardState([.. frame.Keys]), frame.Cursor, frame.Pad.ToState(), frame.Wheel);
+    }
+
     /// <summary>A tap landed inside <paramref name="bounds"/> this frame.</summary>
     public bool Tapped(Rectangle bounds) => Tap is { } at && bounds.Contains(at);
 }

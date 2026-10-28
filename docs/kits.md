@@ -499,6 +499,31 @@ game.Rumble.Play(RumbleEffect.Bump);                                // a crate l
 game.Rumble.Play(0.6f, 0.2f, TimeSpan.FromSeconds(1), fade: false); // an engine running
 ```
 
+## Recording and replaying input
+
+`JentlGame` can record what the player does and play it back: a bug exactly as it happened, a ghost of a best run, or
+a test of a real-time game. `StartRecording()` captures every frame from the next update on (the keys down, the
+pointer as the game saw it, the gamepad, the wheel, the text typed, and how long the frame lasted) and
+`StopRecording()` hands it over. `Replay(recording)` plays one back: its frames stand in for the devices and the clock,
+one a frame, until `ReplayFinished`, when the devices take over again.
+
+A replay does the same things again only in a game that runs the same way: start it in the state the recording
+started from, seed its randomness, take time only from the elapsed time `Update` is given, and step physics with
+`PhysicsWorld.Update` (its fixed step makes the same elapsed times give the same simulation). `InputRecording.Save`
+writes text, one line per frame and a run of the same frame on one line, which `Load` reads back. Without a
+`JentlGame`, `InputState.Capture(elapsed)` and `Apply(frame)` record and replay directly, as the tests do:
+
+```csharp
+// F5 starts recording, F6 saves it, F7 replays the saved one from a fresh level.
+if (input.WasPressed(Keys.F5)) game.StartRecording();
+if (input.WasPressed(Keys.F6) && game.StopRecording() is { } run) store.WriteText("run.txt", run.Save());
+if (input.WasPressed(Keys.F7) && store.ReadText("run.txt") is { } saved)
+{
+    scenes.Reset(new LevelScene(seed));
+    game.Replay(InputRecording.Load(saved));
+}
+```
+
 ## Camera and resolution independence
 
 `Camera2D` decides which part of a world shows in a screen viewport: `Position` is the world point in the middle,
