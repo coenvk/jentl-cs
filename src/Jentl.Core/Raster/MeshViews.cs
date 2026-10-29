@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Jentl.Geometry;
 using Jentl.Raster;
+using Jentl.Scene3D;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Numerics = System.Numerics;
@@ -191,6 +192,7 @@ public sealed class GpuView : IMeshView
         _effect.LightingEnabled = _effect.TextureEnabled = _effect.FogEnabled = false;
         _effect.VertexColorEnabled = true;
         _effect.DiffuseColor = Vector3.One;
+        _effect.EmissiveColor = Vector3.Zero;
         _effect.Alpha = 1;
         _device.DepthStencilState = DepthStencilState.None;
         _device.RasterizerState = RasterizerState.CullNone;
@@ -259,6 +261,7 @@ public sealed class GpuView : IMeshView
         }
 
         _device.DepthStencilState = material.Translucent ? DepthStencilState.DepthRead : DepthStencilState.Default;
+        _device.RasterizerState = material.DoubleSided ? RasterizerState.CullNone : Cull;
 
         if (_effect.LightingEnabled)
         {
@@ -266,10 +269,17 @@ public sealed class GpuView : IMeshView
             _effect.DirectionalLight0.Enabled = true;
             _effect.DirectionalLight0.Direction = Convert3D.ToXna(Numerics.Vector3.Normalize(Lighting.Direction));
             _effect.DirectionalLight0.DiffuseColor = Convert3D.ToXna(Lighting.Color);
-            _effect.DirectionalLight0.SpecularColor = Vector3.Zero;
-            _effect.DirectionalLight1.Enabled = false;
-            _effect.DirectionalLight2.Enabled = false;
+            _effect.DirectionalLight0.SpecularColor = Convert3D.ToXna(Lighting.Color);
+            Fill(_effect.DirectionalLight1, Lighting.Fill.Count > 0 ? Lighting.Fill[0] : null);
+            Fill(_effect.DirectionalLight2, Lighting.Fill.Count > 1 ? Lighting.Fill[1] : null);
+
+            // Shine is worked out per pixel, or it smears across big triangles.
+            _effect.SpecularColor = Convert3D.ToXna(material.Specular);
+            _effect.SpecularPower = material.Shininess;
+            _effect.PreferPerPixelLighting = material.Specular != Numerics.Vector3.Zero;
         }
+
+        _effect.EmissiveColor = Convert3D.ToXna(material.Emissive);
 
         _device.SetVertexBuffer(buffers.Vertices);
         _device.Indices = buffers.Indices;
@@ -287,6 +297,17 @@ public sealed class GpuView : IMeshView
         }
 
         Triangles += buffers.Triangles;
+    }
+
+    private static void Fill(Microsoft.Xna.Framework.Graphics.DirectionalLight light, Jentl.Raster.ParallelLight? from)
+    {
+        light.Enabled = from is not null;
+        if (from is { } fill)
+        {
+            light.Direction = Convert3D.ToXna(Numerics.Vector3.Normalize(fill.Direction));
+            light.DiffuseColor = Convert3D.ToXna(fill.Color);
+            light.SpecularColor = Convert3D.ToXna(fill.Color);
+        }
     }
 
     public void DrawPoint(Numerics.Vector3 position, float size, Numerics.Vector4 color)
@@ -312,6 +333,7 @@ public sealed class GpuView : IMeshView
             _effect.TextureEnabled = false;
             _effect.VertexColorEnabled = true;
             _effect.DiffuseColor = Vector3.One;
+            _effect.EmissiveColor = Vector3.Zero;
             _effect.Alpha = 1;
             _effect.FogEnabled = Fog is not null;
             if (Fog is { } fog)
@@ -391,6 +413,26 @@ public static class MeshViewExtensions
         {
             view.DrawMesh(parts[i].Mesh, world, parts[i].Material);
         }
+    }
+
+    /// <summary>
+    /// Looks through <paramref name="camera"/> and draws what it sees of the scene under <paramref name="root"/>: out
+    /// of view left out, solid things first and see-through ones last (see <see cref="RenderList"/>). Pass a list to
+    /// reuse each frame and to read how much was drawn and culled.
+    /// </summary>
+    public static RenderList DrawScene(this IMeshView view, Node root, Camera camera, RenderList? list = null)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        ArgumentNullException.ThrowIfNull(camera);
+        view.Look(camera);
+        list ??= new RenderList();
+        list.Build(root, view.ViewProjection, camera.Position);
+        foreach (var item in list.Items)
+        {
+            view.DrawMesh(item.Mesh, item.World, item.Material);
+        }
+
+        return list;
     }
 
     /// <summary>Draws the living <paramref name="particles"/> as points, each its size, colour and fading alpha.</summary>

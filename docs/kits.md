@@ -1253,3 +1253,64 @@ view-projection; the graphics card needs the view on its own to measure fog), so
 after the meshes. Call
 `Begin`, `DrawMesh`, `Finish` from `Scene.DrawLayers` (the sprite batch is not begun there), and draw `Texture` in
 `Draw`.
+
+## 3D scenes: nodes, glTF models and animation
+
+`Jentl.Scene3D` (framework-free) puts 3D content together the way engines and modelling tools do, and both mesh views
+draw it.
+
+- **Nodes.** A `Node` has a position, rotation (a quaternion) and scale relative to its parent, any number of
+  `MeshPart`s (a mesh in a material), children that move with it, `Visible` and a `Tag` for the game's own object.
+  `World`, `WorldPosition`, `WorldRotation` and `Forward` (+Z, as glTF models face) say where it is; `Local` gets or
+  sets the three as one matrix; `Turn` rotates it about its own axis, `LookAt` faces a point in the world under any
+  parent; `Find`, `SelfAndDescendants`, `WorldBounds` and `Clone` (sharing the meshes) do the rest.
+- **Drawing.** `view.DrawScene(root, camera, list)` looks through the camera and draws what it sees. The
+  `RenderList` behind it leaves out meshes whose boxes are outside the view, draws solid meshes first, grouped by
+  material and nearest first, then see-through ones furthest first, and counts what it drew and culled.
+- **Materials and lights.** `Material` also takes `Emissive` (a glow, whatever the lights), `Specular` and
+  `Shininess` (a shine; on the graphics card, worked out per pixel) and `DoubleSided` (leaves, flags, sails).
+  `Lighting.Fill` adds up to two more directional lights to the main one (a bounce from the ground, a rim light);
+  `ParallelLight` is one. The software renderer takes all of these except the shine.
+- **glTF models.** `Gltf.Load(path)` (or bytes, with a way to find the files a `.gltf` refers to) reads glTF 2.0,
+  `.gltf` or `.glb`, as Blender and most tools export it: meshes (triangles, strips and fans, with normals and
+  texture coordinates; flat when they have no normals), materials (base colour and texture, emission, blending or
+  cut-out alpha, double sides, a shine guessed from roughness and metalness, `KHR_materials_unlit`), textures in
+  PNG or JPEG (baseline or progressive) with their filtering and wrapping, the node tree (by translation, rotation and
+  scale or a matrix), and animations of position, rotation and scale (linear, step or cubic spline). Skins, morph
+  targets, cameras and lights are left out, each noted in `Warnings`. `model.Instantiate()` makes a copy to put in a
+  scene: its `Root`, and its `Nodes` by their index in the file, all sharing the meshes.
+- **Animation.** An `AnimationClip` is a set of `AnimationChannel`s, each moving one node's position, rotation or
+  scale through keys (`AnimationChannel.Move`, `Turn` and `Resize` make one in code). An `AnimationPlayer` plays clips on a
+  list of nodes: looping or once, at a `Speed`, cross-fading from the clip before over a time (`Play(run, fade:
+  TimeSpan.FromSeconds(0.3))`), so a walk turns into a run without a jump.
+- **Cameras and picking.** An `OrbitCamera` circles a target (`Rotate` by a drag, `Zoom` by the wheel, `Pan`,
+  `Frame` a box) and a `FollowCamera` trails a node from a place of its own relative to it, catching up smoothly; both
+  set a `Camera`. `camera.RayThrough(point, size)` is the ray under the pointer, and `root.Pick(ray)` the nearest
+  mesh it hits: the node, the part, the distance and the point.
+
+```csharp
+var windmill = Gltf.Load("Content/windmill.glb");
+var world = new Node("world");
+world.Add("field", MeshBuilder.Plane(40, 40), grass);
+var mill = windmill.Instantiate("mill");
+world.Add(mill.Root).Position = new Vector3(5, 0, 2);
+var sails = mill.CreatePlayer();
+sails.Play(windmill.Animation("turn")!);
+var orbit = new OrbitCamera { Target = Vector3.Zero, Distance = 20 };
+
+// Update:
+sails.Update(elapsed);
+orbit.Rotate(drag.X * -0.01f, drag.Y * 0.01f);
+if (input.Tap is { } tap && world.Pick(camera.RayThrough(tap, screen)) is { } hit)
+    Select(hit.Node);
+
+// DrawLayers:
+orbit.Apply(camera);
+view.Look(camera);
+view.Begin(sky);
+view.DrawScene(world, camera, list);
+view.Finish();
+```
+
+`Jentl.Assets.Jpeg.Decode` reads JPEG pictures for any other use too: baseline and progressive, grey or colour, any
+chroma subsampling, restart markers. Lossless, arithmetic-coded, 12-bit and CMYK files are refused.

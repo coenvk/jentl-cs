@@ -24,7 +24,8 @@ draws them.
 | `Jentl.Tracks` | Tracks and roads: paths built from straights and arcs, with position, heading and curvature along them |
 | `Jentl.Geometry` | Geometry on System.Numerics: rays, segments, planes, triangles, polygons (area, containment, triangulation), boxes, view frustums, polygon clipping, edge functions, and triangle meshes with builders (box, plane, sphere, cylinder, cone, extruded outline), outlines traced from pictures, and Perlin noise (fractal and ridged) for terrain and wobble |
 | `Jentl.Raster` | A software renderer: frame and depth buffers, a camera, and triangles drawn on the CPU with clipping, back-face culling, depth testing, perspective-correct colours, textures, flat or smooth lighting, distance fog, and models extruded from sprites; `Jentl.Core.Raster` shows its pictures and draws the same meshes on the GPU |
-| `Jentl.Assets` | PNG reading and writing, a pixel canvas for art drawn in code, texture atlases, asset checks |
+| `Jentl.Scene3D` | 3D scenes: a tree of nodes with meshes, glTF 2.0 models (meshes, materials, PNG and JPEG textures, animations), an animation player with cross-fades, culling and draw order, picking, orbit and follow cameras |
+| `Jentl.Assets` | PNG and JPEG reading, PNG writing, a pixel canvas for art drawn in code, texture atlases, asset checks |
 | `Jentl.Fluffy` | Fluffy, a finite state machine engine |
 | `Jentl.Assets.Tool` | The `jentl-assets` command line: pack atlases, check assets |
 

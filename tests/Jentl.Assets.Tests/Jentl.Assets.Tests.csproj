@@ -6,4 +6,9 @@
     <ProjectReference Include="..\..\src\Jentl.Assets\Jentl.Assets.csproj" />
   </ItemGroup>
 
+  <!-- JPEGs written by libjpeg's cjpeg, each with djpeg's own decoding (-nosmooth -dct float) to compare against. -->
+  <ItemGroup>
+    <None Include="Jpegs\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

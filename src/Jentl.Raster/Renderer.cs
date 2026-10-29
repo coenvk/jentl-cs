@@ -24,7 +24,31 @@ public enum Shading
 /// <paramref name="Translucent"/> one is blended over what is behind it by its alpha and writes no depth (shadows,
 /// glass, water): draw it after the solid things it shows.
 /// </summary>
-public sealed record Material(Vector4 Color, Shading Shading = Shading.Smooth, Texture? Texture = null, bool Translucent = false);
+public sealed record Material(Vector4 Color, Shading Shading = Shading.Smooth, Texture? Texture = null, bool Translucent = false)
+{
+    /// <summary>Light the surface gives off itself, added whatever the lights (lamps, screens, lava); black by default.</summary>
+    public Vector3 Emissive { get; init; }
+
+    /// <summary>
+    /// The colour of its shine, where the lights glance off it towards the camera; black (none) by default. On the
+    /// graphics card only: the software renderer leaves it out.
+    /// </summary>
+    public Vector3 Specular { get; init; }
+
+    /// <summary>How tight the shine is: higher is smaller and sharper (polished), lower broader (satin).</summary>
+    public float Shininess { get; init; } = 16;
+
+    /// <summary>Whether its back faces are drawn too (leaves, flags, paper), rather than culled.</summary>
+    public bool DoubleSided { get; init; }
+
+    /// <summary>The colour of a surface of this material facing <paramref name="normal"/> under <paramref name="lighting"/>, with its own glow.</summary>
+    public Vector4 Shade(Lighting lighting, Vector3 normal)
+    {
+        ArgumentNullException.ThrowIfNull(lighting);
+        var lit = lighting.Shade(Color, normal);
+        return Emissive == Vector3.Zero ? lit : new Vector4(Vector3.Min(new Vector3(lit.X, lit.Y, lit.Z) + Emissive, Vector3.One), lit.W);
+    }
+}
 
 /// <summary>
 /// A sky to clear to: <paramref name="Zenith"/> overhead fading to <paramref name="Horizon"/> at eye level, and
@@ -53,21 +77,50 @@ public sealed record Sky(Vector4 Zenith, Vector4 Horizon, Vector4? Ground = null
     }
 }
 
-/// <summary>One directional light (the way it travels, and its colour) plus light from everywhere.</summary>
+/// <summary>
+/// One directional light (the way it travels, and its colour) plus light from everywhere, and up to two more
+/// directional lights as <see cref="Fill"/> (a bounce from the ground, a rim light behind).
+/// </summary>
 public sealed record Lighting(Vector3 Direction, Vector3 Color, Vector3 Ambient)
 {
+    private readonly IReadOnlyList<ParallelLight> _fill = [];
+
     /// <summary>Sunlight from above and a little in front, with soft fill.</summary>
     public static Lighting Default { get; } = new(new Vector3(-0.3f, -1, -0.5f), new Vector3(0.9f), new Vector3(0.25f));
 
-    /// <summary>The colour of a surface of <paramref name="color"/> facing <paramref name="normal"/> (Lambert).</summary>
+    /// <summary>Further directional lights, at most two (as many as the graphics card's basic lighting takes besides the main one).</summary>
+    public IReadOnlyList<ParallelLight> Fill
+    {
+        get => _fill;
+        init => _fill = value is null || value.Count <= 2
+            ? value ?? []
+            : throw new ArgumentException("Lighting takes at most two fill lights.", nameof(value));
+    }
+
+    /// <summary>The colour of a surface of <paramref name="color"/> facing <paramref name="normal"/> (Lambert), from every light.</summary>
     public Vector4 Shade(Vector4 color, Vector3 normal)
     {
-        var toLight = -Vector3.Normalize(Direction);
-        var diffuse = MathF.Max(0, Vector3.Dot(normal, toLight));
-        var light = Ambient + (Color * diffuse);
+        var light = Ambient + Diffuse(Direction, Color, normal);
+        foreach (var fill in _fill)
+        {
+            light += Diffuse(fill.Direction, fill.Color, normal);
+        }
+
         return new Vector4(Vector3.Min(new Vector3(color.X, color.Y, color.Z) * light, Vector3.One), color.W);
     }
+
+    // Records compare their fields; the fill lights by their contents rather than by which list holds them.
+    public bool Equals(Lighting? other) =>
+        other is not null && Direction == other.Direction && Color == other.Color && Ambient == other.Ambient && _fill.SequenceEqual(other._fill);
+
+    public override int GetHashCode() => HashCode.Combine(Direction, Color, Ambient, _fill.Count);
+
+    private static Vector3 Diffuse(Vector3 direction, Vector3 color, Vector3 normal) =>
+        color * MathF.Max(0, Vector3.Dot(normal, -Vector3.Normalize(direction)));
 }
+
+/// <summary>Light from far away along one direction (the way it travels), in a colour: the sun, the moon, a fill light.</summary>
+public readonly record struct ParallelLight(Vector3 Direction, Vector3 Color);
 
 /// <summary>
 /// Haze that thickens with distance in front of the camera: nothing nearer than <paramref name="Start"/>, only
@@ -165,6 +218,20 @@ public sealed class Renderer
         var normalMatrix = Matrix4x4.Transpose(inverse);
         Vector3 WorldNormal(Vector3 n) => SafeNormalize(Vector3.TransformNormal(n, normalMatrix));
         var uvs = mesh.UVs.Count == mesh.Positions.Count ? mesh.UVs : null;
+        var cull = CullBackFaces;
+        CullBackFaces &= !material.DoubleSided;
+        try
+        {
+            DrawTriangles(mesh, world, material, uvs, WorldNormal);
+        }
+        finally
+        {
+            CullBackFaces = cull;
+        }
+    }
+
+    private void DrawTriangles(Mesh mesh, Matrix4x4 world, Material material, IReadOnlyList<Vector2>? uvs, Func<Vector3, Vector3> worldNormal)
+    {
         var triangles = mesh.Triangles;
         for (var i = 0; i < triangles.Count; i++)
         {
@@ -174,16 +241,16 @@ public sealed class Renderer
             switch (material.Shading)
             {
                 case Shading.Unlit:
-                    ca = cb = cc = material.Color;
+                    ca = cb = cc = material.Color + new Vector4(material.Emissive, 0);
                     break;
                 case Shading.Flat:
-                    var face = WorldNormal(Vector3.Cross(pb - pa, pc - pa));
-                    ca = cb = cc = Lighting.Shade(material.Color, face);
+                    var face = worldNormal(Vector3.Cross(pb - pa, pc - pa));
+                    ca = cb = cc = material.Shade(Lighting, face);
                     break;
                 default:
-                    ca = Lighting.Shade(material.Color, WorldNormal(mesh.Normals[t.A]));
-                    cb = Lighting.Shade(material.Color, WorldNormal(mesh.Normals[t.B]));
-                    cc = Lighting.Shade(material.Color, WorldNormal(mesh.Normals[t.C]));
+                    ca = material.Shade(Lighting, worldNormal(mesh.Normals[t.A]));
+                    cb = material.Shade(Lighting, worldNormal(mesh.Normals[t.B]));
+                    cc = material.Shade(Lighting, worldNormal(mesh.Normals[t.C]));
                     break;
             }
 

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's 3D scenes: a tree of nodes with meshes, glTF 2.0 models with their materials, textures and animations, an animation player with cross-fades, culling and draw order, picking, and orbit and follow cameras. Framework-free; Jentl.Core draws it on the graphics card or the CPU.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Scene3D.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Jentl.Geometry\Jentl.Geometry.csproj" />
+    <ProjectReference Include="..\Jentl.Raster\Jentl.Raster.csproj" />
+    <ProjectReference Include="..\Jentl.Assets\Jentl.Assets.csproj" />
+  </ItemGroup>
+
+</Project>
