@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Jentl's traffic simulation: road networks with lanes, junctions, traffic lights and roundabouts; cars, vans, trucks, buses and motorbikes driving by the Intelligent Driver Model, giving way by the rules, routed through the town; and measurements of how well it flows. Framework-free and seeded.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jentl.Traffic.Tests" />
+  </ItemGroup>
+
+</Project>

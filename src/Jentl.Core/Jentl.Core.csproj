@@ -27,6 +27,7 @@
     <ProjectReference Include="..\Jentl.Tracks\Jentl.Tracks.csproj" />
     <ProjectReference Include="..\Jentl.Raster\Jentl.Raster.csproj" />
     <ProjectReference Include="..\Jentl.Scene3D\Jentl.Scene3D.csproj" />
+    <ProjectReference Include="..\Jentl.Traffic\Jentl.Traffic.csproj" />
     <ProjectReference Include="..\Jentl.Collect\Jentl.Collect.csproj" />
   </ItemGroup>
 
