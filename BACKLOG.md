@@ -79,23 +79,20 @@ My reading of the names; please correct:
 - A word kit in Jentl may be worth it: word lists, checking words, a crossword fitter for Connect Word.
 - Questions: are these the games you mean? In which languages?
 
-### Hot Pan: a game in a frying pan
+### Hot Pan: more for the frying pan
 
-Working title. You stand in a frying pan. Pieces of chicken are dropped in, and they heat up, and so does the pan.
-Stand on the pan or on a piece that has got too hot and your feet burn: you lose health. Jump from piece to piece to
-those still cool enough. At no health the game is over; the longer you last, the more points.
+The first version is playable (games-cs `apps/HotPan`): a side-view platformer, the chicken heating from raw pink
+through golden to black, the pan getting hotter without end, health burning away on anything too hot, ten points a
+second, leaderboards, keys, gamepad and touch. Still to do:
 
-- Seen from the side, a little platformer: you run and jump across the pan, the pieces are platforms. Jentl's physics
-  (as in Bricks) can carry the jumping and landing.
-- Heat: each piece warms from the pan it lies on, from raw pink through golden to burnt, so you can see how hot it is;
-  the pan heats over the game, so pieces warm faster as time goes on. Burning takes health while you stand on
-  something too hot, with a moment of sizzle and smoke.
-- New pieces fall in now and then (where, and how often, set the difficulty); burnt ones might be flipped out, or
-  stay as hazards. Possibly power-ups: a cold drink, oven gloves, a lid.
-- Score by time survived, with a best score and an online leaderboard (the shell has them), and sounds and music to
-  match.
-- Questions: seen from the side, or from above (moving round the pan rather than jumping)? Phone controls (tap to
-  jump, tilt or drag to move)? Is the pan heat what ends a long game, or does it level out?
+- Power-ups: a cold drink (health back), oven gloves (no burning for a while), a lid (the pan stops heating), ice
+  cubes to cool a piece.
+- More happening: burnt pieces that stay as hazards instead of being flicked out, a spatula that flips pieces (a hot
+  side goes down, a cooler side comes up), oil spitting, pieces landing on the cook.
+- Tuning by play: how fast pieces heat and drop, how much burning hurts; play on a phone (touch controls, sizes).
+- Character art and animation beyond shapes (walking, jumping, hopping on hot feet), and more sounds (a sizzle that
+  grows with the heat, a sigh of relief on cool chicken).
+- Questions: should the pan heat level off at some point? A choice of cooks? Daily seeds for a shared challenge?
 
 ## Loose ends of what is built
 
@@ -153,4 +150,4 @@ These pass their tests but have not been checked by eye or ear:
 
 ## Housekeeping
 
-- Push: Jentl is 17 commits ahead of `origin/main` (0.6.12 to 0.6.28), games-cs 6.
+- Push: Jentl is 18 commits ahead of `origin/main` (0.6.12 to 0.6.28, and this backlog), games-cs 7.
