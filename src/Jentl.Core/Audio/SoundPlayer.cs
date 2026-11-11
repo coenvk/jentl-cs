@@ -19,7 +19,9 @@ public sealed class SoundPlayer : IDisposable
     private readonly Dictionary<string, SoundEffect> _sounds;
     private readonly Dictionary<string, Func<short[]>> _tracks = [];
     private readonly Dictionary<string, SoundEffect> _rendered = [];
+    private readonly Dictionary<string, Task<short[]>> _rendering = [];
     private Playing? _music;
+    private (string Name, TimeSpan Fade)? _waiting;
     private Playing? _fading;
     private TimeSpan _retry;
 
@@ -73,7 +75,7 @@ public sealed class SoundPlayer : IDisposable
     }
 
     /// <summary>The track playing (or fading in), if any.</summary>
-    public string? CurrentMusic => _music?.Name;
+    public string? CurrentMusic => _waiting?.Name ?? _music?.Name;
 
     /// <summary>A player with no sounds: every <see cref="Play"/> does nothing. For tests and games without audio.</summary>
     public static SoundPlayer Silent() => new([], isAvailable: false);
@@ -121,7 +123,10 @@ public sealed class SoundPlayer : IDisposable
         _sounds[name] = new SoundEffect(Synth.ToPcm(samples), sampleRate, AudioChannels.Mono);
     }
 
-    /// <summary>Adds a music track; <paramref name="render"/> makes its samples the first time it is played.</summary>
+    /// <summary>
+    /// Adds a music track; <paramref name="render"/> makes its samples the first time it is played (or
+    /// <see cref="PrepareMusic"/>d), away from the game's thread so a long song doesn't hold up a frame.
+    /// </summary>
     public void AddMusic(string name, Func<short[]> render)
     {
         ArgumentNullException.ThrowIfNull(render);
@@ -169,24 +174,43 @@ public sealed class SoundPlayer : IDisposable
         }
     }
 
+    /// <summary>Starts rendering track <paramref name="name"/> in the background, so it is ready when it is played.</summary>
+    public void PrepareMusic(string name)
+    {
+        if (IsAvailable && !_rendered.ContainsKey(name) && !_rendering.ContainsKey(name) && _tracks.TryGetValue(name, out var render))
+        {
+            _rendering[name] = Task.Run(render);
+        }
+    }
+
     /// <summary>
     /// Loops track <paramref name="name"/>, fading it in over <paramref name="fade"/> while the current one fades
-    /// out. Asking for the track already playing changes nothing, so every screen can simply name its music.
+    /// out. Asking for the track already playing changes nothing, so every screen can simply name its music. A
+    /// track not rendered yet is rendered in the background while the current one plays on, and starts when ready
+    /// (in <see cref="Update"/>).
     /// </summary>
     public void PlayMusic(string name, TimeSpan? fade = null)
     {
-        if (!IsAvailable || _music?.Name == name || !_tracks.TryGetValue(name, out var render))
+        if (!IsAvailable || CurrentMusic == name || !_tracks.ContainsKey(name))
         {
             return;
         }
 
         var time = fade ?? TimeSpan.FromSeconds(1);
-        if (!_rendered.TryGetValue(name, out var effect))
+        if (!_rendered.ContainsKey(name))
         {
-            effect = new SoundEffect(Synth.ToPcm(render()), Synth.SampleRate, AudioChannels.Mono);
-            _rendered[name] = effect;
+            PrepareMusic(name);
+            _waiting = (name, time);
+            return;
         }
 
+        _waiting = null;
+        Begin(name, time);
+    }
+
+    private void Begin(string name, TimeSpan time)
+    {
+        var effect = _rendered[name];
         FadeOut(time);
         var instance = effect.CreateInstance();
         instance.IsLooped = true;
@@ -198,6 +222,7 @@ public sealed class SoundPlayer : IDisposable
     /// <summary>Fades the music out and stops it.</summary>
     public void StopMusic(TimeSpan? fade = null)
     {
+        _waiting = null;
         FadeOut(fade ?? TimeSpan.FromSeconds(1));
         _music = null;
     }
@@ -206,6 +231,7 @@ public sealed class SoundPlayer : IDisposable
     public void Update(TimeSpan elapsed)
     {
         Mixer.Update(elapsed);
+        Collect();
         var seconds = (float)elapsed.TotalSeconds;
         if (_music is { } music)
         {
@@ -239,6 +265,24 @@ public sealed class SoundPlayer : IDisposable
         foreach (var sound in _sounds.Values.Concat(_rendered.Values))
         {
             sound.Dispose();
+        }
+    }
+
+    /// <summary>Takes in the tracks finished rendering, and starts the one waited for when it is ready.</summary>
+    private void Collect()
+    {
+        foreach (var (name, task) in _rendering.Where(r => r.Value.IsCompleted).ToList())
+        {
+            _rendering.Remove(name);
+
+            // A song that fails to render is a bug in its writing: let it surface here, on the game's thread.
+            _rendered[name] = new SoundEffect(Synth.ToPcm(task.GetAwaiter().GetResult()), Synth.SampleRate, AudioChannels.Mono);
+        }
+
+        if (_waiting is { } waiting && _rendered.ContainsKey(waiting.Name))
+        {
+            _waiting = null;
+            Begin(waiting.Name, waiting.Fade);
         }
     }
 

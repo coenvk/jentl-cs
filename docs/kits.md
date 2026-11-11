@@ -517,8 +517,31 @@ sounds.AddMusic("menu", () => Synth.Render(tune, loop: true));       // rendered
 sounds.Add("blip", Synth.Render(new Tune(900, new Voice(lead, "E6 B6"))));
 ```
 
+Beyond the bare waves, `Synth` has instruments made the way real ones sound: `Wave.Pluck` is a plucked string
+(Karplus-Strong: a burst of noise ringing round a loop one period long, losing its highs as it goes), `Wave.Fm`
+bends a sine with another (brass with whole ratios, bells and celestas with odd ones), `Wave.Partials` adds up
+harmonics (organs, pianos, reeds; the higher ones may fade faster), and `Wave.Choir` sings "ah". Any instrument can
+play as several detuned copies (`Unison`, `Detune`: strings, a choir), through a low-pass filter that can open
+with the envelope (`Cutoff`, `CutoffEnvelope`), with breath noise, and with a decay that rings away like a struck
+thing (`Ring`). A tune's `Reverb` puts it in a room, from a hall (0.3) to a cathedral (0.6); a loop's echo wraps
+round to its start. `Instruments` has the presets, matched in volume: harp, lute, guitar, harpsichord, pizzicato,
+upright bass, strings, violin, cello, flute, recorder, pan pipes, clarinet, oboe, accordion, horn, trumpet, brass,
+choir, organ, piano, electric piano, celesta, bells, marimba, timpani, frame drum, kick, snare, shaker, cymbal and
+the chiptune voices (`Instruments.All` lists them by name).
+
+```csharp
+var tune = new Tune(96,
+    new Voice(Instruments.Flute, "E5 - G5 - A5 - - . | G5 - E5 - D5 - - ."),
+    new Voice(Instruments.Harp, "A3 C4 E4 C4 A3 C4 E4 C4 | G3 B3 D4 B3 G3 B3 D4 B3"),
+    new Voice(Instruments.Cello, "A2 - - - - - - - | G2 - - - - - - -")) { Reverb = 0.3f };
+```
+
+Rendering a long song takes a moment, so `SoundPlayer` renders a track on a worker the first time it is asked for,
+playing the old one until the new one is ready; `PrepareMusic` starts that early.
+
 A `Song` is longer than a loop of a few bars: its parts (lead, bass, drums, each an instrument), its sections (an
-intro, A, B, each some bars with what every part plays, a part left out resting) and the order to play them in.
+intro, A, B, each some bars with what every part plays, a part left out resting) and the order to play them in,
+four beats to a bar or three (`BeatsPerBar`, for a waltz), and a `Reverb`.
 `ToTune` joins each part up through the order, filling a section out with rests, and says which part of which
 section is too long. `Chords` writes accompaniment from chord symbols, so only the melody needs writing note by
 note: a progression is bars between "|", each with one or more chords (`"C | Am F | Dm7 | G7"`; m, 7, maj7, m7, dim,

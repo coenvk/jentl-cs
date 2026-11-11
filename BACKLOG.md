@@ -8,8 +8,10 @@ heard. Where an idea is my reading of a wish rather than a decision, it says so,
 
 ### A game soundtrack, as RuneScape has its music
 
-The first version is in (0.6.30): `Song` and `Chords` in Jentl, and in games-cs one soundtrack of 35 songs shared by
-all the games, in ten moods (title screens, puzzles, solitaire, card tables, village, cellar, races, kitchen, word
+In (0.6.30 and 0.6.31): `Song` and `Chords` in Jentl, real instruments in `Synth` (plucked strings, FM, additive
+harmonics, a choir, ensembles, filters, reverb; `Instruments` has 35 presets), and in games-cs one soundtrack of 52
+songs for harp, strings, flutes, lute, brass, choir and drums (chiptune kept for Bricks), shared by all the games,
+in ten moods (title screens, puzzles, solitaire, card tables, village, cellar, races, kitchen, word
 games, Bricks). A place asks for a mood and gets its songs in turn; a song is unlocked the first time it plays,
 with a notice, and saved. The title screens' Music screen lists them all, plays the unlocked ones and says where the
 locked ones are heard.

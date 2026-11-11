@@ -12,13 +12,17 @@ public sealed record Section(string Name, int Bars, IReadOnlyDictionary<string, 
 
 /// <summary>
 /// A song longer than a loop of a few bars: sections played in an <paramref name="Order"/> (intro, A, A, B, A), each
-/// part's steps joined up into one <see cref="Tune"/> for <see cref="Synth"/>. Four beats to a bar.
+/// part's steps joined up into one <see cref="Tune"/> for <see cref="Synth"/>. Four beats to a bar, or
+/// <paramref name="BeatsPerBar"/> (three for a waltz).
 /// </summary>
-public sealed record Song(string Title, int Tempo, IReadOnlyList<SongPart> Parts, IReadOnlyList<Section> Sections, IReadOnlyList<string> Order, int StepsPerBeat = 2)
+public sealed record Song(string Title, int Tempo, IReadOnlyList<SongPart> Parts, IReadOnlyList<Section> Sections, IReadOnlyList<string> Order, int StepsPerBeat = 2, int BeatsPerBar = 4)
 {
-    public int StepsPerBar => StepsPerBeat * 4;
+    public int StepsPerBar => StepsPerBeat * BeatsPerBar;
 
-    public TimeSpan Duration => TimeSpan.FromSeconds(Order.Sum(name => SectionNamed(name).Bars) * 4 * 60.0 / Tempo);
+    /// <summary>The room it is played in: <see cref="Tune.Reverb"/>.</summary>
+    public float Reverb { get; init; }
+
+    public TimeSpan Duration => TimeSpan.FromSeconds(Order.Sum(name => SectionNamed(name).Bars) * BeatsPerBar * 60.0 / Tempo);
 
     /// <summary>The whole song as one tune: every part through the sections in order, each section filled out with rests to its length.</summary>
     /// <exception cref="ArgumentException">A part is longer than its section, or the order names a section that isn't there.</exception>
@@ -45,7 +49,7 @@ public sealed record Song(string Title, int Tempo, IReadOnlyList<SongPart> Parts
             voices.Add(new Voice(part.Instrument, steps.ToString()));
         }
 
-        return new Tune(Tempo, voices, StepsPerBeat);
+        return new Tune(Tempo, voices, StepsPerBeat) { Reverb = Reverb };
     }
 
     private Section SectionNamed(string name) =>
