@@ -8,19 +8,19 @@ heard. Where an idea is my reading of a wish rather than a decision, it says so,
 
 ### A game soundtrack, as RuneScape has its music
 
-Many songs, made for the games, collected so they can be played back.
+The first version is in (0.6.30): `Song` and `Chords` in Jentl, and in games-cs one soundtrack of 35 songs shared by
+all the games, in ten moods (title screens, puzzles, solitaire, card tables, village, cellar, races, kitchen, word
+games, Bricks). A place asks for a mood and gets its songs in turn; a song is unlocked the first time it plays,
+with a notice, and saved. The title screens' Music screen lists them all, plays the unlocked ones and says where the
+locked ones are heard.
 
-- What there is: `Synth` renders tunes written as text (pulse, square, triangle, sine, saw and noise voices, with
-  envelopes, vibrato and slides), and `SoundPlayer` loops and cross-fades music. Each game now has a song or two.
-- To do:
-  - Compose a library of songs per game and per mood (menus, play, tension, victory, defeat, calm), in the same
-    chiptune style; far more than today, so each place in a game can have its own.
-  - A music player, as RuneScape's: every song by name, those not yet unlocked greyed out, unlocked by playing (the
-    place or moment the song belongs to), shuffle and loop, the unlocked ones remembered in the saves.
-  - Longer songs than a loop of a few bars: sections (intro, A, B, bridge) and an order to play them in, which the
-    text format doesn't have yet. The music maker below would write them.
-- Questions: one soundtrack shared by all the games, or one per game? A player in each game, or an app of its own
-  ("Jukebox")? How many songs to aim for at first?
+- Still to do:
+  - Locked songs drawn greyed out: `Menu` has no disabled item yet, so they show as "? ? ?" in the usual colour.
+  - Shuffle and loop-one in the Music screen, and the mood's songs following each other while one place plays,
+    rather than the first song looping until the place changes.
+  - Moments as well as places: victory, defeat, tension (a timer running low) with songs of their own.
+  - More songs per game, so each has a sound of its own: Mossbrook's other places, each card game, each race track.
+  - Hear them: every song renders in the tests, but most have only been checked by numbers, not by ear.
 
 ### A music maker, like Bosca Ceoil
 

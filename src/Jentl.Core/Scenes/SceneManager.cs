@@ -31,6 +31,9 @@ public sealed class SceneManager
     /// <summary>The debug panel (F3), and whether scenes draw their debug shapes.</summary>
     public DebugOverlay Debug { get; } = new();
 
+    /// <summary>Drawn above every scene (and its effects) each frame: notices that belong to no scene, such as "a new track".</summary>
+    public Action<SpriteBatch, Rectangle>? Overlay { get; set; }
+
     /// <summary>The inspector (F4): looks inside the top scene and changes it, with the game paused.</summary>
     public Inspector Inspector { get; } = new();
 
@@ -159,6 +162,7 @@ public sealed class SceneManager
         }
 
         Effects.Draw(batch);
+        Overlay?.Invoke(batch, viewport);
         _transition?.Draw(batch, viewport);
         Inspector.Draw(batch, viewport, Debug.Text, Debug.TextSize);
     }

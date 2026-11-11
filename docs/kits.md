@@ -517,6 +517,31 @@ sounds.AddMusic("menu", () => Synth.Render(tune, loop: true));       // rendered
 sounds.Add("blip", Synth.Render(new Tune(900, new Voice(lead, "E6 B6"))));
 ```
 
+A `Song` is longer than a loop of a few bars: its parts (lead, bass, drums, each an instrument), its sections (an
+intro, A, B, each some bars with what every part plays, a part left out resting) and the order to play them in.
+`ToTune` joins each part up through the order, filling a section out with rests, and says which part of which
+section is too long. `Chords` writes accompaniment from chord symbols, so only the melody needs writing note by
+note: a progression is bars between "|", each with one or more chords (`"C | Am F | Dm7 | G7"`; m, 7, maj7, m7, dim,
+sus2, sus4 and 5), and a pattern names chord tones per step (1, 3, 5 and 7, 8 the octave, 10 the third above it,
+-5 the fifth below, "." and "-"), repeated over each chord:
+
+```csharp
+var verse = "C | Am | F | G7";
+var song = new Song("Open Doors", 108,
+    [new SongPart("lead", lead), new SongPart("bass", bass), new SongPart("arp", arp)],
+    [
+        new Section("a", 4, new Dictionary<string, string>
+        {
+            ["lead"] = "E5 - G5 - C6 - B5 A5 | G5 - E5 - D5 - C5 - | A4 - C5 - F5 - E5 D5 | D5 - - - . . . .",
+            ["bass"] = Chords.Play(verse, 2, "1 . 5 . 8 . 5 ."),        // root, fifth, octave
+            ["arp"] = Chords.Play(verse, 4, "1 3 5 3"),
+        }),
+        new Section("b", 4, new Dictionary<string, string> { ["arp"] = Chords.Hold("F | G | Em | Am", 4, 1) }),
+    ],
+    ["a", "a", "b", "a"]);
+sounds.AddMusic("open-doors", () => Synth.Render(song.ToTune(), loop: true));
+```
+
 `SoundPlayer` plays effects by name (recorded `.wav` files or rendered ones) and loops music: `PlayMusic` fades
 the new track in while the old one fades out, and asking for the track already playing does nothing, so every
 screen can simply name its music in `OnEnter`. Effects and music each have a switch and a volume; call `Update`
@@ -547,6 +572,9 @@ Every `SceneManager` has an `Effects` system drawn above all scenes, for effects
 scenes.Effects.EmitArea(new Rectangle(0, -10, scenes.Viewport.Width, 8), ParticleEffects.Confetti);
 scenes.Effects.Emit(cardCentre, ParticleEffects.Sparkles);
 ```
+
+`SceneManager.Overlay` draws over every scene too, after the effects: a notice that should outlive the screen it
+came from ("You have unlocked a new music track") draws there.
 
 `Animation` is a list of frames with durations played as a loop, once, or ping-pong; `FrameAt(time)` says which
 frame shows, so many sprites can share one animation. `Animator` keeps the clock for a sprite that switches between
