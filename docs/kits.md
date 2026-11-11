@@ -565,6 +565,13 @@ var song = new Song("Open Doors", 108,
 sounds.AddMusic("open-doors", () => Synth.Render(song.ToTune(), loop: true));
 ```
 
+A `Composition` is a song as a music maker writes it, in the manner of Bosca Ceoil: channels, each an `Instruments`
+preset at a volume, with patterns a bar long (notes by step, MIDI pitch and length), and an arrangement saying which
+pattern each channel plays in each bar. `ToTune` makes it a `Tune` (a chord becomes several voices; `from` and `to`
+bars play part of it), `ToJson` and `FromJson` save it, and `ToCode` writes the C# of the tune for a game to play.
+`Synth.ToWav` turns samples into a WAV file, and `SoundPlayer.ReplaceMusic` swaps a track for a new rendering of it
+(the song after an edit). games-cs's Composer app is the editor.
+
 `SoundPlayer` plays effects by name (recorded `.wav` files or rendered ones) and loops music: `PlayMusic` fades
 the new track in while the old one fades out, and asking for the track already playing does nothing, so every
 screen can simply name its music in `OnEnter`. Effects and music each have a switch and a volume; call `Update`

@@ -133,6 +133,44 @@ public sealed class SoundPlayer : IDisposable
         _tracks[name] = render;
     }
 
+    /// <summary>
+    /// Puts a new <paramref name="render"/> in place of track <paramref name="name"/>'s, dropping what was rendered of
+    /// the old one (stopping it at once if it was playing): a music maker's song after each change.
+    /// </summary>
+    public void ReplaceMusic(string name, Func<short[]> render)
+    {
+        ArgumentNullException.ThrowIfNull(render);
+        if (_music?.Name == name)
+        {
+            _music.Instance.Stop();
+            _music.Instance.Dispose();
+            _music = null;
+        }
+
+        if (_fading?.Name == name)
+        {
+            _fading.Instance.Stop();
+            _fading.Instance.Dispose();
+            _fading = null;
+        }
+
+        if (_waiting?.Name == name)
+        {
+            _waiting = null;
+        }
+
+        if (_rendered.Remove(name, out var old))
+        {
+            old.Dispose();
+        }
+
+        _rendering.Remove(name);
+        _tracks[name] = render;
+    }
+
+    /// <summary>Whether track <paramref name="name"/> is playing now, rather than waiting to be rendered.</summary>
+    public bool IsPlayingMusic(string name) => _music?.Name == name && _waiting is null;
+
     /// <summary>Whether an effect or a track of that name exists.</summary>
     public bool Has(string name) => _sounds.ContainsKey(name) || _tracks.ContainsKey(name);
 

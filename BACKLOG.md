@@ -26,19 +26,18 @@ jingles for trumpet, horn, harp and timpani.
 
 ### A music maker, like Bosca Ceoil
 
-Writing songs on a grid, by mouse or touch, rather than as text.
+In (0.6.33): `Composition` in Jentl (channels of one-bar patterns and an arrangement, rendered through `Synth` with
+the instrument presets and reverb, saved as JSON, written out as a tune's code or a WAV), and games-cs's Composer
+app: a piano roll with a key and scale to shade, patterns made, copied, cleared and transposed, the arrangement a row
+per channel and a column per bar, instruments chosen from the presets, tempo, bars, 3/4 or 4/4, echo, undo and
+redo, playing with a playhead (edits heard from the bar playing), songs saved and opened, copied as code, and saved
+as WAV on the desktop. Still to do:
 
-- An app in games-cs (working title "Composer") on top of `Synth`:
-  - Instruments: a wave, envelope, vibrato, slide and volume each, with presets (lead, bass, pad, pluck, and a drum
-    kit of kick, snare and hats made of noise and slides), heard as they are changed.
-  - Patterns: a piano roll per instrument, a bar or more long, notes placed and stretched on the grid, with a scale
-    to keep to and an octave range to scroll.
-  - The arrangement: patterns placed on a timeline, one row per instrument, to make the song; tempo and swing.
-  - Play from anywhere, loop a section, undo and redo, save and open songs (JSON, in the saves), and export: to the
-    `Tune` text a game plays, and to WAV.
-- In Jentl: the song format (patterns and an arrangement) and its rendering belong in `Jentl.Core.Audio`, so games
-  play what the Composer writes; the editor itself is a games-cs app.
-- Question: should songs also play effects (filters, echo), which `Synth` doesn't have yet?
+- Editing instruments themselves (wave, envelope, filter), rather than choosing a preset and a volume.
+- Swing, a loop of a few bars to work on, selecting and moving several notes, and changing a note's length from its
+  end rather than drawing it again.
+- In the browser: WAV export as a download, and the clipboard.
+- Play it on a phone: the grid is small for fingers.
 
 ### Animation
 

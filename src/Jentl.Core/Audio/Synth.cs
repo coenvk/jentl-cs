@@ -261,6 +261,31 @@ public static class Synth
         return [.. samples.Select(s => (short)Math.Round(s * gain))];
     }
 
+    /// <summary>The samples as a WAV file (16-bit mono PCM), for saving or sharing what was made.</summary>
+    public static byte[] ToWav(short[] samples, int sampleRate = SampleRate)
+    {
+        var pcm = ToPcm(samples);
+        using var stream = new MemoryStream(44 + pcm.Length);
+        using (var writer = new BinaryWriter(stream))
+        {
+            writer.Write("RIFF"u8);
+            writer.Write(36 + pcm.Length);
+            writer.Write("WAVEfmt "u8);
+            writer.Write(16);
+            writer.Write((short)1);
+            writer.Write((short)1);
+            writer.Write(sampleRate);
+            writer.Write(sampleRate * 2);
+            writer.Write((short)2);
+            writer.Write((short)16);
+            writer.Write("data"u8);
+            writer.Write(pcm.Length);
+            writer.Write(pcm);
+        }
+
+        return stream.ToArray();
+    }
+
     /// <summary>16-bit little-endian PCM bytes, the form MonoGame's <c>SoundEffect</c> takes.</summary>
     public static byte[] ToPcm(short[] samples)
     {
