@@ -7,7 +7,11 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Jentl.Core.UI;
 
-public sealed record MenuItem(string Label, Action Select);
+public sealed record MenuItem(string Label, Action Select)
+{
+    /// <summary>Drawn faded: an item that can still be chosen (to say why it isn't available) but isn't on offer yet.</summary>
+    public bool Dimmed { get; init; }
+}
 
 /// <summary>
 /// A vertical list of options: up/down and confirm, or tap/click an item. A mouse hovering over an item
@@ -153,7 +157,7 @@ public sealed class Menu
                 Theme.Current.Control.Draw(batch, row, Palette.Accent);
             }
 
-            batch.DrawText(font, _items[i].Label, row, selected ? Palette.Ink : Palette.Text, shadow: !selected);
+            batch.DrawText(font, _items[i].Label, row, selected ? Palette.Ink : _items[i].Dimmed ? Palette.Muted : Palette.Text, shadow: !selected && !_items[i].Dimmed);
         }
 
         // Arrows beside the first and last rows when there is more to scroll to.

@@ -16,13 +16,13 @@ games, Bricks). A place asks for a mood and gets its songs in turn; a song is un
 with a notice, and saved. The title screens' Music screen lists them all, plays the unlocked ones and says where the
 locked ones are heard.
 
+In 0.6.32: locked songs are greyed out; a place's songs follow one another; the Music screen has three modes (by
+place, loop the chosen song, shuffle the unlocked ones), saved; and the moments (a win, a loss, a level gained) have
+jingles for trumpet, horn, harp and timpani.
+
 - Still to do:
-  - Locked songs drawn greyed out: `Menu` has no disabled item yet, so they show as "? ? ?" in the usual colour.
-  - Shuffle and loop-one in the Music screen, and the mood's songs following each other while one place plays,
-    rather than the first song looping until the place changes.
-  - Moments as well as places: victory, defeat, tension (a timer running low) with songs of their own.
   - More songs per game, so each has a sound of its own: Mossbrook's other places, each card game, each race track.
-  - Hear them: every song renders in the tests, but most have only been checked by numbers, not by ear.
+  - Hear them: every song renders in the tests and is levelled, but none has been checked by ear.
 
 ### A music maker, like Bosca Ceoil
 
