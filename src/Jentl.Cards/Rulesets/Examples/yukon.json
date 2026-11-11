@@ -1,0 +1,10 @@
+{
+  "name": "Yukon",
+  "description": "Like Klondike without a stock: every card is dealt, and any face-up card moves with everything on top of it, in order or not. Build down in alternating colours; only a king goes in an empty column.",
+  "deck": "standard",
+  "piles": [
+    { "name": "column", "count": 7, "at": [0, 0], "fan": "down", "deal": { "cards": [1, 6, 7, 8, 9, 10, 11], "faceDown": "index" },
+      "build": { "rank": "down", "suit": "alternate", "empty": "K" }, "take": "any" },
+    { "name": "foundation", "count": 4, "at": [7.25, 0], "step": [0, 1.1], "goal": true, "build": { "rank": "up", "suit": "same", "empty": "A" }, "take": "top" }
+  ]
+}

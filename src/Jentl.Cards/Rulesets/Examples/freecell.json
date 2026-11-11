@@ -1,0 +1,11 @@
+{
+  "name": "FreeCell",
+  "description": "Every card is dealt face up. Build the foundations up by suit from ace to king; the columns build down in alternating colours. Each free cell holds one card, and runs move as far as the free cells and empty columns allow.",
+  "deck": "standard",
+  "piles": [
+    { "name": "cell", "count": 4, "at": [0, 0], "build": { "max": 1 }, "take": "top" },
+    { "name": "foundation", "count": 4, "at": [4, 0], "goal": true, "build": { "rank": "up", "suit": "same", "empty": "A" }, "take": "top" },
+    { "name": "column", "count": 8, "at": [0, 1.25], "fan": "down", "deal": { "cards": [7, 7, 7, 7, 6, 6, 6, 6] },
+      "build": { "rank": "down", "suit": "alternate" }, "take": { "kind": "run", "limit": "freecells" } }
+  ]
+}

@@ -14,9 +14,15 @@ public enum CardColor
     Red,
 }
 
-/// <summary>A playing card. Ranks run from 1 (ace) to 13 (king).</summary>
+/// <summary>
+/// A card: a standard playing card, ranks 1 (ace) to 13 (king) in four suits, or a card of a deck of its own (Uno's,
+/// say) with a <see cref="CardFace"/> that says its rank, suit, colours and what it does. <see cref="Face"/> describes
+/// either kind the same way, which is what rulesets read.
+/// </summary>
 public readonly record struct Card
 {
+    private readonly CardFace? _custom;
+
     public const int Ace = 1;
     public const int Jack = 11;
     public const int Queen = 12;
@@ -32,13 +38,33 @@ public readonly record struct Card
 
         ArgumentOutOfRangeException.ThrowIfNegative(copy);
         Rank = rank;
-        Suit = suit;
+        _suit = suit;
         Copy = copy;
     }
 
+    /// <summary>A card of a deck of its own, such as Uno's; <paramref name="copy"/> tells identical ones apart.</summary>
+    public Card(CardFace face, int copy = 0)
+    {
+        ArgumentNullException.ThrowIfNull(face);
+        ArgumentOutOfRangeException.ThrowIfNegative(copy);
+        _custom = face;
+        Rank = face.Order;
+        Copy = copy;
+    }
+
+    /// <summary>The rank, 1 (ace) to 13 (king); for a card of a deck of its own, its face's <see cref="CardFace.Order"/>.</summary>
     public int Rank { get; }
 
-    public Suit Suit { get; }
+    /// <summary>The suit of a standard card; a card of a deck of its own has none (read <see cref="Face"/> instead).</summary>
+    public Suit Suit => _custom is null ? _suit : throw new InvalidOperationException($"{_custom.Code} is not a standard card; read its Face.");
+
+    /// <summary>Whether it is one of the 52 standard cards (rather than a card of a deck of its own).</summary>
+    public bool IsStandard => _custom is null;
+
+    /// <summary>What the card is, for rulesets and drawing: rank, suit, label, order, points, colours and tags.</summary>
+    public CardFace Face => _custom ?? CardFace.Standard(Rank, _suit);
+
+    private readonly Suit _suit;
 
     /// <summary>
     /// Tells identical cards from different decks apart, so every card on a table is unique (the screen
@@ -48,8 +74,8 @@ public readonly record struct Card
 
     public CardColor Color => Suit is Suit.Hearts or Suit.Diamonds ? CardColor.Red : CardColor.Black;
 
-    /// <summary>"A", "2" ... "10", "J", "Q", "K".</summary>
-    public string RankLabel => Rank switch
+    /// <summary>"A", "2" ... "10", "J", "Q", "K"; a card of a deck of its own gives its face's label.</summary>
+    public string RankLabel => _custom?.Label ?? Rank switch
     {
         Ace => "A",
         Jack => "J",
@@ -59,7 +85,7 @@ public readonly record struct Card
     };
 
     /// <summary>The card as people write it, "Q♥" or "10♠", for text on screen (Jentl's fonts all have the suits).</summary>
-    public string Symbol => RankLabel + Suit switch
+    public string Symbol => _custom is { } face ? face.Label + face.SuitSymbol : RankLabel + Suit switch
     {
         Suit.Spades => "♠",
         Suit.Hearts => "♥",
@@ -71,7 +97,7 @@ public readonly record struct Card
     public static string Symbols(IEnumerable<Card> cards) => string.Join(' ', cards.Select(card => card.Symbol));
 
     /// <summary>Short code such as "QH" or "10S", handy in tests and logs.</summary>
-    public override string ToString() => RankLabel + Suit.ToString()[0];
+    public override string ToString() => _custom?.Code ?? RankLabel + Suit.ToString()[0];
 
     /// <summary>Parses a short code such as "QH", "10S" or "AD".</summary>
     public static Card Parse(string code)

@@ -142,6 +142,73 @@ view.Draw(batch, cardRenderer, input.Cursor.Position);
 `TableView.HasSlot` hides the outline of piles that should vanish once empty, and when piles overlap (a pyramid)
 taps and drops go to the pile placed last, which is drawn on top.
 
+### A card game from a ruleset
+
+A card game can also be written down instead of programmed: a JSON ruleset names the deck, how many play, the piles
+with their deal and rules, what cards do, and how the game is won, and `RulesetGame` plays it. Jentl comes with
+eight (`RulesetExamples`): the solitaires `klondike`, `freecell`, `spider`, `golf`, `yukon` and `fortythieves`, and
+for players `crazyeights` and `uno`. Copy one to start a new game.
+
+```csharp
+var ruleset = CardRuleset.Parse(File.ReadAllText("rules/klondike.json"));   // or RulesetExamples.Load("klondike")
+var game = new RulesetGame(ruleset, seed: deal);       // deals; game.Game is the CardGame: play, undo, hints, auto-moves
+RulesetLayout.Solitaire(view, game, area);             // each frame: the piles where the ruleset puts them
+```
+
+```json
+{
+  "name": "Klondike",
+  "deck": "standard",
+  "piles": [
+    { "name": "stock", "at": [0, 0], "deal": { "rest": true, "faceUp": false }, "click": { "to": "waste", "redealFrom": "waste" } },
+    { "name": "waste", "at": [1, 0], "take": "top" },
+    { "name": "foundation", "count": 4, "at": [3, 0], "goal": true, "build": { "rank": "up", "suit": "same", "empty": "A" }, "take": "top" },
+    { "name": "column", "count": 7, "at": [0, 1.25], "fan": "down", "deal": { "cards": "index+1", "faceUp": "top" },
+      "build": { "rank": "down", "suit": "alternate", "empty": "K" }, "take": "run" }
+  ]
+}
+```
+
+- **Deck**: `"standard"`, `{ "standard": 2 }` (two decks), `{ "standard": 4, "suits": ["spades", "hearts"] }` (two-suit
+  Spider), `"uno"`, or one of its own: `suits` (name, symbol, colour group, ink and fill as `#rrggbb`), `ranks` (name,
+  label, order, points, copies per suit, tags) and `extra` cards of no suit (wilds); `"jokers": 2` adds jokers to any.
+  Every card has a `CardFace` saying all of this, standard cards too, and `CardRenderer` draws a face of its own as a
+  card in its fill with its label in its ink.
+- **Piles**: a `name` (a group of `count` piles is named `column0`, `column1` ...; `perPlayer` makes one per player),
+  `goal` for foundations, and:
+  - `deal`: `cards` (a number, a list by pile, or `"index+1"`), `rest` for the stock, `faceUp` (`true`, `false`, `"top"`),
+    `faceDown` (counts by pile, Yukon's `"index"`), `not` (a rank or tag never dealt there: no wild to start a discard).
+  - `build`, what may be put on it: `rank` (`up`, `down`, `updown`, `same`, `any`; `wrap` from king to ace), `suit`
+    (`same`, `alternate` colours, `samecolour`, `different`, `any`), `empty` (the rank an empty pile takes, or `none`),
+    `max` cards (1 for a free cell), `from` (only from these piles), `runs` (whether several cards at once; goal piles
+    take one at a time), or for shedding games `"match": "suitOrRank"` with `wild` ranks or tags that go on anything.
+  - `take`, what may be picked up: `top`, `run` (in the pile's building order, or `{ "kind": "run", "rank": "down",
+    "suit": "same", "limit": "freecells" }`), `any` face-up card with what is on it (Yukon), `one` card from a hand.
+  - `click`, what a tap does: deal `deal` cards `to` a pile (or one to `each` of a group, Spider's `requireFilled`),
+    and when empty turn `redealFrom` back over, `redeals` times (-1: always).
+  - `complete`: a run of `length` cards in order leaves for a goal pile (Spider). `flipTop`: a face-down card left on
+    top turns over (yes by default).
+  - `at`, `step` and `fan` (`stacked`, `down`, `right`): where it goes, in card sizes, for `RulesetLayout`.
+- **Players**: `1` (a solitaire) or `{ "min": 2, "max": 8, "default": 4 }`. With players, `turns` names the `stock`,
+  `discard` and `hand` piles, how many cards a `draw` takes, and `afterDraw`: `mayPlay` the card drawn, `pass`, or
+  `untilPlayable`; the discards are shuffled back into an empty stock. `effects` say what cards do, chosen by `rank`,
+  `suit` or `tag`: `skip` players, `reverse` play (a skip for two), make the next player `draw`, `chooseSuit`, or
+  `playAgain`.
+- **Win**: `"goals"` (every card on goal piles, for solitaires), `{ "empty": ["column"] }` (Golf), or `"emptyHand"`
+  (the first to shed their cards wins and scores the points left in the other hands).
+
+Mistakes say where they are, and unknown fields are mistakes, so a typo never quietly changes a game:
+`ruleset.piles[2].build.rank: 'upp' isn't a rank (use any, up, down, updown, same).`
+
+A solitaire plays as any `CardGame`: drags, taps (a card goes to a goal pile if it can, else where it builds; a stock
+deals), hints that rank goal moves and turning cards over first, and automatic finishing once nothing is hidden. A
+game for players is an `ITurnBasedGame<CardInput>`: the player whose turn it is taps a card in their hand to play it
+(`ClickPile`), taps the stock to draw, `PassTurn`s to keep a drawn card, or names a suit (`ChooseSuit`), and
+`LegalMoves` lists what they may do. `RulesetBot` plays any of them, so a `Match` runs the bots; `RulesetLayout.Table`
+lays out the table with the other hands face down (`TableView.Hidden`). Turn state (whose turn, direction, the named
+suit) lives in table counters, so undo takes it back with the cards. Layouts with cards covering each other (Pyramid,
+TriPeaks) and rules beyond these fields still need C# rules.
+
 ### Chips
 
 Betting games need money on the table. `Chips.Break(amount)` gives the fewest chips, largest value first, and

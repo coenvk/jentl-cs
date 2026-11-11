@@ -101,6 +101,24 @@ public sealed class CardTurnBuilder
         Record(new CardsMoved(from, index, from.Count - index, to));
     }
 
+    /// <summary>Moves just the card at <paramref name="index"/> of <paramref name="from"/> onto <paramref name="to"/>, leaving the cards above it (a card played from the middle of a hand).</summary>
+    public void MoveOne(Pile from, int index, Pile to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+        if (index < 0 || index >= from.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), index, $"{from.Name} has {from.Count} cards.");
+        }
+
+        if (from == to)
+        {
+            throw new ArgumentException("Cannot move a card onto its own pile.", nameof(to));
+        }
+
+        Record(new CardsMoved(from, index, 1, to));
+    }
+
     /// <summary>Moves the top card of <paramref name="from"/> onto <paramref name="to"/>.</summary>
     public void MoveTop(Pile from, Pile to)
     {

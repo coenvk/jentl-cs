@@ -52,16 +52,23 @@ public sealed class TableView
     /// </summary>
     public Func<Pile, bool> HasSlot { get; set; } = _ => true;
 
+    /// <summary>Cards drawn face down whatever they are: the other players' hands. None by default.</summary>
+    public Func<Pile, int, bool> Hidden { get; set; } = (_, _) => false;
+
     public bool IsDragging => _dragging is not null;
 
     /// <summary>Forgets the layout; call before placing the piles for this frame.</summary>
     public void Clear() => _spots.Clear();
 
     /// <param name="room">For fanned piles: pixels available along the fan; the overlap tightens to fit. 0 means no limit.</param>
-    public void Place(Pile pile, Point position, Fan fan = Fan.Stacked, int room = 0)
+    /// <param name="spread">
+    /// For fanned piles: how far apart face-up cards are, as a fraction of the card along the fan (0.6 for a hand you
+    /// read at a glance); 0 for the usual overlap.
+    /// </param>
+    public void Place(Pile pile, Point position, Fan fan = Fan.Stacked, int room = 0, float spread = 0)
     {
         ArgumentNullException.ThrowIfNull(pile);
-        _spots.Add(new PileSpot(pile, position, fan, room));
+        _spots.Add(new PileSpot(pile, position, fan, room, spread));
     }
 
     /// <summary>Where card <paramref name="index"/> of <paramref name="pile"/> belongs (ignoring animation and dragging).</summary>
@@ -201,11 +208,11 @@ public sealed class TableView
                 var at = Place(pile[i].Card, CardBounds(pile, i), out var gliding);
                 if (gliding)
                 {
-                    flying.Add((pile[i], at));
+                    flying.Add((Seen(pile, i), at));
                 }
                 else
                 {
-                    cards.Draw(batch, pile[i], at);
+                    cards.Draw(batch, Seen(pile, i), at);
                 }
             }
         }
@@ -224,7 +231,7 @@ public sealed class TableView
                 var at = CardBounds(dragging.Pile, i);
                 at.Location = origin + (at.Location - first);
                 _drawnAt[dragging.Pile[i].Card] = at;
-                cards.Draw(batch, dragging.Pile[i], at);
+                cards.Draw(batch, Seen(dragging.Pile, i), at);
             }
         }
 
@@ -234,6 +241,8 @@ public sealed class TableView
             Outline(batch, bounds, new Color(255, 199, 44), Math.Max(3, CardSize.X / 25));
         }
     }
+
+    private PlacedCard Seen(Pile pile, int index) => Hidden(pile, index) ? pile[index] with { FaceUp = false } : pile[index];
 
     /// <summary>Where to draw a card this frame; starts a glide when its target moved since the last frame.</summary>
     private Rectangle Place(Card card, Rectangle target, out bool gliding)
@@ -302,7 +311,7 @@ public sealed class TableView
 
         // Face-down cards overlap more than face-up ones; squeeze both if the pile would not fit.
         var along = spot.Fan == Fan.Down ? CardSize.Y : CardSize.X;
-        float down = along * 0.12f, up = along * (spot.Fan == Fan.Down ? 0.27f : 0.22f);
+        float down = along * 0.12f, up = along * (spot.Spread > 0 ? spot.Spread : spot.Fan == Fan.Down ? 0.27f : 0.22f);
         var length = Enumerable.Range(0, pile.Count - 1).Sum(i => pile[i].FaceUp ? up : down);
         var scale = spot.Room > 0 && length > spot.Room - along ? Math.Max(0.2f, (spot.Room - along) / length) : 1f;
 
@@ -327,5 +336,5 @@ public sealed class TableView
         batch.FillRectangle(new Rectangle(r.Right - width, r.Y, width, r.Height), color);
     }
 
-    private sealed record PileSpot(Pile Pile, Point Position, Fan Fan, int Room);
+    private sealed record PileSpot(Pile Pile, Point Position, Fan Fan, int Room, float Spread);
 }

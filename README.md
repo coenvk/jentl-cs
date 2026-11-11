@@ -12,7 +12,7 @@ draws them.
 | `Jentl.Core` | The screen layer for MonoGame: game loop and scenes, input (keyboard, pointer, gamepad), UI widgets, audio and a synthesizer, particles and sprite animation, camera and virtual resolution, render layers, lighting and post effects, timers and coroutines, a debug overlay with a profiler, an inspector that edits the running game, object pools, an audio mixer, rumble, accessibility settings, input recording and replay, localization, and an asset store with hot reload |
 | `Jentl.Core.Kni` | The same, built against KNI for the browser |
 | `Jentl.Puzzle` | Grid puzzles: boards, rules through recorded turns, exact undo and redo, level files |
-| `Jentl.Cards` | Card games: cards, piles, tables, rules, undo and redo, hints, chips |
+| `Jentl.Cards` | Card games: cards and decks of any design (standard, Uno, your own), piles, tables, rules, undo and redo, hints, chips, and games written as JSON rulesets (solitaires, and games for players and bots) |
 | `Jentl.Rpg` | Turn-based RPGs: Tiled maps, field of view, actors and combat, items, quests, dialogue, saves |
 | `Jentl.Multiplayer` | Turn-based games for humans and bots at one table, with timed decisions and duplicate seatings |
 | `Jentl.Net` | Online play: a JSON protocol, an authoritative room server, online leaderboards, a WebSocket client, agents in their own process or on their owners' computers |

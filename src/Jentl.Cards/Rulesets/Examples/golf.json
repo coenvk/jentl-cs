@@ -1,0 +1,11 @@
+{
+  "name": "Golf",
+  "description": "Play the top card of any column onto the waste when it is one rank above or below the waste's top card. The stock turns over one card at a time, once. Clear the columns to win.",
+  "deck": "standard",
+  "piles": [
+    { "name": "column", "count": 7, "at": [0, 0], "fan": "down", "deal": { "cards": 5 }, "take": "top" },
+    { "name": "stock", "at": [0, 3.5], "deal": { "rest": true, "faceUp": false }, "click": { "to": "waste" } },
+    { "name": "waste", "at": [1.25, 3.5], "deal": { "cards": 1 }, "build": { "rank": "updown", "from": ["column"] } }
+  ],
+  "win": { "empty": ["column"] }
+}

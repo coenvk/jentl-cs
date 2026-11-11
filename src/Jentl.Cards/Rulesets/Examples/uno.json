@@ -1,0 +1,20 @@
+{
+  "name": "Uno",
+  "description": "Get rid of your cards. Match the top of the discard pile by colour or by number or symbol, or play a wild and name the colour. Skip misses the next player, Reverse turns play round, +2 and +4 make the next player draw and miss their turn. Draw a card if you can't (or won't) play; you may play it at once.",
+  "deck": "uno",
+  "players": { "min": 2, "max": 8, "default": 4 },
+  "piles": [
+    { "name": "stock", "deal": { "rest": true, "faceUp": false } },
+    { "name": "discard", "deal": { "cards": 1, "not": "wild" }, "build": { "match": "suitOrRank" } },
+    { "name": "hand", "perPlayer": true, "deal": { "cards": 7 }, "take": "one" }
+  ],
+  "effects": [
+    { "tag": "skip", "skip": 1 },
+    { "tag": "reverse", "reverse": true },
+    { "rank": "+2", "draw": 2, "skip": 1 },
+    { "rank": "wild", "chooseSuit": true },
+    { "rank": "+4", "chooseSuit": true, "draw": 4, "skip": 1 }
+  ],
+  "turns": { "afterDraw": "mayPlay" },
+  "win": "emptyHand"
+}

@@ -1,13 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Jentl's card game kit: cards, piles, tables, rules through recorded turns, undo and redo, hints. Framework-free.</Description>
+    <Description>Jentl's card game kit: cards and decks of any design (standard, Uno, your own), piles, tables, rules through recorded turns, undo and redo, hints, and card games made from a ruleset file, solitaires and games for players and bots alike. Framework-free.</Description>
   </PropertyGroup>
 
   <!-- Framework-free: no MonoGame, so it runs in tests, tools, solvers and any front end. -->
 
   <ItemGroup>
     <InternalsVisibleTo Include="Jentl.Cards.Tests" />
+  </ItemGroup>
+
+  <!-- Example rulesets, to play as they are or to start a new game from. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Rulesets\Examples\*.json" LogicalName="Jentl.Cards.Rulesets.%(Filename).json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Jentl.Multiplayer\Jentl.Multiplayer.csproj" />
   </ItemGroup>
 
 </Project>

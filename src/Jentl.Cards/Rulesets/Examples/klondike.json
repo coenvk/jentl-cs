@@ -1,0 +1,13 @@
+{
+  // Comments are allowed in ruleset files.
+  "name": "Klondike",
+  "description": "Build the four foundations up by suit from ace to king. The columns build down in alternating colours, and only a king goes in an empty column. Turn the stock over a card at a time, as often as you like.",
+  "deck": "standard",
+  "piles": [
+    { "name": "stock", "at": [0, 0], "deal": { "rest": true, "faceUp": false }, "click": { "to": "waste", "redealFrom": "waste" } },
+    { "name": "waste", "at": [1, 0], "take": "top" },
+    { "name": "foundation", "count": 4, "at": [3, 0], "goal": true, "build": { "rank": "up", "suit": "same", "empty": "A" }, "take": "top" },
+    { "name": "column", "count": 7, "at": [0, 1.25], "fan": "down", "deal": { "cards": "index+1", "faceUp": "top" },
+      "build": { "rank": "down", "suit": "alternate", "empty": "K" }, "take": "run" }
+  ]
+}

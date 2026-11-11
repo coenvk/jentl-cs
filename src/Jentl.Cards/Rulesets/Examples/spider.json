@@ -1,0 +1,12 @@
+{
+  "name": "Spider",
+  "description": "Two suits, two decks' worth. Build down in any suit, but only runs of one suit move together. A whole run from king to ace in one suit leaves the table; clear it to win. Each tap on the stock deals a card to every column, once none is empty.",
+  "deck": { "standard": 4, "suits": ["spades", "hearts"] },
+  "piles": [
+    { "name": "stock", "at": [0, 0], "deal": { "rest": true, "faceUp": false }, "click": { "to": "column", "each": true, "requireFilled": true } },
+    { "name": "foundation", "count": 8, "at": [2, 0], "goal": true },
+    { "name": "column", "count": 10, "at": [0, 1.25], "fan": "down", "deal": { "cards": [6, 6, 6, 6, 5, 5, 5, 5, 5, 5], "faceUp": "top" },
+      "build": { "rank": "down" }, "take": { "kind": "run", "rank": "down", "suit": "same" },
+      "complete": { "length": 13, "to": "foundation" } }
+  ]
+}

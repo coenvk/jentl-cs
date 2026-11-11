@@ -1,0 +1,16 @@
+{
+  "name": "Crazy Eights",
+  "description": "Get rid of your cards. Play one that matches the top of the discard pile by suit or rank; an eight goes on anything, and its player names the suit to follow. Can't play? Draw until you can.",
+  "deck": "standard",
+  "players": { "min": 2, "max": 5, "default": 4 },
+  "piles": [
+    { "name": "stock", "deal": { "rest": true, "faceUp": false } },
+    { "name": "discard", "deal": { "cards": 1, "not": "8" }, "build": { "match": "suitOrRank", "wild": ["8"] } },
+    { "name": "hand", "perPlayer": true, "deal": { "cards": 5 }, "take": "one" }
+  ],
+  "effects": [
+    { "rank": "8", "chooseSuit": true }
+  ],
+  "turns": { "afterDraw": "untilPlayable" },
+  "win": "emptyHand"
+}
