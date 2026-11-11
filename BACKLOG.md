@@ -150,4 +150,4 @@ These pass their tests but have not been checked by eye or ear:
 
 ## Housekeeping
 
-- Push: Jentl is 18 commits ahead of `origin/main` (0.6.12 to 0.6.28, and this backlog), games-cs 7.
+- Push: nothing since Jentl 0.6.11 has been pushed, in either repository (`git log origin/main..`).
