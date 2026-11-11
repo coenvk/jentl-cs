@@ -41,20 +41,14 @@ as WAV on the desktop. Still to do:
 
 ### Animation
 
-What Jentl has: frame animations of sprites (`Animation`, `Animator`, `SpriteSheet`), tweens and easing (`Tween`,
-`Easing`), coroutines and timers, particles, Tiled's tile animations, and in 3D node animations from glTF with
-cross-fades. What is missing, as far as I can see:
+In (0.6.34): tween sequences (`Motion`: tweens of floats, vectors and colours in sequence or together, waits, calls,
+repeats and yoyo), more easings, animation states for sprites (`AnimationStates`), frame events, Aseprite's sheets
+and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab has an Animation demo. Still to do:
 
-- Sequences of tweens: one after another and side by side, with delays, loops and yoyo, on any value (position,
-  scale, rotation, colour), and events at points in them; today each tween runs on its own.
-- Animation states for a sprite: idle, run, jump, hurt, with the moves between them and when they happen (Fluffy's
-  state machines could drive them).
-- Events on frames: a footstep sound on frame 3, a hit box on frame 5.
-- Reading animations made in tools: Aseprite's sprite sheets and tags (JSON), so artists draw and Jentl plays.
+- See the Lab's Animation demo on screen (the screen was locked when it was built; its pieces are tested).
 - Bones for 2D (a body of parts that bend and turn, as Spine or DragonBones make), and skins for 3D models (glTF
-  skins; the fox now stands still): both larger pieces of work.
-- Little touches: squash and stretch, shake, flash on hit, as ready-made effects.
-- Question: which of these matter most to you? Sequences, states and Aseprite are small; bones and skins are not.
+  skins; the fox stands still): both larger pieces of work, left for when a game needs them.
+- Use them in the games: cards dealt with sequences, Hot Pan's cook squashing on landing, hits flashing in Mossbrook.
 
 ### Android
 

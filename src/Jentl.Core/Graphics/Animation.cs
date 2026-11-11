@@ -70,12 +70,64 @@ public sealed record Animation(IReadOnlyList<int> Frames, IReadOnlyList<TimeSpan
 
     /// <summary>Whether a <see cref="AnimationMode.Once"/> animation has reached its end by <paramref name="time"/>.</summary>
     public bool IsDone(TimeSpan time) => Mode == AnimationMode.Once && time >= Length;
+
+    /// <summary>
+    /// Names fired when a frame comes up, by the frame's place in <see cref="Frames"/> (not its number): a footstep on
+    /// the third frame of a walk, a hit box on the fifth of a swing.
+    /// </summary>
+    public IReadOnlyDictionary<int, string>? Events { get; init; }
+
+    /// <summary>The events of the frames that come up after <paramref name="from"/> and by <paramref name="to"/>, in order; a time below zero is before the first frame.</summary>
+    public IEnumerable<string> EventsBetween(TimeSpan from, TimeSpan to)
+    {
+        if (Events is not { Count: > 0 } events || to < from || Frames.Count == 0)
+        {
+            yield break;
+        }
+
+        var order = Order;
+        var length = Length;
+        var pass = length > TimeSpan.Zero && from > TimeSpan.Zero ? from.Ticks / length.Ticks : 0;
+        if (Mode == AnimationMode.Once && pass > 0)
+        {
+            yield break;
+        }
+
+        var start = TimeSpan.FromTicks(pass * length.Ticks);
+        for (var guard = 0; guard < 100_000; pass++)
+        {
+            foreach (var index in order)
+            {
+                if (start > to)
+                {
+                    yield break;
+                }
+
+                if (start > from && events.TryGetValue(index, out var name))
+                {
+                    yield return name;
+                }
+
+                start += Durations[index];
+                guard++;
+            }
+
+            if (Mode == AnimationMode.Once || length <= TimeSpan.Zero)
+            {
+                yield break;
+            }
+        }
+    }
 }
 
 /// <summary>Plays one <see cref="Animation"/> at a time and keeps the clock, for a sprite that switches between animations (idle, walk, attack).</summary>
 public sealed class Animator
 {
     private TimeSpan _time;
+    private bool _starting;
+
+    /// <summary>Raised with a frame's event name (<see cref="Animation.Events"/>) as the frame comes up.</summary>
+    public event Action<string>? FrameEvent;
 
     public Animation? Current { get; private set; }
 
@@ -92,10 +144,26 @@ public sealed class Animator
         {
             Current = animation;
             _time = TimeSpan.Zero;
+            _starting = true;
         }
     }
 
-    public void Update(TimeSpan elapsed) => _time += elapsed;
+    public void Update(TimeSpan elapsed)
+    {
+        var before = _starting ? TimeSpan.FromTicks(-1) : _time;
+        _starting = false;
+        _time += elapsed;
+        if (FrameEvent is { } raise && Current is { } animation)
+        {
+            foreach (var name in animation.EventsBetween(before, _time).ToList())
+            {
+                raise(name);
+            }
+        }
+    }
+
+    /// <summary>How long the current animation has played.</summary>
+    public TimeSpan Time => _time;
 }
 
 /// <summary>A texture cut into a grid of equally sized frames, numbered left to right, top to bottom.</summary>

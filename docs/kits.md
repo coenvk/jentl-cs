@@ -608,7 +608,41 @@ came from ("You have unlocked a new music track") draws there.
 
 `Animation` is a list of frames with durations played as a loop, once, or ping-pong; `FrameAt(time)` says which
 frame shows, so many sprites can share one animation. `Animator` keeps the clock for a sprite that switches between
-animations, and `SpriteSheet` cuts a texture into numbered frames.
+animations, and `SpriteSheet` cuts a texture into numbered frames. An animation's `Events` name frames (a footstep
+on the third, a hit box on the fifth), and the `Animator` raises `FrameEvent` as they come up. `AsepriteSheet.Parse`
+reads the JSON Aseprite exports with a sheet (array or hash): each frame's place and duration, and its tags as
+animations by name, forwards, backwards or ping-pong.
+
+`AnimationStates<TState>` is a sprite's poses as states, each with its animation, and the moves between them: when a
+condition holds (from one state, or `WhenAny`), or `After` a one-off animation has played out. The first move that
+applies wins; `Changed` says when.
+
+```csharp
+var states = new AnimationStates<Pose>(Pose.Idle)
+    .Add(Pose.Idle, idle).Add(Pose.Run, run).Add(Pose.Hurt, hurt)
+    .WhenAny(Pose.Hurt, () => player.WasHit)
+    .After(Pose.Hurt, Pose.Idle)
+    .When(Pose.Idle, Pose.Run, () => player.Speed > 0.1f)
+    .When(Pose.Run, Pose.Idle, () => player.Speed <= 0.1f);
+states.Animator.FrameEvent += name => sounds.Play(name);   // "step"
+```
+
+`Motion` puts tweens on a timeline: a float, `Vector2` or `Color` tweened through a setter with an easing, motions
+in a `Sequence` or `Together`, `Wait`s, `Call`s at points along the way, and `Repeat` (a number of times or forever,
+there and back with `yoyo`). A motion keeps no clock; a `MotionPlayer` plays one, and `Motions` plays many, dropping
+each when it ends. `Easing` has quad, cubic and sine curves in and out, back (an overshoot), elastic and bounce.
+
+```csharp
+motions.Play(Motion.Sequence(
+    Motion.Tween(v => card.Position = v, deck, slot, 0.4, Easing.BackOut),
+    Motion.Call(() => sounds.Play("card")),
+    Motion.Tween(s => card.Scale = s, 1, 1.1f, 0.1),
+    Motion.Tween(s => card.Scale = s, 1.1f, 1, 0.1)));
+```
+
+For feel: `Flash` turns a sprite's colour to white (or any) on a hit and back, `SquashStretch` gives a scale that is
+wide and short on landing, narrow and tall on a jump, springing back, and `Shake` throws anything off by a smooth,
+fading wobble. The Lab's Animation demo has them all.
 
 The RPG kit reads Tiled's tile animations (`<animation>` frames in a tileset), and `MapView` plays them: Mossbrook's
 water ripples, torches flicker and glowcaps pulse. A character tile with a `walk` property names its stride frame,
