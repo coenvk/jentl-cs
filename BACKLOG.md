@@ -66,18 +66,25 @@ cross-fades. What is missing, as far as I can see:
 - Note: the browser build already runs on phones, as a fallback until then.
 - Question: one APK holding all the games, or one app per game?
 
-### Word games: Connect Word and Associate Words
+### Connect Word: more of it
 
-My reading of the names; please correct:
+The first version is playable (games-cs `apps/ConnectWord`): a 4×4 grid of word cards with a deck behind it; a card
+dropped on one of its category merges with it, on any other it swaps; a category whose words are all in one row is
+matched and leaves as a coloured row; cards fall and new ones come in; twenty levels, stars by moves, progress saved.
+Still to do:
 
-- **Connect Word**: letters in a wheel, swiped across to make words that fill a small crossword (as Wordscapes),
-  with levels of growing size, hints and bonus words.
-- **Associate Words**: words that belong together: either sorting a grid of sixteen into four groups of four by what
-  links them (as the New York Times' Connections), or finding the word that links three others.
-- Both need word lists (English and Dutch, as the games are in both) with a licence that allows it, and for
-  Associate Words, groups made and checked by hand or checked by a person after they are made.
-- A word kit in Jentl may be worth it: word lists, checking words, a crossword fitter for Connect Word.
-- Questions: are these the games you mean? In which languages?
+- Check it against the Android original: whether a matched row really leaves the grid or stays frozen in place,
+  whether wrong drops should cost something (lives, or moves), and how its levels grow.
+- Dutch levels (the words are English only; the rest of the game is in both languages), and many more levels: a
+  level editor or a format others can write levels in.
+- Undo, a merge animation (cards sliding into each other), and the solved row flying up to its place.
+- Daily puzzles, and scores for time as well as moves.
+
+### Associate Words
+
+Words that belong together, as a game of its own: either sorting a grid of sixteen into four groups of four by what
+links them (as the New York Times' Connections), or finding the word that links three others. It could share Connect
+Word's levels format and categories. Questions: which of the two, and is it different enough from Connect Word?
 
 ### Hot Pan: more for the frying pan
 
