@@ -80,11 +80,17 @@ Still to do:
 - Undo, a merge animation (cards sliding into each other), and the solved row flying up to its place.
 - Daily puzzles, and scores for time as well as moves.
 
-### Associate Words
+### Associate Words: more of it
 
-Words that belong together, as a game of its own: either sorting a grid of sixteen into four groups of four by what
-links them (as the New York Times' Connections), or finding the word that links three others. It could share Connect
-Word's levels format and categories. Questions: which of the two, and is it different enough from Connect Word?
+The first version is playable (games-cs `apps/AssociateWords`), built to the rules settled with you: five columns
+with their top card up, a draw pile turning one card and recycling, a few slots that a category card opens and a
+complete category frees, words on their own kind in any order in the columns, a move limit, fifteen levels. Still to
+do:
+
+- Jokers, as the originals have (a card that goes with any category, or bridges two columns).
+- More levels, Dutch ones, and picture cards; a level editor, or levels made and checked by the autoplayer.
+- Tuning the move limits by play (they are a quarter above a simple autoplayer's), and extra moves as a reward.
+- A daily deal, and a custom game: pick the size and play a fresh deal.
 
 ### Hot Pan: more for the frying pan
 
