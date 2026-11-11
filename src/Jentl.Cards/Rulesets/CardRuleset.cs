@@ -78,6 +78,12 @@ public sealed record BuildRule
     /// </summary>
     public IReadOnlyList<string> Wild { get; init; } = [];
 
+    /// <summary>
+    /// A function of the ruleset's <see cref="CardRuleset.Script"/> that must also say yes: called with the card, the pile
+    /// and the pile it comes from (nil when dealt), as <c>fn check(card, pile, from)</c>.
+    /// </summary>
+    public string? Check { get; init; }
+
     /// <summary>Whether <paramref name="face"/> goes on anything here.</summary>
     public bool IsWild(CardFace face)
     {
@@ -279,6 +285,9 @@ public sealed record CardEffect(CardSelector Cards)
 
     /// <summary>Whether the same player goes again.</summary>
     public bool PlayAgain { get; init; }
+
+    /// <summary>A function of the ruleset's <see cref="CardRuleset.Script"/> to call as well, <c>fn name(card, seat)</c>, which may act through the turn.</summary>
+    public string? Script { get; init; }
 }
 
 /// <summary>What a player may do after drawing on their turn.</summary>
@@ -353,6 +362,13 @@ public sealed record CardRuleset(string Name, CardDeck Deck, IReadOnlyList<PileR
     public IReadOnlyList<CardEffect> Effects { get; init; } = [];
 
     public TurnRules Turns { get; init; } = new();
+
+    /// <summary>
+    /// Jentl.Script source for what the fields can't say: functions that piles' <see cref="BuildRule.Check"/>s and
+    /// effects' <see cref="CardEffect.Script"/>s name, and hooks called at their moments (<c>played</c>, <c>moved</c>,
+    /// <c>drawing</c>, <c>won</c>, <c>score</c>). The guide lists what scripts can read and do.
+    /// </summary>
+    public string? Script { get; init; }
 
     /// <summary>Reads a ruleset written as JSON; throws <see cref="InvalidDataException"/> saying where a mistake is.</summary>
     public static CardRuleset Parse(string json) => RulesetReader.Read(json);

@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Jentl.Multiplayer\Jentl.Multiplayer.csproj" />
+    <ProjectReference Include="..\Jentl.Script\Jentl.Script.csproj" />
   </ItemGroup>
 
 </Project>

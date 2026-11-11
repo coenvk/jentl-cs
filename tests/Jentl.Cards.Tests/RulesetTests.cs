@@ -30,7 +30,7 @@ public class RulesetTests
     [Fact]
     public void TheExamples_AreAllThere()
     {
-        RulesetExamples.Names.Should().Equal("crazyeights", "fortythieves", "freecell", "golf", "klondike", "spider", "uno", "yukon");
+        RulesetExamples.Names.Should().Equal("crazyeights", "fortythieves", "freecell", "golf", "klondike", "maumau", "spider", "uno", "yukon");
     }
 
     [Theory]
@@ -42,6 +42,7 @@ public class RulesetTests
     [InlineData("fortythieves")]
     [InlineData("crazyeights")]
     [InlineData("uno")]
+    [InlineData("maumau")]
     public void EveryExample_DealsTheWholeDeck(string name)
     {
         var ruleset = RulesetExamples.Load(name);

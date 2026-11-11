@@ -146,8 +146,8 @@ taps and drops go to the pile placed last, which is drawn on top.
 
 A card game can also be written down instead of programmed: a JSON ruleset names the deck, how many play, the piles
 with their deal and rules, what cards do, and how the game is won, and `RulesetGame` plays it. Jentl comes with
-eight (`RulesetExamples`): the solitaires `klondike`, `freecell`, `spider`, `golf`, `yukon` and `fortythieves`, and
-for players `crazyeights` and `uno`. Copy one to start a new game.
+nine (`RulesetExamples`): the solitaires `klondike`, `freecell`, `spider`, `golf`, `yukon` and `fortythieves`, and
+for players `crazyeights`, `uno` and `maumau`. Copy one to start a new game.
 
 ```csharp
 var ruleset = CardRuleset.Parse(File.ReadAllText("rules/klondike.json"));   // or RulesetExamples.Load("klondike")
@@ -197,6 +197,36 @@ RulesetLayout.Solitaire(view, game, area);             // each frame: the piles 
 - **Win**: `"goals"` (every card on goal piles, for solitaires), `{ "empty": ["column"] }` (Golf), or `"emptyHand"`
   (the first to shed their cards wins and scores the points left in the other hands).
 
+- **Script**: for what the fields can't say, a ruleset carries Jentl.Script code (`"script"`, one string or a list of
+  lines). A pile's `build` may name a `check` that must also say yes (`fn check(card, pile, from)`), an effect may name
+  a `script` to call when its cards are played (`fn name(card, seat)`), and these functions run if the script has them:
+  `played(card, seat)` after any card is played, `moved(from, to, count)` after a solitaire move, `drawing(seat)` for
+  how many cards a draw takes, `won()` for whether a solitaire is won, and `score(seat)` for a winner's score. Scripts
+  read the table any time: `pile(name)`, `piles(group)`, `hand(seat)`, `seat()`, `players()`, `direction()`, `suit()`
+  and `counter(name)`; cards are maps (`rank`, `suit`, `label`, `order`, `points`, `colour`, `tags`, `code`, `faceUp`)
+  and piles objects (`name`, `group`, `index`, `count`, `empty`, `top`, `cards`). While a move is played they may act,
+  through the turn so undo takes it back: `skip(n)`, `reverse()`, `again()`, `chooseSuit()`, `draw(seat, n)`,
+  `move(from, to, n)`, `flip(pile, up)`, `count(name, amount)` and `say(text)` (a message for the screen). Keep
+  state in counters, not in script variables, so undo takes it back too. Golf's `check` puts nothing on a king;
+  Mau-Mau's sevens stack:
+
+```json
+"script": [
+  "fn played(card, seat)",
+  "  if card.rank == \"7\" then count(\"penalty\", 2) end",
+  "end",
+  "fn drawing(seat)",
+  "  let penalty = counter(\"penalty\")",
+  "  if penalty == 0 then return 1 end",
+  "  count(\"penalty\", -penalty)",
+  "  return penalty",
+  "end"
+]
+```
+
+  A mistake in the script is found when the ruleset is read (`ruleset.script: Mau-Mau:12: expected 'end' to close 'if'`),
+  as is a function named but missing; one while playing is a `ScriptException` with the line, and the move is undone.
+
 Mistakes say where they are, and unknown fields are mistakes, so a typo never quietly changes a game:
 `ruleset.piles[2].build.rank: 'upp' isn't a rank (use any, up, down, updown, same).`
 
@@ -207,7 +237,7 @@ game for players is an `ITurnBasedGame<CardInput>`: the player whose turn it is 
 `LegalMoves` lists what they may do. `RulesetBot` plays any of them, so a `Match` runs the bots; `RulesetLayout.Table`
 lays out the table with the other hands face down (`TableView.Hidden`). Turn state (whose turn, direction, the named
 suit) lives in table counters, so undo takes it back with the cards. Layouts with cards covering each other (Pyramid,
-TriPeaks) and rules beyond these fields still need C# rules.
+TriPeaks) still need C# rules.
 
 ### Chips
 

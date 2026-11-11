@@ -1,0 +1,52 @@
+{
+  "name": "Mau-Mau",
+  "description": "Get rid of your cards, matching the top of the discard pile by suit or rank. A seven makes the next player draw two, unless they answer with a seven of their own, which passes on four, and so on. An eight skips the next player. A jack goes on anything but a jack, and its player names the suit.",
+  "deck": {
+    "name": "piquet",
+    "suits": [
+      { "name": "clubs", "symbol": "♣", "colour": "black" },
+      { "name": "diamonds", "symbol": "♦", "colour": "red", "ink": "#ce2030" },
+      { "name": "hearts", "symbol": "♥", "colour": "red", "ink": "#ce2030" },
+      { "name": "spades", "symbol": "♠", "colour": "black" }
+    ],
+    "ranks": [
+      { "name": "7", "order": 7, "points": 7 }, { "name": "8", "order": 8, "points": 8 }, { "name": "9", "order": 9, "points": 9 },
+      { "name": "10", "order": 10, "points": 10 }, { "name": "J", "order": 11, "points": 20 }, { "name": "Q", "order": 12, "points": 3 },
+      { "name": "K", "order": 13, "points": 4 }, { "name": "A", "order": 14, "points": 11 }
+    ]
+  },
+  "players": { "min": 2, "max": 5, "default": 3 },
+  "piles": [
+    { "name": "stock", "deal": { "rest": true, "faceUp": false } },
+    { "name": "discard", "deal": { "cards": 1, "not": "J" }, "build": { "match": "suitOrRank", "wild": ["J"], "check": "answer" } },
+    { "name": "hand", "perPlayer": true, "deal": { "cards": 5 }, "take": "one" }
+  ],
+  "effects": [
+    { "rank": "8", "skip": 1 },
+    { "rank": "J", "chooseSuit": true }
+  ],
+  "win": "emptyHand",
+  "script": [
+    "# Sevens stack: each adds two to what the next player must draw.",
+    "fn played(card, seat)",
+    "  if card.rank == \"7\" then",
+    "    count(\"penalty\", 2)",
+    "    say(str(counter(\"penalty\")) + \" to draw\")",
+    "  end",
+    "end",
+    "",
+    "# Whoever draws instead of answering takes the whole penalty.",
+    "fn drawing(seat)",
+    "  let penalty = counter(\"penalty\")",
+    "  if penalty == 0 then return 1 end",
+    "  count(\"penalty\", -penalty)",
+    "  return penalty",
+    "end",
+    "",
+    "# With a penalty waiting only a seven answers; and no jack on a jack.",
+    "fn answer(card, pile)",
+    "  if counter(\"penalty\") > 0 then return card.rank == \"7\" end",
+    "  return not (card.rank == \"J\" and pile.top.rank == \"J\")",
+    "end"
+  ]
+}

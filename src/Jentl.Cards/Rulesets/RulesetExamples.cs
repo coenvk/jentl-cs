@@ -3,7 +3,8 @@ namespace Jentl.Cards.Rulesets;
 /// <summary>
 /// Rulesets that come with Jentl, to play as they are or to copy and change: the solitaires <c>klondike</c>,
 /// <c>freecell</c>, <c>spider</c>, <c>golf</c>, <c>yukon</c> and <c>fortythieves</c>, and for several players
-/// <c>crazyeights</c> (the standard deck) and <c>uno</c> (Uno's).
+/// <c>crazyeights</c> (the standard deck), <c>uno</c> (Uno's) and <c>maumau</c> (a 32-card deck of its own, with
+/// a script for its stacking sevens).
 /// </summary>
 public static class RulesetExamples
 {

@@ -32,7 +32,7 @@ internal static class RulesetReader
 
     private static CardRuleset ReadRuleset(Node root)
     {
-        root.Allow("name", "description", "deck", "jokers", "players", "piles", "effects", "turns", "win");
+        root.Allow("name", "description", "deck", "jokers", "players", "piles", "effects", "turns", "win", "script");
         var (min, max, preferred) = root.Get("players") is { } players ? ReadPlayers(players) : (1, 1, 1);
         var deck = ReadDeck(root.Get("deck") ?? throw root.Error("needs a deck (\"standard\", \"uno\" or one of its own)"), root.Get("jokers"));
         var piles = root.Require("piles").Items().Select((pile, _) => ReadPile(pile)).ToList();
@@ -44,6 +44,7 @@ internal static class RulesetReader
             DefaultPlayers = preferred,
             Effects = root.Get("effects")?.Items().Select(ReadEffect).ToList() ?? [],
             Turns = root.Get("turns") is { } turns ? ReadTurns(turns) : new TurnRules(),
+            Script = root.Get("script") is { } script ? script.Source() : null,
         };
     }
 
@@ -196,7 +197,7 @@ internal static class RulesetReader
             return node.Choice("build", "none", "any") == 0 ? BuildRule.None : new BuildRule();
         }
 
-        node.Allow("rank", "wrap", "suit", "match", "wild", "empty", "max", "from", "runs");
+        node.Allow("rank", "wrap", "suit", "match", "wild", "empty", "max", "from", "runs", "check");
         var match = node.Get("match");
         return new BuildRule
         {
@@ -209,6 +210,7 @@ internal static class RulesetReader
             From = node.Get("from")?.Items().Select(f => f.Text()).ToList() ?? [],
             Runs = node.Get("runs")?.Flag() ?? true,
             Wild = node.Get("wild")?.Items().Select(w => w.Text()).ToList() ?? [],
+            Check = node.Get("check")?.Text(),
         };
     }
 
@@ -261,7 +263,7 @@ internal static class RulesetReader
 
     private static CardEffect ReadEffect(Node node)
     {
-        node.Allow("rank", "suit", "tag", "skip", "reverse", "draw", "chooseSuit", "playAgain");
+        node.Allow("rank", "suit", "tag", "skip", "reverse", "draw", "chooseSuit", "playAgain", "script");
         var selector = new CardSelector { Rank = node.Get("rank")?.Text(), Suit = node.Get("suit")?.Text(), Tag = node.Get("tag")?.Text() };
         if (selector is { Rank: null, Suit: null, Tag: null })
         {
@@ -275,6 +277,7 @@ internal static class RulesetReader
             Draw = node.Get("draw")?.Whole(0, 20) ?? 0,
             ChooseSuit = node.Get("chooseSuit")?.Flag() ?? false,
             PlayAgain = node.Get("playAgain")?.Flag() ?? false,
+            Script = node.Get("script")?.Text(),
         };
     }
 
@@ -368,9 +371,47 @@ internal static class RulesetReader
             }
         }
 
+        CheckScript(ruleset);
+
         if (ruleset.Win.Kind == WinKind.AllOnGoals && !ruleset.Piles.Any(p => p.Goal))
         {
             throw new InvalidDataException("ruleset.win: to win with every card on a goal pile, mark the foundations \"goal\": true.");
+        }
+    }
+
+    /// <summary>Compiles the script and runs its top level, and checks the functions the ruleset names are in it.</summary>
+    private static void CheckScript(CardRuleset ruleset)
+    {
+        var named = ruleset.Piles.Select((p, i) => (Name: p.Build.Check, Where: $"ruleset.piles[{i}].build.check"))
+            .Concat(ruleset.Effects.Select((e, i) => (Name: e.Script, Where: $"ruleset.effects[{i}].script")))
+            .Where(n => n.Name is not null)
+            .ToList();
+        if (ruleset.Script is not { } source)
+        {
+            if (named.Count > 0)
+            {
+                throw new InvalidDataException($"{named[0].Where}: names the function '{named[0].Name}', but the ruleset has no \"script\".");
+            }
+
+            return;
+        }
+
+        RulesetScript script;
+        try
+        {
+            script = new RulesetScript(source, ruleset.Name, 0);
+        }
+        catch (Jentl.Script.ScriptException mistake)
+        {
+            throw new InvalidDataException($"ruleset.script: {mistake.Message}", mistake);
+        }
+
+        foreach (var (name, where) in named)
+        {
+            if (!script.Has(name!))
+            {
+                throw new InvalidDataException($"{where}: the script has no function '{name}'.");
+            }
         }
     }
 
@@ -421,6 +462,11 @@ internal static class RulesetReader
                 ? name
                 : throw Error($"'{name}' should be letters and digits, not ending in a digit");
         }
+
+        /// <summary>Script source: one string, or a list of lines (JSON has no text across lines).</summary>
+        public string Source() => Element.ValueKind == JsonValueKind.Array
+            ? string.Join('\n', Items().Select(line => line.Text()))
+            : Text();
 
         public bool Flag() => Element.ValueKind switch
         {

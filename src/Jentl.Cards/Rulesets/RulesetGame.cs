@@ -1,4 +1,5 @@
 using Jentl.Multiplayer;
+using Jentl.Script;
 
 namespace Jentl.Cards.Rulesets;
 
@@ -34,6 +35,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
     private readonly Random _random;
     private readonly int _lowest;
     private readonly int _highest;
+    private readonly RulesetScript? _script;
 
     /// <param name="seed">Shuffles the deck (and later reshuffles): the same seed, the same deal.</param>
     /// <param name="players">How many play; the ruleset's default when null.</param>
@@ -64,6 +66,11 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
         (_lowest, _highest) = (ranked.Min(), ranked.Max());
         Table = Deal(order ?? Deck.Shuffled(ruleset.Deck.Cards, _random));
         Game = new CardGame(Table, this);
+        if (ruleset.Script is { } source)
+        {
+            _script = new RulesetScript(source, ruleset.Name, seed);
+            _script.Attach(this);
+        }
     }
 
     public CardRuleset Ruleset { get; }
@@ -112,14 +119,31 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
         _groups.TryGetValue(name, out var group) ? group : [Table[name]];
 
     /// <summary>What a player scores for winning: the points of the cards left in the other hands.</summary>
-    public int Score(int seat) => Enumerable.Range(0, Players).Where(s => s != seat).Sum(s => Hand(s).Cards.Sum(c => c.Card.Face.Points));
+    public int Score(int seat) => _script?.Hook("score", seat) is { } score
+        ? (int)score.AsNumber
+        : Enumerable.Range(0, Players).Where(s => s != seat).Sum(s => Hand(s).Cards.Sum(c => c.Card.Face.Points));
+
+    /// <summary>A pile's group and its index in it.</summary>
+    public (PileRule Rule, int Index) PlaceOf(Pile pile) => _piles[pile];
 
     /// <summary>Plays an input; null if the rules refuse it.</summary>
     public CardTurn? Play(CardInput input) => Game.Play(input);
 
-    bool ICardRules.Play(CardTurnBuilder turn, CardInput input) => Ruleset.IsSolitaire ? PlaySolitaire(turn, input) : PlayTurn(turn, input);
+    bool ICardRules.Play(CardTurnBuilder turn, CardInput input)
+    {
+        _script?.Begin(turn);
+        try
+        {
+            return Ruleset.IsSolitaire ? PlaySolitaire(turn, input) : PlayTurn(turn, input);
+        }
+        finally
+        {
+            _script?.End();
+        }
+    }
 
-    public bool IsWon(Table table) => Ruleset.Win.Kind switch
+    /// <summary>Whether the game is won: as the ruleset's win rule says, or a solitaire's script's <c>won()</c> when it answers.</summary>
+    public bool IsWon(Table table) => Ruleset.IsSolitaire && _script?.Hook("won") is { } won ? won.IsTruthy : Ruleset.Win.Kind switch
     {
         WinKind.AllOnGoals => _piles.Where(p => p.Value.Rule.Goal).Sum(p => p.Key.Count) == Ruleset.Deck.Cards.Count,
         WinKind.Empty => Ruleset.Win.Piles.SelectMany(Piles).All(p => p.IsEmpty),
@@ -162,6 +186,13 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
     public bool Fits(Card card, Pile to, int count = 1, Pile? from = null)
     {
         ArgumentNullException.ThrowIfNull(to);
+        return FitsByRules(card, to, count, from)
+            && (RuleOf(to).Build.Check is not { } check
+                || _script!.Call(check, RulesetScript.CardValue(card), _script.PileValue(to), from is null ? ScriptValue.Nil : _script.PileValue(from)).IsTruthy);
+    }
+
+    private bool FitsByRules(Card card, Pile to, int count, Pile? from)
+    {
         var build = RuleOf(to).Build;
         if (build.Closed || (build.Max > 0 && to.Count + count > build.Max) || (!build.Runs && count > 1)
             || (from is not null && build.From.Count > 0 && !build.From.Any(f => Piles(f).Contains(from))))
@@ -416,6 +447,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
 
     private bool Move(CardTurnBuilder turn, Pile from, int index, Pile to)
     {
+        var moving = RuleOf(from).Take.Kind == TakeKind.One ? 1 : from.Count - index;
         if (RuleOf(from).Take.Kind == TakeKind.One)
         {
             turn.MoveOne(from, index, to);
@@ -433,6 +465,11 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
         }
 
         Complete(turn, to);
+        if (_script is { } script && script.Has("moved"))
+        {
+            script.Call("moved", script.PileValue(from), script.PileValue(to), moving);
+        }
+
         return true;
     }
 
@@ -658,7 +695,27 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
 
         var effects = Ruleset.Effects.Where(e => e.Cards.Matches(face)).ToList();
         var skip = effects.Sum(e => e.Skip);
-        foreach (var effect in effects.Where(e => e.Reverse))
+        var reverses = effects.Count(e => e.Reverse);
+        var choose = effects.Any(e => e.ChooseSuit);
+        var again = effects.Any(e => e.PlayAgain);
+        if (_script is { } script)
+        {
+            // Effects that call the script, then its played(card, seat); what they ask for joins the rest.
+            var card = RulesetScript.CardValue(Discard.Top!.Value.Card);
+            foreach (var effect in effects.Where(e => e.Script is not null))
+            {
+                script.Call(effect.Script!, card, seat);
+            }
+
+            if (script.Has("played"))
+            {
+                script.Call("played", card, seat);
+            }
+
+            (skip, reverses, choose, again) = (skip + script.Skip, reverses + script.Reverses, choose || script.Choose, again || script.Again);
+        }
+
+        for (var i = 0; i < reverses; i++)
         {
             if (Players == 2)
             {
@@ -684,21 +741,22 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             turn.Tag($"skip:{skip}");
         }
 
-        if (effects.Any(e => e.ChooseSuit))
+        if (choose)
         {
             turn.Count(ChoosingCounter, 1);
             turn.Count(SkippingCounter, skip);
             return true;
         }
 
-        EndTurn(turn, seat, skip, effects.Any(e => e.PlayAgain));
+        EndTurn(turn, seat, skip, again);
         return true;
     }
 
     private bool Draw(CardTurnBuilder turn, int seat)
     {
         var hand = Hand(seat);
-        var drawn = DrawCards(turn, seat, Ruleset.Turns.DrawCount);
+        var count = _script?.Hook("drawing", seat) is { } asked ? (int)asked.AsNumber : Ruleset.Turns.DrawCount;
+        var drawn = DrawCards(turn, seat, count);
         turn.Tag("drew");
         if (Ruleset.Turns.AfterDraw == AfterDraw.UntilPlayable)
         {
@@ -716,6 +774,19 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
 
         EndTurn(turn, seat, 0, playAgain: false);
         return true;
+    }
+
+    /// <summary>For scripts: <paramref name="seat"/> draws <paramref name="count"/> cards; how many came.</summary>
+    internal int DrawFor(CardTurnBuilder turn, int seat, int count)
+    {
+        if (seat < 0 || seat >= Players || Ruleset.IsSolitaire)
+        {
+            throw new ScriptException($"draw: there is no seat {seat} to draw for");
+        }
+
+        var drawn = DrawCards(turn, seat, count);
+        turn.Tag($"draw:{drawn}");
+        return drawn;
     }
 
     private int DrawCards(CardTurnBuilder turn, int seat, int count)
