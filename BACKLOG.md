@@ -94,6 +94,39 @@ second, leaderboards, keys, gamepad and touch. Still to do:
   grows with the heat, a sigh of relief on cool chicken).
 - Questions: should the pan heat level off at some point? A choice of cooks? Daily seeds for a shared challenge?
 
+### Traffic: a simulation, and a game of building roads
+
+A full traffic simulation: cars, vans, trucks and more on roads of every kind, through traffic lights, priority
+junctions and roundabouts. It should stand on its own as a kit, so that a game can be built on it: for instance one
+where the player lays out the roads, junctions and lights of a town and is scored on how well the traffic flows.
+
+- The simulation, as a framework-free kit (`Jentl.Traffic`), seeded and testable like the others:
+  - **Vehicles**: types with their own length, top speed, acceleration, braking and how much room they keep (car,
+    van, truck, bus, motorbike; perhaps bikes on their own paths). Following the vehicle ahead smoothly, as the
+    Intelligent Driver Model does, and changing lanes when it helps and is safe (as MOBIL does), with drivers who
+    differ a little (some cautious, some in a hurry).
+  - **Roads**: a network of roads with lanes, each road a path of straights and curves (Jentl.Tracks already builds
+    and measures such paths), with speed limits, one-way roads, turning lanes and lane markings that say where a
+    lane may go; kinds from a residential street to a motorway with slip roads.
+  - **Junctions**: priority from the right or by signs (give way, stop), traffic lights, and roundabouts (giving way
+    to traffic already on them, one or two lanes). Vehicles slow for corners, queue, and leave room for a junction
+    they can't cross yet so they don't block it.
+  - **Traffic lights**: signal groups and phases with green, amber and red times, all-red clearance, fixed cycles,
+    lights that react to waiting traffic (detectors), green waves along a road, and turning arrows.
+  - **Demand**: trips from where they start to where they go (homes, shops, work), with rush hours; each vehicle
+    picks a route through the network (the shortest or the quickest, and going round congestion).
+  - **Measurements**: flow per road, travel and waiting times, queue lengths, stops, and where the jams are; enough
+    for a game's score and for overlays on screen.
+  - Fast enough for a town of thousands of vehicles, in a fixed time step that can run faster than real time.
+- On screen (in `Jentl.Core`): drawing the network and the vehicles (from above), lights, overlays of speed and
+  jams, and following a vehicle with the camera.
+- The game (in games-cs): build roads on a grid or freely, place junctions, lights and roundabouts, and set the
+  lights' timings; demand grows as the town does; a budget, goals per level (everyone home within a time, fewer than
+  so many seconds waiting on average), and a sandbox; watch the traffic and fix the jams. Mini Motorways and the
+  traffic side of Cities: Skylines are the nearest examples.
+- Questions: seen from above in 2D, or in 3D (the 3D kit could draw it)? Which country's rules (driving on the right,
+  priority from the right as in the Netherlands)? Pedestrians and cyclists too? A grid to build on, or free curves?
+
 ## Loose ends of what is built
 
 ### Cards and rulesets
