@@ -188,10 +188,14 @@ RulesetLayout.Solitaire(view, game, area);             // each frame: the piles 
     and when empty turn `redealFrom` back over, `redeals` times (-1: always).
   - `complete`: a run of `length` cards in order leaves for a goal pile (Spider). `flipTop`: a face-down card left on
     top turns over (yes by default).
-  - `at`, `step` and `fan` (`stacked`, `down`, `right`): where it goes, in card sizes, for `RulesetLayout`.
+  - `at`, `step` and `fan` (`stacked`, `down`, `right`): where it goes, in card sizes, for `RulesetLayout`; `places`
+    lists each pile's spot (from `at`) for layouts that aren't rows.
+  - `coveredBy`, for overlapping cards (TriPeaks, Pyramid): for each pile of the group, the piles of it lying over it.
+    A covered pile is dealt face down, can't be taken from, and turns up once everything over it has gone; the
+    `tripeaks` example is built this way.
 - **Players**: `1` (a solitaire) or `{ "min": 2, "max": 8, "default": 4 }`. With players, `turns` names the `stock`,
   `discard` and `hand` piles, how many cards a `draw` takes, and `afterDraw`: `mayPlay` the card drawn, `pass`, or
-  `untilPlayable`; the discards are shuffled back into an empty stock. `effects` say what cards do, chosen by `rank`,
+  `untilPlayable`; `afterPenalty` the same after a draw a script made bigger (Mau-Mau's sevens: `pass`); the discards are shuffled back into an empty stock. `effects` say what cards do, chosen by `rank`,
   `suit` or `tag`: `skip` players, `reverse` play (a skip for two), make the next player `draw`, `chooseSuit`, or
   `playAgain`.
 - **Win**: `"goals"` (every card on goal piles, for solitaires), `{ "empty": ["column"] }` (Golf), or `"emptyHand"`

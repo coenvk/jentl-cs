@@ -1,6 +1,6 @@
 {
   "name": "Mau-Mau",
-  "description": "Get rid of your cards, matching the top of the discard pile by suit or rank. A seven makes the next player draw two, unless they answer with a seven of their own, which passes on four, and so on. An eight skips the next player. A jack goes on anything but a jack, and its player names the suit.",
+  "description": "Get rid of your cards, matching the top of the discard pile by suit or rank. A seven makes the next player draw two, unless they answer with a seven of their own, which passes on four, and so on; whoever takes the penalty ends their turn. An eight skips the next player. A jack goes on anything but a jack, and its player names the suit.",
   "deck": {
     "name": "piquet",
     "suits": [
@@ -16,6 +16,7 @@
     ]
   },
   "players": { "min": 2, "max": 5, "default": 3 },
+  "turns": { "afterPenalty": "pass" },
   "piles": [
     { "name": "stock", "deal": { "rest": true, "faceUp": false } },
     { "name": "discard", "deal": { "cards": 1, "not": "J" }, "build": { "match": "suitOrRank", "wild": ["J"], "check": "answer" } },

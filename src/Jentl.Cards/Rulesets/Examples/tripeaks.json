@@ -1,0 +1,13 @@
+{
+  "name": "TriPeaks",
+  "description": "Three peaks of overlapping cards. Play an uncovered card onto the waste when it is one rank above or below the waste's top card, round the corner from king to ace; a card turns up when nothing lies on it any more. The stock turns over one card at a time, once. Clear the peaks to win.",
+  "deck": "standard",
+  "piles": [
+    { "name": "peak", "count": 28, "at": [0, 0], "deal": { "cards": 1 }, "take": "top",
+      "places": [[1.5, 0], [4.5, 0], [7.5, 0], [1.0, 0.5], [2.0, 0.5], [4.0, 0.5], [5.0, 0.5], [7.0, 0.5], [8.0, 0.5], [0.5, 1.0], [1.5, 1.0], [2.5, 1.0], [3.5, 1.0], [4.5, 1.0], [5.5, 1.0], [6.5, 1.0], [7.5, 1.0], [8.5, 1.0], [0.0, 1.5], [1.0, 1.5], [2.0, 1.5], [3.0, 1.5], [4.0, 1.5], [5.0, 1.5], [6.0, 1.5], [7.0, 1.5], [8.0, 1.5], [9.0, 1.5]],
+      "coveredBy": [[3, 4], [5, 6], [7, 8], [9, 10], [10, 11], [12, 13], [13, 14], [15, 16], [16, 17], [18, 19], [19, 20], [20, 21], [21, 22], [22, 23], [23, 24], [24, 25], [25, 26], [26, 27], [], [], [], [], [], [], [], [], [], []] },
+    { "name": "stock", "at": [3, 3], "deal": { "rest": true, "faceUp": false }, "click": { "to": "waste" } },
+    { "name": "waste", "at": [4.5, 3], "deal": { "cards": 1 }, "build": { "rank": "updown", "wrap": true, "from": ["peak"] } }
+  ],
+  "win": { "empty": ["peak"] }
+}

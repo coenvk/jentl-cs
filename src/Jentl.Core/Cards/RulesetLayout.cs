@@ -104,7 +104,10 @@ public static class RulesetLayout
             var piles = game.Piles(rule.Name);
             for (var i = 0; i < piles.Count; i++)
             {
-                yield return (piles[i], rule, rule.At.X + (rule.Step.X * i), rule.At.Y + (rule.Step.Y * i));
+                // Laid where the rule places each one (from its At), or stepped along from At.
+                yield return rule.Places is { } places && i < places.Count
+                    ? (piles[i], rule, rule.At.X + places[i].X, rule.At.Y + places[i].Y)
+                    : (piles[i], rule, rule.At.X + (rule.Step.X * i), rule.At.Y + (rule.Step.Y * i));
             }
         }
     }

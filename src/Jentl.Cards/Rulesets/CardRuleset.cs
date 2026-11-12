@@ -234,6 +234,16 @@ public sealed record PileRule(string Name)
     /// <summary>Whether a face-down card left on top turns face up by itself.</summary>
     public bool FlipTop { get; init; } = true;
 
+    /// <summary>
+    /// For a layout of overlapping cards (TriPeaks, Pyramid): for each pile of the group, the piles of the same group
+    /// lying over it, by number from 0. A covered pile can't be taken from, and its card turns face up once every pile
+    /// over it is empty.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<int>>? CoveredBy { get; init; }
+
+    /// <summary>Where each pile of the group lies, in card widths and heights, instead of <see cref="At"/> stepped by <see cref="Step"/>: for layouts that aren't rows.</summary>
+    public IReadOnlyList<(float X, float Y)>? Places { get; init; }
+
     /// <summary>Where the first pile goes, in card widths and heights from the top left.</summary>
     public (float X, float Y) At { get; init; }
 
@@ -318,6 +328,12 @@ public sealed record TurnRules
     public int DrawCount { get; init; } = 1;
 
     public AfterDraw AfterDraw { get; init; } = AfterDraw.MayPlay;
+
+    /// <summary>
+    /// What follows a penalty: a draw whose count the script's <c>drawing</c> hook changed (Mau-Mau's sevens). Many
+    /// play that the turn ends there; when not set, it is as <see cref="AfterDraw"/>.
+    /// </summary>
+    public AfterDraw? AfterPenalty { get; init; }
 
     /// <summary>Whether the discards (but the top) are shuffled back into an empty stock.</summary>
     public bool Reshuffle { get; init; } = true;

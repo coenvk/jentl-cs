@@ -161,6 +161,15 @@ public class RulesetScriptTests
         game.Apply(0, new ClickPile(game.Stock, game.Stock.Count - 1));
         game.Hand(0).Count.Should().Be(before + 4);
         game.Table.Counter("script:penalty").Should().Be(0);
+        game.CurrentSeat.Should().Be(1, "taking the penalty ends the turn (afterPenalty: pass)");
+    }
+
+    [Fact]
+    public void ANormalDraw_StillLetsTheCardDrawnBePlayed()
+    {
+        var ruleset = RulesetExamples.Load("maumau");
+        ruleset.Turns.AfterPenalty.Should().Be(AfterDraw.Pass);
+        ruleset.Turns.AfterDraw.Should().Be(AfterDraw.MayPlay);
     }
 
     [Theory]

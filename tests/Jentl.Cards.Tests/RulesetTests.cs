@@ -30,7 +30,7 @@ public class RulesetTests
     [Fact]
     public void TheExamples_AreAllThere()
     {
-        RulesetExamples.Names.Should().Equal("crazyeights", "fortythieves", "freecell", "golf", "klondike", "maumau", "spider", "uno", "yukon");
+        RulesetExamples.Names.Should().Equal("crazyeights", "fortythieves", "freecell", "golf", "klondike", "maumau", "spider", "tripeaks", "uno", "yukon");
     }
 
     [Theory]
@@ -38,6 +38,7 @@ public class RulesetTests
     [InlineData("freecell")]
     [InlineData("spider")]
     [InlineData("golf")]
+    [InlineData("tripeaks")]
     [InlineData("yukon")]
     [InlineData("fortythieves")]
     [InlineData("crazyeights")]
@@ -53,6 +54,27 @@ public class RulesetTests
         game.Table.Piles.SelectMany(p => p.Cards).Select(c => c.Card).Should().OnlyHaveUniqueItems();
         game.IsOver.Should().BeFalse();
         game.LegalMoves(game.CurrentSeat).Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void TriPeaks_ShowsOnlyUncoveredCards_AndTurnsOneUpWhenItsCoversGo()
+    {
+        var game = new RulesetGame(RulesetExamples.Load("tripeaks"), seed: 3);
+        var peaks = game.Piles("peak");
+
+        peaks.Take(18).Should().OnlyContain(p => !p.Top!.Value.FaceUp && game.IsCovered(p));
+        peaks.Skip(18).Should().OnlyContain(p => p.Top!.Value.FaceUp && !game.IsCovered(p));
+        game.CanTake(peaks[9], 0).Should().BeFalse();
+
+        // Play on: whatever is face down is covered, and cards turn up as what lies on them goes.
+        for (var i = 0; i < 60 && game.LegalMoves(game.CurrentSeat) is { Count: > 0 } moves; i++)
+        {
+            game.Apply(game.CurrentSeat, moves[0]);
+            peaks.Where(p => p.Top is { FaceUp: false }).All(game.IsCovered).Should().BeTrue();
+            peaks.Where(game.IsCovered).Any(p => game.CanTake(p, p.Count - 1)).Should().BeFalse();
+        }
+
+        peaks.Take(18).Count(p => p.Top is not { FaceUp: false }).Should().BeGreaterThan(0);
     }
 
     [Fact]

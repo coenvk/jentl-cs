@@ -159,6 +159,11 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             return false;
         }
 
+        if (IsCovered(pile))
+        {
+            return false;
+        }
+
         var take = RuleOf(pile).Take;
         switch (take.Kind)
         {
@@ -179,6 +184,33 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
                 return true;
             default:
                 return false;
+        }
+    }
+
+    /// <summary>Whether another pile of its group lies over <paramref name="pile"/> and still has cards (see <see cref="PileRule.CoveredBy"/>).</summary>
+    public bool IsCovered(Pile pile)
+    {
+        ArgumentNullException.ThrowIfNull(pile);
+        var (rule, index) = _piles[pile];
+        if (rule.CoveredBy is not { } covers)
+        {
+            return false;
+        }
+
+        var group = Piles(rule.Name);
+        return covers[index].Any(i => i < group.Count && !group[i].IsEmpty);
+    }
+
+    /// <summary>Turns face up the top card of every covered pile that nothing lies over any more.</summary>
+    private void Uncover(CardTurnBuilder turn)
+    {
+        foreach (var (pile, (rule, _)) in _piles)
+        {
+            if (rule.CoveredBy is not null && pile.Top is { FaceUp: false } && !IsCovered(pile))
+            {
+                turn.Flip(pile, pile.Count - 1, faceUp: true);
+                turn.Tag("reveal");
+            }
         }
     }
 
@@ -358,7 +390,9 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
                     if (round < counts[i])
                     {
                         var card = Take(deck, rule.Deal);
-                        group[i].Deal(card, faceUp: dealt[i]++ >= rule.Deal.FaceDownFor(i, counts[i]));
+                        // A covered pile's card lies face down until what is over it has gone.
+                        var faceUp = dealt[i]++ >= rule.Deal.FaceDownFor(i, counts[i]);
+                        group[i].Deal(card, faceUp: faceUp && (rule.CoveredBy is not { } covers || covers[i].Count == 0));
                     }
                 }
             }
@@ -465,6 +499,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
         }
 
         Complete(turn, to);
+        Uncover(turn);
         if (_script is { } script && script.Has("moved"))
         {
             script.Call("moved", script.PileValue(from), script.PileValue(to), moving);
@@ -511,7 +546,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             return DealFrom(turn, pile, click);
         }
 
-        if (index >= 0 && index == pile.Count - 1 && !pile[index].FaceUp && rule.FlipTop)
+        if (index >= 0 && index == pile.Count - 1 && !pile[index].FaceUp && rule.FlipTop && !IsCovered(pile))
         {
             turn.Flip(pile, index, faceUp: true);
             turn.Tag("reveal");
@@ -756,9 +791,10 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
     {
         var hand = Hand(seat);
         var count = _script?.Hook("drawing", seat) is { } asked ? (int)asked.AsNumber : Ruleset.Turns.DrawCount;
+        var after = count != Ruleset.Turns.DrawCount ? Ruleset.Turns.AfterPenalty ?? Ruleset.Turns.AfterDraw : Ruleset.Turns.AfterDraw;
         var drawn = DrawCards(turn, seat, count);
         turn.Tag("drew");
-        if (Ruleset.Turns.AfterDraw == AfterDraw.UntilPlayable)
+        if (after == AfterDraw.UntilPlayable)
         {
             while (drawn > 0 && !Fits(hand[^1].Card, Discard, 1, hand))
             {
@@ -766,7 +802,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             }
         }
 
-        if (drawn > 0 && Ruleset.Turns.AfterDraw != AfterDraw.Pass && Fits(hand[^1].Card, Discard, 1, hand))
+        if (drawn > 0 && after != AfterDraw.Pass && Fits(hand[^1].Card, Discard, 1, hand))
         {
             turn.Count(DrawnCounter, 1);
             return true;

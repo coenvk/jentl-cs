@@ -41,6 +41,9 @@ public sealed record CardFace(string Rank, string? Suit)
     /// <summary>Short, unique within its deck, for logs and tests: "QH", "red 7", "wild".</summary>
     public string Code { get; init; } = Suit is null ? Rank : $"{Suit} {Rank}";
 
+    /// <summary>The card as a player would name it: its label and suit symbol ("7♣"), or its suit and label ("red 7").</summary>
+    public string Name => SuitSymbol.Length > 0 ? Label + SuitSymbol : Suit is null ? Label : $"{Suit} {Label}";
+
     public bool Has(string tag) => Tags.Contains(tag, StringComparer.Ordinal);
 
     /// <summary>The face of a standard card.</summary>

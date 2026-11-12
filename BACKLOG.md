@@ -125,16 +125,13 @@ delay against a target gives stars; five levels. Still to do:
 
 ### Cards and rulesets
 
-- Layouts with cards covering each other (Pyramid, TriPeaks) can't be written as rulesets yet: a pile would need to
-  know which piles cover it.
+- Pyramid as a ruleset: covered piles are in (`coveredBy`, `places`; the `tripeaks` example), but Pyramid's pairs
+  adding up to thirteen need a pair move rulesets don't have (two cards leaving together).
 - Uno as a ruleset leaves out the "Uno!" call, challenging a +4, stacking draw cards and the starting card's effect.
-  Scripts could now carry most of these; the hand-written Uno has them.
+  Scripts could now carry most of these (as Mau-Mau's sevens stack); the hand-written Uno has them.
 - Ruleset games for players are against bots only: no passing the device round, no online play, and one round at a
   time (no scores carried over to a match).
-- Cards of a deck of its own are named by their code in messages ("clubs 7"), not by symbol ("7♣"); Uno's "rev"
-  label is cramped on its card.
-- After drawing a penalty in Mau-Mau, the player may still play the card drawn; some rules end the turn there. A
-  ruleset field could say which.
+- Uno's "rev" label is cramped on its card.
 - The ruleset bot plays well enough but simply: it doesn't count cards or think about the other players.
 
 ### Scripting

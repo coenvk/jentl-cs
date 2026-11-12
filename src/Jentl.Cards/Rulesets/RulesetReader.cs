@@ -148,7 +148,7 @@ internal static class RulesetReader
 
     private static PileRule ReadPile(Node node)
     {
-        node.Allow("name", "count", "perPlayer", "goal", "deal", "build", "take", "click", "complete", "flipTop", "at", "step", "fan");
+        node.Allow("name", "count", "perPlayer", "goal", "deal", "build", "take", "click", "complete", "flipTop", "at", "step", "fan", "coveredBy", "places");
         var count = node.Get("count")?.Whole(1, 52) ?? 1;
         var goal = node.Get("goal")?.Flag() ?? false;
         var build = node.Get("build") is { } b ? ReadBuild(b) : BuildRule.None;
@@ -172,7 +172,20 @@ internal static class RulesetReader
             At = node.Get("at")?.Pair() ?? (0, 0),
             Step = node.Get("step")?.Pair() ?? (1, 0),
             Fan = node.Get("fan") is { } fan ? (PileFan)fan.Choice("fan", "stacked", "down", "right") : PileFan.Stacked,
+            CoveredBy = node.Get("coveredBy") is { } covered ? ReadCovers(covered, count) : null,
+            Places = node.Get("places") is { } places ? [.. places.Items().Select(p => p.Pair())] : null,
         };
+    }
+
+    private static List<IReadOnlyList<int>> ReadCovers(Node node, int count)
+    {
+        var covers = node.Items().Select(item => (IReadOnlyList<int>)[.. item.Items().Select(i => i.Whole(0, count - 1))]).ToList();
+        if (covers.Count != count)
+        {
+            throw node.Error($"needs a list for each of the {count} piles");
+        }
+
+        return covers;
     }
 
     private static DealRule ReadDeal(Node node, int count)
@@ -283,7 +296,7 @@ internal static class RulesetReader
 
     private static TurnRules ReadTurns(Node node)
     {
-        node.Allow("stock", "discard", "hand", "draw", "afterDraw", "reshuffle");
+        node.Allow("stock", "discard", "hand", "draw", "afterDraw", "afterPenalty", "reshuffle");
         return new TurnRules
         {
             Stock = node.Get("stock")?.Text() ?? "stock",
@@ -291,6 +304,7 @@ internal static class RulesetReader
             Hand = node.Get("hand")?.Text() ?? "hand",
             DrawCount = node.Get("draw")?.Whole(1, 10) ?? 1,
             AfterDraw = node.Get("afterDraw") is { } after ? (AfterDraw)after.Choice("afterDraw", "mayPlay", "pass", "untilPlayable") : AfterDraw.MayPlay,
+            AfterPenalty = node.Get("afterPenalty") is { } penalty ? (AfterDraw)penalty.Choice("afterPenalty", "mayPlay", "pass", "untilPlayable") : null,
             Reshuffle = node.Get("reshuffle")?.Flag() ?? true,
         };
     }
