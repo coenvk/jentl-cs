@@ -58,6 +58,11 @@ and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab ha
 - Checking every game on a phone: layouts at small sizes, touch targets, performance (the software renderer and the
   physics), sound starting.
 - Note: the browser build already runs on phones, as a fallback until then.
+- Under way: the suites are in (games-cs `suites/`: Words, Puzzles, Arcade, with "All games" on a game's title screen
+  and each game's saves kept apart), and so is the Android head (`shell/Android.props`, `MainActivity`; Solitaire's
+  project first, not yet committed). Waiting on the .NET android workload, which needs `sudo dotnet workload install
+  android` in a terminal; the SDK, emulator and an Android 36 image (device `jentl`) are installed. Still to do: the
+  per-app music (only its games' songs), the back button at the root, pausing with the app, icons.
 - Decided: an app per game, games of a kind together: Solitaire (with the solo ruleset deals), Card Table, Poker,
   Word games (Connect Word, Associate Words), Puzzles (Sokoban, CodeLock), Arcade (Bricks, Hot Pan), Mossbrook,
   Paddock, Roadworks and Composer; not the Lab. Each has the shell cut to its own games and songs, and its own saves.
@@ -127,6 +132,21 @@ delay against a target gives stars; five levels. Still to do:
 - Roadworks: more levels and tuning by play (the five are passable with simple plans, checked by the tests), overlays
   of speed and jams, a sandbox. Seen on screen (offscreen screenshots, 0.6.40): the gates now keep clear of the bar.
 
+### Cheese Farm
+
+In (games-cs `apps/CheeseFarm`, `src/CheeseFarm`): a made-up farm in the east of the country. The herd gives milk each
+morning; a wheel is made in four steps in the kitchen (warm the milk into the band, test the curd for a clean break,
+cut on the marks as the harp crosses them, choose the days in the brine), which give its stars; the cellar's racks,
+where wheels ripen from young to very old and want turning every other day; the farm shop's customers, each wanting a
+ripeness and a flavour; and cows, racks, flavours, a better kettle and road signs to buy. Still to do:
+
+- A cheese fair every week: enter the best wheel, judged on its stars and ripeness, prizes and a ribbon on the wall.
+- The meadow mattering: grass and herbs changing the milk, and room left for meadow birds (as in the ideas below).
+- Milking as a little game of its own; the cows with names; calves.
+- Cheeses of more sizes (a baby cheese, a big wheel) and selling by the piece; seasons, and the market in town.
+- A song of its own for the farm (it plays the village's songs now), and art beyond shapes.
+- Tuning by play: prices, costs, how fast neglect bites; and on a phone.
+
 ### New games that do some good
 
 Ideas for games that are fun first and leave the world a little better, the good built into the rules rather than
@@ -164,6 +184,9 @@ told between levels. In the order I expect them to be popular, the most played f
    cards (on Associate Words's list) and recorded or generated speech.
 
 ## Loose ends of what is built
+
+- Fixed in 0.6.41: the stars (★ ☆) were missing from the game font, so Connect Word's, Associate Words' and
+  Roadworks' stars showed as gaps; Jentl now draws them (and ▲ ▼ ◀ ▶) itself, as it does the card suits.
 
 ### Cards and rulesets
 

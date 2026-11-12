@@ -17,6 +17,38 @@ public sealed class SuitGlyphTests : IDisposable
     [InlineData('♣')]
     public void TheFourSuits_AreInTheFont(char suit) => _suits.GetGlyphId(suit).Should().NotBeNull();
 
+    [Theory]
+    [InlineData('★')]
+    [InlineData('☆')]
+    [InlineData('▲')]
+    [InlineData('▼')]
+    [InlineData('◀')]
+    [InlineData('▶')]
+    public void TheStarsAndArrowheads_AreInTheFontToo(char symbol) => _suits.GetGlyphId(symbol).Should().NotBeNull();
+
+    [Fact]
+    public void AStar_IsFilled_AndAnOpenStarIsHollow()
+    {
+        const int Side = 40;
+        SuitGlyphSource.SymbolCoverage('★', Side / 2, Side / 2, Side).Should().Be(1, "the filled star's middle");
+        SuitGlyphSource.SymbolCoverage('☆', Side / 2, Side / 2, Side).Should().Be(0, "the open star's middle");
+        SuitGlyphSource.SymbolCoverage('★', 0, Side - 1, Side).Should().Be(0, "a corner between the points");
+
+        // The top point is in both, the open star drawn as an outline.
+        SuitGlyphSource.SymbolCoverage('★', Side / 2, 4, Side).Should().BeGreaterThan(0);
+        SuitGlyphSource.SymbolCoverage('☆', Side / 2, 4, Side).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void AnArrowhead_PointsItsWay()
+    {
+        const int Side = 40;
+        SuitGlyphSource.SymbolCoverage('▶', 6, Side / 2, Side).Should().Be(1, "its broad end is on the left");
+        SuitGlyphSource.SymbolCoverage('▶', Side - 6, 6, Side).Should().Be(0, "its point is on the right");
+        SuitGlyphSource.SymbolCoverage('▲', Side / 2, Side - 6, Side).Should().Be(1, "its broad end is at the bottom");
+        SuitGlyphSource.SymbolCoverage('▲', 6, 6, Side).Should().Be(0, "its point is at the top");
+    }
+
     [Fact]
     public void Letters_AreNot() => _suits.GetGlyphId('A').Should().BeNull();
 
