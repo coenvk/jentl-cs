@@ -152,8 +152,8 @@ delay against a target gives stars; five levels. Still to do:
 
 ### Inspector
 
-- An ECS world's entities can be listed (`Inspectable.Entities`), but a scene still has to offer them; no game uses it
-  yet. Undo (Z) and moving the panel (M) are in.
+- Entities (`Inspectable.Entities`, offered by Bricks), undo (Z) and moving the panel (M) are in; none of it has been
+  looked at on screen yet.
 
 ### Games
 
