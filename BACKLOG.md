@@ -157,7 +157,8 @@ delay against a target gives stars; five levels. Still to do:
 
 ### Games
 
-- One games-cs test failed once in 108 and didn't again; probably a timing test worth making steady.
+- The flaky server test was a bot's hello racing a ten-second limit under load; the league's start limit is now a
+  setting and its tests have room. Watch for others.
 
 ## Built but never seen or heard
 
