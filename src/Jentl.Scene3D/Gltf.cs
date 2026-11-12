@@ -16,10 +16,13 @@ public sealed class GltfModel
     private readonly Node[] _nodes;
     private readonly int[] _roots;
     private readonly int[][] _children;
+    private readonly (int[] Joints, Matrix4x4[] InverseBind)[] _skins;
+    private readonly int?[] _nodeSkins;
 
-    internal GltfModel(Node[] nodes, int[][] children, int[] roots, IReadOnlyList<Material> materials, IReadOnlyList<AnimationClip> animations, IReadOnlyList<string> warnings)
+    internal GltfModel(Node[] nodes, int[][] children, int[] roots, IReadOnlyList<Material> materials, IReadOnlyList<AnimationClip> animations, IReadOnlyList<string> warnings, (int[] Joints, Matrix4x4[] InverseBind)[] skins, int?[] nodeSkins)
     {
         (_nodes, _children, _roots) = (nodes, children, roots);
+        (_skins, _nodeSkins) = (skins, nodeSkins);
         Materials = materials;
         Animations = animations;
         Warnings = warnings;
@@ -30,7 +33,7 @@ public sealed class GltfModel
     /// <summary>The animations, targeting nodes by their index in the file (as <see cref="ModelInstance.Nodes"/> are).</summary>
     public IReadOnlyList<AnimationClip> Animations { get; }
 
-    /// <summary>What was in the file but left out: skins, morph targets, JPEG textures and the like.</summary>
+    /// <summary>What was in the file but left out: morph targets, extra scenes and the like.</summary>
     public IReadOnlyList<string> Warnings { get; }
 
     /// <summary>The animation by this name, or null.</summary>
@@ -61,6 +64,15 @@ public sealed class GltfModel
             root.Add(nodes[index]);
         }
 
+        // Each copy's skins have that copy's joints.
+        for (var i = 0; i < nodes.Length; i++)
+        {
+            if (_nodeSkins[i] is { } skin)
+            {
+                nodes[i].Skin = new Skin([.. _skins[skin].Joints.Select(j => nodes[j])], _skins[skin].InverseBind);
+            }
+        }
+
         return new ModelInstance(root, nodes);
     }
 }
@@ -74,13 +86,23 @@ public sealed class ModelInstance(Node root, IReadOnlyList<Node> nodes)
 
     /// <summary>A player for this copy's nodes.</summary>
     public AnimationPlayer CreatePlayer() => new(Nodes);
+
+    /// <summary>Bends every skinned mesh to its joints' pose: call after the animation has moved them, before drawing.</summary>
+    public void UpdateSkins()
+    {
+        foreach (var node in Nodes)
+        {
+            node.Skin?.Deform(node);
+        }
+    }
 }
 
 /// <summary>
 /// Reads glTF 2.0, the common format for 3D models (Blender, most tools and stores export it): <c>.gltf</c> with its
 /// buffers and images in files beside it or inside it, or the single-file <c>.glb</c>. Triangles with positions,
 /// normals and texture coordinates; base colour, texture, emission, transparency, double sides and a shine guessed
-/// from roughness; the node tree; and animations of position, rotation and scale. Skins, morph targets, cameras,
+/// from roughness; the node tree; animations of position, rotation and scale; and skins (bent on the CPU by
+/// <see cref="ModelInstance.UpdateSkins"/>). Morph targets, cameras,
 /// lights and progressive JPEG textures are left out, each with a <see cref="GltfModel.Warnings">warning</see>.
 /// </summary>
 public static class Gltf
@@ -205,7 +227,14 @@ public static class Gltf
             }
 
             var animations = Items(root, "animations").Select(ReadAnimation).ToList();
-            return new GltfModel(nodes, children, roots, materials, animations, _warnings);
+            var skins = Items(root, "skins").Select(ReadSkin).ToArray();
+            var nodeSkins = nodeElements.Select(e => Int(e, "skin")).ToArray();
+            if (nodeSkins.Any(s => s is { } index && (index < 0 || index >= skins.Length)) || skins.Any(s => s.Joints.Any(j => j < 0 || j >= nodes.Length)))
+            {
+                throw new InvalidDataException("A skin, or one of its joints, is missing.");
+            }
+
+            return new GltfModel(nodes, children, roots, materials, animations, _warnings, skins, nodeSkins);
         }
 
         private static JsonElement[] Items(JsonElement element, string name) =>
@@ -218,7 +247,7 @@ public static class Gltf
 
         private static int? Int(JsonElement element, string name) => element.TryGetProperty(name, out var value) ? value.GetInt32() : null;
 
-        private Node ReadNode(JsonElement element, int index, List<List<MeshPart>> meshes)
+        private static Node ReadNode(JsonElement element, int index, List<List<MeshPart>> meshes)
         {
             var node = new Node(element.TryGetProperty("name", out var name) ? name.GetString() ?? "" : $"node{index}");
             if (element.TryGetProperty("matrix", out _))
@@ -240,11 +269,6 @@ public static class Gltf
             if (Int(element, "mesh") is { } mesh)
             {
                 node.Parts.AddRange(meshes[mesh]);
-            }
-
-            if (element.TryGetProperty("skin", out _))
-            {
-                _warnings.Add($"Node '{node.Name}' is skinned; skins aren't supported, so it is drawn in its rest pose.");
             }
 
             return node;
@@ -373,7 +397,14 @@ public static class Gltf
                     material = material with { Shading = Shading.Flat };
                 }
 
-                parts.Add(new MeshPart(new Mesh(Vectors3(positions), triangles, normals, uvs), material));
+                // A skinned mesh: four joints and weights per vertex.
+                SkinWeights? weights = null;
+                if (Int(attributes, "JOINTS_0") is { } joints && Int(attributes, "WEIGHTS_0") is { } weighting)
+                {
+                    weights = new SkinWeights([.. ReadAccessor(joints).Values.Select(j => (int)j)], ReadAccessor(weighting).Values);
+                }
+
+                parts.Add(new MeshPart(new Mesh(Vectors3(positions), triangles, normals, uvs), material) { Weights = weights });
             }
 
             return parts;
@@ -450,6 +481,30 @@ public static class Gltf
 
             var name = element.TryGetProperty("name", out var n) ? n.GetString() ?? "" : $"animation{index}";
             return new AnimationClip(name, channels);
+        }
+
+        private (int[] Joints, Matrix4x4[] InverseBind) ReadSkin(JsonElement element, int index)
+        {
+            int[] joints = [.. Items(element, "joints").Select(j => j.GetInt32())];
+            var inverse = new Matrix4x4[joints.Length];
+            Array.Fill(inverse, Matrix4x4.Identity);
+            if (Int(element, "inverseBindMatrices") is { } accessor)
+            {
+                var (m, _) = ReadAccessor(accessor);
+                if (m.Length < joints.Length * 16)
+                {
+                    throw new InvalidDataException($"Skin {index} has fewer inverse bind matrices than joints.");
+                }
+
+                // Column-major with column vectors is, element for element, row-major with row vectors.
+                for (var j = 0; j < joints.Length; j++)
+                {
+                    var o = j * 16;
+                    inverse[j] = new Matrix4x4(m[o], m[o + 1], m[o + 2], m[o + 3], m[o + 4], m[o + 5], m[o + 6], m[o + 7], m[o + 8], m[o + 9], m[o + 10], m[o + 11], m[o + 12], m[o + 13], m[o + 14], m[o + 15]);
+                }
+            }
+
+            return (joints, inverse);
         }
 
         private static Vector3[] Vectors3(float[] values)

@@ -40,6 +40,20 @@ public sealed class Mesh
         bool Outside(int index) => index < 0 || index >= positions.Count;
     }
 
+    // A deformed copy: shares the original's triangles and texture coordinates, which were checked once already.
+    private Mesh(Mesh original, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
+    {
+        Positions = positions;
+        Triangles = original.Triangles;
+        Normals = normals;
+        UVs = original.UVs;
+        Bounds = positions.Count > 0 ? Box3.FromPoints(positions) : default;
+        Original = original;
+    }
+
+    /// <summary>For a mesh made by <see cref="Deform"/>, the mesh it is a shape of; null for any other.</summary>
+    public Mesh? Original { get; }
+
     public IReadOnlyList<Vector3> Positions { get; }
 
     public IReadOnlyList<Vector3> Normals { get; }
@@ -50,6 +64,23 @@ public sealed class Mesh
     public IReadOnlyList<TriangleIndices> Triangles { get; }
 
     public Box3 Bounds { get; }
+
+    /// <summary>
+    /// The same mesh in another shape: new positions and normals, the same triangles and texture coordinates (a skinned
+    /// character in this frame's pose). Its <see cref="Original"/> is this mesh (or this one's original), so a renderer
+    /// can keep one buffer for every shape of it.
+    /// </summary>
+    public Mesh Deform(IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
+    {
+        ArgumentNullException.ThrowIfNull(positions);
+        ArgumentNullException.ThrowIfNull(normals);
+        if (positions.Count != Positions.Count || normals.Count != Positions.Count)
+        {
+            throw new ArgumentException("A deformed mesh has the same number of vertices and normals as the mesh.", nameof(positions));
+        }
+
+        return new Mesh(Original ?? this, positions, normals);
+    }
 
     /// <summary>The corners of one of the mesh's triangles.</summary>
     public Triangle TriangleAt(TriangleIndices t) => new(Positions[t.A], Positions[t.B], Positions[t.C]);

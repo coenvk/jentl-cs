@@ -5,7 +5,93 @@ using Jentl.Raster;
 namespace Jentl.Scene3D;
 
 /// <summary>A mesh in a material, one of the things a <see cref="Node"/> shows.</summary>
-public readonly record struct MeshPart(Mesh Mesh, Material Material);
+public readonly record struct MeshPart(Mesh Mesh, Material Material)
+{
+    /// <summary>For a skinned mesh: which joints move each vertex, and how much (see <see cref="Skin"/>).</summary>
+    public SkinWeights? Weights { get; init; }
+}
+
+/// <summary>Up to four joints per vertex (indices into a <see cref="Skin"/>'s joints) and how much each pulls, summing to one.</summary>
+public sealed class SkinWeights(int[] joints, float[] weights)
+{
+    /// <summary>Four joint numbers per vertex.</summary>
+    public IReadOnlyList<int> Joints { get; } = joints;
+
+    /// <summary>Four weights per vertex.</summary>
+    public IReadOnlyList<float> Weights { get; } = weights;
+}
+
+/// <summary>
+/// A skeleton for a skinned mesh: the nodes that are its joints, and for each the inverse of its pose when the mesh was
+/// bound to it. As the joints move (animated), <see cref="ModelInstance.UpdateSkins"/> bends the mesh with them.
+/// </summary>
+public sealed class Skin(IReadOnlyList<Node> joints, IReadOnlyList<Matrix4x4> inverseBind)
+{
+    public IReadOnlyList<Node> Joints { get; } = joints;
+
+    public IReadOnlyList<Matrix4x4> InverseBind { get; } = inverseBind;
+
+    /// <summary>
+    /// Bends the skinned parts of <paramref name="node"/> to the joints' pose now: each vertex moved by its joints'
+    /// matrices, blended by weight, from the rest shape (kept as each deformed mesh's <see cref="Mesh.Original"/>).
+    /// </summary>
+    public void Deform(Node node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+
+        // The joints' movements in the node's own space, which the renderer then puts in the world.
+        Matrix4x4.Invert(node.World, out var inverse);
+        var matrices = new Matrix4x4[Joints.Count];
+        for (var j = 0; j < matrices.Length; j++)
+        {
+            matrices[j] = InverseBind[j] * Joints[j].World * inverse;
+        }
+
+        for (var p = 0; p < node.Parts.Count; p++)
+        {
+            var part = node.Parts[p];
+            if (part.Weights is not { } weights)
+            {
+                continue;
+            }
+
+            var rest = part.Mesh.Original ?? part.Mesh;
+            var count = rest.Positions.Count;
+            var positions = new Vector3[count];
+            var normals = new Vector3[count];
+            for (var v = 0; v < count; v++)
+            {
+                var blend = default(Matrix4x4);
+                var total = 0f;
+                for (var k = 0; k < 4; k++)
+                {
+                    var weight = weights.Weights[(v * 4) + k];
+                    var joint = weights.Joints[(v * 4) + k];
+                    if (weight > 0 && joint >= 0 && joint < matrices.Length)
+                    {
+                        blend += matrices[joint] * weight;
+                        total += weight;
+                    }
+                }
+
+                if (total <= 0)
+                {
+                    blend = Matrix4x4.Identity;
+                }
+                else if (MathF.Abs(total - 1) > 1e-4f)
+                {
+                    blend *= 1 / total;
+                }
+
+                positions[v] = Vector3.Transform(rest.Positions[v], blend);
+                var normal = Vector3.TransformNormal(rest.Normals[v], blend);
+                normals[v] = normal.LengthSquared() > 0 ? Vector3.Normalize(normal) : rest.Normals[v];
+            }
+
+            node.Parts[p] = part with { Mesh = rest.Deform(positions, normals) };
+        }
+    }
+}
 
 /// <summary>
 /// A thing in a 3D scene: placed by its position, rotation and scale relative to its parent, showing any number of
@@ -31,6 +117,9 @@ public sealed class Node
 
     /// <summary>The meshes it shows, in its own space.</summary>
     public List<MeshPart> Parts { get; } = [];
+
+    /// <summary>The skeleton that bends this node's skinned parts, if it has one.</summary>
+    public Skin? Skin { get; set; }
 
     /// <summary>Anything the game wants to keep with it (the entity it shows, say).</summary>
     public object? Tag { get; set; }

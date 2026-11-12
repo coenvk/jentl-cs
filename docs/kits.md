@@ -1472,9 +1472,14 @@ draw it.
   texture coordinates; flat when they have no normals), materials (base colour and texture, emission, blending or
   cut-out alpha, double sides, a shine guessed from roughness and metalness, `KHR_materials_unlit`), textures in
   PNG or JPEG (baseline or progressive) with their filtering and wrapping, the node tree (by translation, rotation and
-  scale or a matrix), and animations of position, rotation and scale (linear, step or cubic spline). Skins, morph
+  scale or a matrix), animations of position, rotation and scale (linear, step or cubic spline), and skins. Morph
   targets, cameras and lights are left out, each noted in `Warnings`. `model.Instantiate()` makes a copy to put in a
   scene: its `Root`, and its `Nodes` by their index in the file, all sharing the meshes.
+- **Skins.** A skinned node has a `Skin` (its joint nodes and their inverse bind matrices) and parts with
+  `SkinWeights` (four joints and weights a vertex). After the animation has moved the joints, `instance.UpdateSkins()`
+  (or `skin.Deform(node)`) bends the mesh on the CPU into a shape made with `Mesh.Deform`, which keeps its
+  `Original`: the software renderer draws it as any mesh, and the GPU view refills one buffer for all its shapes. A
+  skin can be made in code too, as the Lab's swaying stalk is.
 - **Animation.** An `AnimationClip` is a set of `AnimationChannel`s, each moving one node's position, rotation or
   scale through keys (`AnimationChannel.Move`, `Turn` and `Resize` make one in code). An `AnimationPlayer` plays clips on a
   list of nodes: looping or once, at a `Speed`, cross-fading from the clip before over a time (`Play(run, fade:

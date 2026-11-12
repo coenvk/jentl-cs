@@ -109,17 +109,24 @@ public class GltfTests
         var file = GltfFixture.With(document =>
         {
             document["images"]![0]!["uri"] = "data:image/webp;base64," + Convert.ToBase64String("RIFF0000WEBP"u8.ToArray());
-            document["nodes"]![1]!["skin"] = 0;
             ((JsonObject)document["meshes"]![0]!["primitives"]![0]!["attributes"]!).Remove("NORMAL");
         });
 
         var model = Gltf.Load(file);
 
-        model.Warnings.Should().HaveCount(2);
-        model.Warnings.Should().Contain(w => w.Contains("neither PNG nor JPEG", StringComparison.Ordinal))
-            .And.Contain(w => w.Contains("skinned", StringComparison.Ordinal));
+        model.Warnings.Should().ContainSingle(w => w.Contains("neither PNG nor JPEG", StringComparison.Ordinal));
         model.Materials[0].Texture.Should().BeNull();
         model.Instantiate().Nodes[1].Parts[0].Material.Shading.Should().Be(Shading.Flat, "glTF draws meshes without normals flat");
+    }
+
+    [Fact]
+    public void ANodeWithASkinThatIsntThere_IsAnError()
+    {
+        var file = GltfFixture.With(document => document["nodes"]![1]!["skin"] = 0);
+
+        var act = () => Gltf.Load(file);
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*skin*");
     }
 
     [Fact]

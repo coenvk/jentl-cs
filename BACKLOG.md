@@ -46,8 +46,8 @@ repeats and yoyo), more easings, animation states for sprites (`AnimationStates`
 and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab has an Animation demo. Still to do:
 
 - See the Lab's Animation demo on screen (the screen was locked when it was built; its pieces are tested).
-- Bones for 2D (a body of parts that bend and turn, as Spine or DragonBones make), and skins for 3D models (glTF
-  skins; the fox stands still): both larger pieces of work, left for when a game needs them.
+- Bones for 2D (a body of parts that bend and turn, as Spine or DragonBones make): a larger piece of work, left for
+  when a game needs it. (3D skins are in since 0.6.38.)
 - Use them in the games: cards dealt with sequences, Hot Pan's cook squashing on landing, hits flashing in Mossbrook.
 
 ### Android
@@ -142,12 +142,13 @@ delay against a target gives stars; five levels. Still to do:
 
 ### 3D
 
-- Skins (characters bending as they move) and morph targets in glTF models.
+- Morph targets in glTF models; skins are bent on the CPU, which is fine for a few characters but not a crowd (GPU
+  skinning needs shaders of our own).
 - Shadows, point lights and spotlights: MonoGame's basic effect has three directional lights only; these need shaders
   of our own, compiled for desktop and the browser.
 - Writing glTF files (for scenes built in code), and `KHR_texture_transform`.
-- The Lab's 3D scene on the graphics card has never been looked at (the screen was locked); the software renderer
-  path was checked offscreen.
+- The Lab's 3D scene on the graphics card has never been looked at (the screen was locked), nor its skinned stalk; the
+  software renderer path was checked offscreen.
 
 ### Inspector
 

@@ -213,7 +213,17 @@ public sealed class GpuView : IMeshView
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(material);
         var flat = material.Shading == Shading.Flat;
-        var buffers = (flat ? _flat : _smooth).GetValue(mesh, m => Buffers.Create(_device, m, flat));
+        Buffers buffers;
+        if (mesh.Original is { } original)
+        {
+            // A shape of another mesh (a skinned one, posed): one buffer for every shape, filled again each time.
+            buffers = (flat ? _flat : _smooth).GetValue(original, m => Buffers.Create(_device, m, flat, dynamic: true));
+            buffers.Refill(mesh, flat);
+        }
+        else
+        {
+            buffers = (flat ? _flat : _smooth).GetValue(mesh, m => Buffers.Create(_device, m, flat));
+        }
 
         // The view goes in View (fog is measured there) and the rest of the view-projection in Projection; lighting is
         // worked out in world space from World.
@@ -376,17 +386,15 @@ public sealed class GpuView : IMeshView
 
         public int Triangles { get; } = triangles;
 
-        public static Buffers Create(GraphicsDevice device, Mesh mesh, bool flat)
-        {
-            var (vertices, indices) = GpuMeshData.Build(mesh, flat);
-            if (indices.Length > 0 && GpuMeshData.IndexSize(vertices.Length) is null)
-            {
-                // Too many vertices for 16-bit indices: draw every triangle's corners in order instead.
-                vertices = [.. indices.Select(i => vertices[i])];
-                indices = [];
-            }
+        /// <summary>Puts another shape of the same mesh in the vertex buffer (made dynamic for it).</summary>
+        public void Refill(Mesh shape, bool flat) => Vertices.SetData(Prepare(shape, flat).Vertices);
 
-            var vertexBuffer = new VertexBuffer(device, typeof(VertexPositionNormalTexture), vertices.Length, BufferUsage.WriteOnly);
+        public static Buffers Create(GraphicsDevice device, Mesh mesh, bool flat, bool dynamic = false)
+        {
+            var (vertices, indices) = Prepare(mesh, flat);
+            var vertexBuffer = dynamic
+                ? new DynamicVertexBuffer(device, typeof(VertexPositionNormalTexture), vertices.Length, BufferUsage.WriteOnly)
+                : new VertexBuffer(device, typeof(VertexPositionNormalTexture), vertices.Length, BufferUsage.WriteOnly);
             vertexBuffer.SetData(vertices);
             IndexBuffer? indexBuffer = null;
             if (indices.Length > 0)
@@ -396,6 +404,19 @@ public sealed class GpuView : IMeshView
             }
 
             return new Buffers(vertexBuffer, indexBuffer, mesh.Triangles.Count);
+        }
+
+        private static (VertexPositionNormalTexture[] Vertices, int[] Indices) Prepare(Mesh mesh, bool flat)
+        {
+            var (vertices, indices) = GpuMeshData.Build(mesh, flat);
+            if (indices.Length > 0 && GpuMeshData.IndexSize(vertices.Length) is null)
+            {
+                // Too many vertices for 16-bit indices: draw every triangle's corners in order instead.
+                vertices = [.. indices.Select(i => vertices[i])];
+                indices = [];
+            }
+
+            return (vertices, indices);
         }
     }
 }
