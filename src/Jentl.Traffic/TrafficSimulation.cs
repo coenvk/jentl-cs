@@ -98,6 +98,9 @@ public sealed class TrafficSimulation
     private readonly Dictionary<Node, int> _queued = [];
     private readonly Dictionary<Lane, int> _flow = [];
     private readonly Queue<float> _finishTimes = new();
+    private readonly Dictionary<SignalGroup, List<Lane>> _signalled = [];
+    private readonly Dictionary<Lane, float> _laneTimes = [];
+    private readonly Dictionary<Vehicle, float> _entered = [];
     private float _leftOver;
     private int _nextId;
     private float _travelTotal;
@@ -112,7 +115,37 @@ public sealed class TrafficSimulation
         foreach (var lane in network.Lanes)
         {
             _onLane[lane] = [];
+            if (lane.Signal is { } group)
+            {
+                if (!_signalled.TryGetValue(group, out var lanes))
+                {
+                    _signalled[group] = lanes = [];
+                }
+
+                lanes.Add(lane);
+            }
         }
+    }
+
+    /// <summary>
+    /// Whether new vehicles choose their routes by the travel times measured as the simulation runs (so they go round
+    /// jams) rather than by the roads' lengths and limits alone.
+    /// </summary>
+    public bool AvoidJams { get; set; }
+
+    /// <summary>Where generated traffic goes (a random one of them each time); every edge of the network when not set.</summary>
+    public IReadOnlyList<Node>? Destinations { get; set; }
+
+    /// <summary>How long a lane takes to drive now: the time measured over it lately, at least its free time.</summary>
+    public float TravelTime(Lane lane)
+    {
+        ArgumentNullException.ThrowIfNull(lane);
+        var free = lane.Length / lane.SpeedLimit;
+        var measured = _laneTimes.GetValueOrDefault(lane, free);
+
+        // Vehicles still on the lane count for how long they have been on it, so a jam shows before anyone gets out.
+        var onIt = _onLane[lane].Select(v => Time - _entered.GetValueOrDefault(v, Time)).DefaultIfEmpty(0).Max();
+        return MathF.Max(free, MathF.Max(measured, onIt));
     }
 
     public RoadNetwork Network { get; }
@@ -188,7 +221,7 @@ public sealed class TrafficSimulation
         var queue = new PriorityQueue<Lane, float>();
         foreach (var lane in starts)
         {
-            cost[lane] = lane.Length / lane.SpeedLimit;
+            cost[lane] = Cost(lane);
             queue.Enqueue(lane, cost[lane]);
         }
 
@@ -213,7 +246,7 @@ public sealed class TrafficSimulation
 
             foreach (var next in lane.Next)
             {
-                var through = spent + (next.Length / next.SpeedLimit);
+                var through = spent + Cost(next);
                 if (through < cost.GetValueOrDefault(next, float.PositiveInfinity))
                 {
                     cost[next] = through;
@@ -225,6 +258,8 @@ public sealed class TrafficSimulation
 
         return null;
     }
+
+    private float Cost(Lane lane) => AvoidJams ? TravelTime(lane) : lane.Length / lane.SpeedLimit;
 
     /// <summary>Puts a vehicle at the start of its route from one edge to another, if there is a way and room; null if not.</summary>
     public Vehicle? Spawn(Node from, Node to, VehicleKind kind)
@@ -252,6 +287,7 @@ public sealed class TrafficSimulation
         vehicle.Speed = room > 30 ? MathF.Min(first.SpeedLimit, kind.MaxSpeed) * 0.7f : 0;
         _vehicles.Add(vehicle);
         lane.Add(vehicle);
+        _entered[vehicle] = Time;
         return vehicle;
     }
 
@@ -271,7 +307,7 @@ public sealed class TrafficSimulation
         Time += dt;
         foreach (var plan in Network.Signals)
         {
-            plan.Advance(dt);
+            plan.Advance(dt, plan.Actuated ? phase => Waiting(plan, phase) : null);
         }
 
         Demand(dt);
@@ -291,6 +327,11 @@ public sealed class TrafficSimulation
         }
     }
 
+    /// <summary>Whether a phase of a junction's lights has vehicles on its approaches near enough to want green.</summary>
+    private bool Waiting(SignalPlan plan, int phase) => plan.Groups.Where(g => g.Phase == phase)
+        .SelectMany(g => _signalled.GetValueOrDefault(g) ?? [])
+        .Any(lane => _onLane[lane].Any(v => v.Position > lane.Length - 70));
+
     private void Demand(float dt)
     {
         foreach (var (edge, perHour) in _demand)
@@ -306,7 +347,7 @@ public sealed class TrafficSimulation
                 continue;
             }
 
-            var destinations = Network.Entries.Where(e => e != edge).ToList();
+            var destinations = (Destinations ?? Network.Entries).Where(e => e != edge).ToList();
             if (destinations.Count == 0)
             {
                 continue;
@@ -586,6 +627,14 @@ public sealed class TrafficSimulation
         {
             var lane = vehicle.Lane;
             vehicle.Position -= lane.Length;
+            if (_entered.TryGetValue(vehicle, out var entered))
+            {
+                // What this lane took, folded into what it has been taking.
+                var took = Time - entered;
+                _laneTimes[lane] = _laneTimes.TryGetValue(lane, out var was) ? (was * 0.8f) + (took * 0.2f) : took;
+            }
+
+            _entered[vehicle] = Time;
             _onLane[lane].Remove(vehicle);
             _flow[lane] = _flow.GetValueOrDefault(lane) + 1;
             if (lane.IsJunction || vehicle.Route[vehicle.RouteIndex + Math.Min(1, vehicle.Route.Count - vehicle.RouteIndex - 1)].IsJunction)
@@ -612,6 +661,7 @@ public sealed class TrafficSimulation
     private void Arrive(Vehicle vehicle)
     {
         _vehicles.Remove(vehicle);
+        _entered.Remove(vehicle);
         Completed++;
         var travel = Time - vehicle.StartTime;
         _travelTotal += travel;

@@ -106,18 +106,20 @@ of relief on cool chicken, and the cook squashing, stretching and flashing. Stil
 The first part is in: `Jentl.Traffic` (networks, lanes, junctions with priority from the right, priority roads,
 lights and roundabouts, five vehicle kinds on the Intelligent Driver Model, routes, demand, measurements), Core's
 `TrafficView`, and a Lab demo of a small town. Decided for now: from above in 2D, driving on the right, Dutch priority
-from the right, no pedestrians or cyclists, roads drawn freely. Still to do:
+from the right, no pedestrians or cyclists, roads drawn freely. Since (0.6.35): lights that follow the traffic, routes
+round jams by measured travel times, and the game's first version, games-cs's Roadworks: lay roads on a grid between
+gates, choose junctions (give way, lights, roundabout), within a budget; the traffic runs for ten minutes and the
+delay against a target gives stars; five levels. Still to do:
 
 - Changing lanes on the way (MOBIL), so routes needn't start in the right lane and fast traffic overtakes.
-- More junctions: turning pockets, stop and give-way signs, two-lane roundabouts, slip roads and motorways.
-- Lights that react to waiting traffic, green waves, turning arrows; timings the player sets.
-- Routes that go round jams (by travel times measured as it runs), and demand by place and time (homes to work in the
-  morning rush).
-- Capacity: single-lane towns saturate around 1,200 vehicles an hour now; left turns waiting in the lane hold up
-  everyone behind them.
+- More junctions: turning pockets, stop and give-way signs, two-lane roundabouts, slip roads and motorways; and in
+  Roadworks: roads of two lanes, faster roads, diagonal roads.
+- Green waves, turning arrows, timings the player sets; demand by place and time (the morning rush).
+- Capacity: single-lane towns saturate around 1,200 vehicles an hour; left turns waiting in the lane hold up everyone
+  behind them.
 - Pedestrians and cyclists; buses on lines with stops.
-- The game: build roads on a grid or freely, place junctions and lights, a budget, goals per level, overlays of
-  speed and jams, and a sandbox.
+- Roadworks: more levels and tuning by play (the five are passable with simple plans, checked by the tests), overlays
+  of speed and jams, a sandbox; and seeing it on screen (built while the screen was locked).
 
 ## Loose ends of what is built
 

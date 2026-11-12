@@ -15,7 +15,7 @@ public sealed class NetworkBuilder
     private readonly List<Node> _nodes = [];
     private readonly List<(Road Road, int Forward, int Backward)> _roads = [];
     private readonly List<Lane> _lanes = [];
-    private readonly Dictionary<Node, (float Green, float Amber, float AllRed)> _signals = [];
+    private readonly Dictionary<Node, (float Green, float Amber, float AllRed, bool Actuated)> _signals = [];
 
     public float LaneWidth { get; set; } = 3.5f;
 
@@ -56,11 +56,12 @@ public sealed class NetworkBuilder
         node.RingRadius = radius;
     }
 
-    public void Signals(Node node, float green = 20, float amber = 3, float allRed = 2)
+    /// <summary>Traffic lights at <paramref name="node"/>; <paramref name="actuated"/> ones follow the traffic (see <see cref="SignalPlan"/>).</summary>
+    public void Signals(Node node, float green = 20, float amber = 3, float allRed = 2, bool actuated = false)
     {
         Own(node);
         node.Control = NodeControl.Signals;
-        _signals[node] = (green, amber, allRed);
+        _signals[node] = (green, amber, allRed, actuated);
     }
 
     /// <summary>Gives two roads through <paramref name="node"/> priority; traffic from the others gives way.</summary>
@@ -298,7 +299,7 @@ public sealed class NetworkBuilder
 
     private void BuildSignals(Node node)
     {
-        var (green, amber, allRed) = _signals[node];
+        var (green, amber, allRed, actuated) = _signals[node];
 
         // Roads on one axis share a phase: north and south together, then east and west.
         var axes = new List<Vector2>();
@@ -322,7 +323,7 @@ public sealed class NetworkBuilder
             phaseOf[road] = phase;
         }
 
-        var plan = new SignalPlan(Math.Max(1, axes.Count), green, amber, allRed);
+        var plan = new SignalPlan(Math.Max(1, axes.Count), green, amber, allRed) { Actuated = actuated };
         foreach (var (road, phase) in phaseOf)
         {
             foreach (var lane in road.ArrivingAt(node))

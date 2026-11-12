@@ -1529,18 +1529,24 @@ var stats = sim.Stats();                                    // on the road, arri
   taken no faster than a comfortable sideways pull allows, so turns and rings are slower.
 - **Junctions**: uncontrolled ones give priority from the right, and a left turn gives way to oncoming traffic;
   `Priority` names two roads that go first; on a roundabout the ring goes first; `Signals` makes lights with a
-  phase per axis (north and south green together), each green, amber, then all red. The builder finds every place two
+  phase per axis (north and south green together), each green, amber, then all red; `actuated: true` (or
+  `SignalPlan.Actuated`) has them follow the traffic: a phase keeps green while cars come, between `MinGreen` and
+  `Green`, gives up early when its approaches are empty and another phase waits, skips phases no one waits for, and
+  rests on green when nobody else is waiting. The builder finds every place two
   turning paths cross or merge (`Lane.Conflicts`) and settles which goes first.
 - **Vehicles** (`VehicleKind`: car, van, truck, bus, motorbike, in a town's mix) follow the one ahead by the
   Intelligent Driver Model, each driver a little keener or calmer. At a junction they stop for red, and for amber if
   they can; they wait while anyone is on a crossing path or a priority vehicle will be there before they are through
   (working out both times from speed and acceleration); they don't go in while the way out is backed up; and when four
   wait for each other at a plain crossroads, the one waiting longest goes. Each vehicle takes the quickest route from
-  its edge to another; lanes aren't changed on the way, so it starts in the lane its route needs.
+  its edge to another (`Destinations` limits where generated traffic goes); lanes aren't changed on the way, so it
+  starts in the lane its route needs. With `AvoidJams`, routes are chosen by the travel times measured as it runs
+  (`TravelTime(lane)`, which counts vehicles still stuck on a lane), so traffic goes round a jam.
 - **Measurements**: `Stats()` gives the vehicles on the road, arrivals and arrivals per hour (over ten minutes), the
   average trip time, delay over empty roads, and stops, how many stand still, and how many wait to come in at the
   edges; `Flow(lane)` counts what drove along a lane, `On(lane)` lists who is on it, front first.
 
 `Jentl.Core.Traffic.TrafficView` draws it from above: asphalt, centre and lane dashes, roundabout islands, stop lines
 in the colour of their lights, and every vehicle to size, coloured by kind; `Fit` shows the whole network, and
-`Centre` and `Scale` zoom and pan. The Lab's Traffic demo puts a small town on it.
+`Centre` and `Scale` zoom and pan. The Lab's Traffic demo puts a small town on it, and games-cs's Roadworks is a game
+of building one.
