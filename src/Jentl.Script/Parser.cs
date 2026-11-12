@@ -7,6 +7,9 @@ internal sealed class Parser
     private readonly string _name;
     private int _position;
 
+    // Functions made so far: a loop that makes any in its body gives each time round its own variables.
+    private int _functionsMade;
+
     private Parser(List<Token> tokens, string name)
     {
         _tokens = tokens;
@@ -106,9 +109,10 @@ internal sealed class Parser
                 Take();
                 var condition = Expression();
                 Expect(TokenKind.Do, "'do' after the condition of 'while'");
+                var made = _functionsMade;
                 var body = Block();
                 Expect(TokenKind.EndKeyword, "'end' to close 'while'");
-                return new WhileStatement(condition, body, token.Line);
+                return new WhileStatement(condition, body, token.Line, _functionsMade > made);
             }
 
             case TokenKind.For:
@@ -119,9 +123,10 @@ internal sealed class Parser
                 Expect(TokenKind.In, "'in' after the names of 'for'");
                 var source = Expression();
                 Expect(TokenKind.Do, "'do' after 'for ... in ...'");
+                var made = _functionsMade;
                 var body = Block();
                 Expect(TokenKind.EndKeyword, "'end' to close 'for'");
-                return new ForStatement(first.Text, second, source, body, token.Line, first.Column);
+                return new ForStatement(first.Text, second, source, body, token.Line, first.Column, _functionsMade > made);
             }
 
             case TokenKind.Return:
@@ -204,6 +209,7 @@ internal sealed class Parser
 
         var body = Block();
         Expect(TokenKind.EndKeyword, $"'end' to close fn {name}");
+        _functionsMade++;
         return new FunctionExpression(name, parameters, body, line);
     }
 

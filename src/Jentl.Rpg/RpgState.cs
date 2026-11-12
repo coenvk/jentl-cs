@@ -44,6 +44,9 @@ public sealed class RpgState
     /// <summary>Runs game-specific effects from content (any effect name the kit does not know).</summary>
     public Action<CustomEffect>? CustomEffect { get; set; }
 
+    /// <summary>What runs the content's <c>{"script": ...}</c> conditions and effects (Jentl.Core's <c>RpgScripts</c>, say).</summary>
+    public IRpgScripts? Scripts { get; set; }
+
     public int Variable(string name) => _variables.GetValueOrDefault(name);
 
     public void AddVariable(string name, int amount) => _variables[name] = Variable(name) + amount;

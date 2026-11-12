@@ -7,7 +7,8 @@ namespace Jentl.Script;
 /// <summary>
 /// One of the game's objects seen through reflection: its public properties and fields to read and set, its public
 /// methods to call, by name without regard to case (<c>player.health</c> is <c>Health</c>). A struct member comes back
-/// as a copy, so set the whole of it (<c>thing.position = ...</c>) rather than a part.
+/// as a copy; setting a part of it in one go (<c>thing.position.x = 5</c>) puts the changed copy back, but a copy kept
+/// in a variable is the script's own.
 /// </summary>
 internal sealed class HostObject(object target) : IScriptObject
 {

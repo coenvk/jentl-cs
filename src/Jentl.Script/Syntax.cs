@@ -38,9 +38,11 @@ internal sealed record ExpressionStatement(Expression Expression) : Statement(Ex
 
 internal sealed record IfStatement(IReadOnlyList<(Expression Condition, IReadOnlyList<Statement> Body)> Branches, IReadOnlyList<Statement>? Otherwise, int Line) : Statement(Line);
 
-internal sealed record WhileStatement(Expression Condition, IReadOnlyList<Statement> Body, int Line) : Statement(Line);
+/// <param name="MakesFunctions">Whether its body makes functions, which then need a binding of their own each time round.</param>
+internal sealed record WhileStatement(Expression Condition, IReadOnlyList<Statement> Body, int Line, bool MakesFunctions = false) : Statement(Line);
 
-internal sealed record ForStatement(string First, string? Second, Expression Source, IReadOnlyList<Statement> Body, int Line, int Column) : Statement(Line);
+/// <param name="MakesFunctions">Whether its body makes functions, which then need a binding of their own each time round.</param>
+internal sealed record ForStatement(string First, string? Second, Expression Source, IReadOnlyList<Statement> Body, int Line, int Column, bool MakesFunctions = false) : Statement(Line);
 
 internal sealed record ReturnStatement(Expression? Value, int Line) : Statement(Line);
 

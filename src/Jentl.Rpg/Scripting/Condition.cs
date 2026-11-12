@@ -35,6 +35,11 @@ public abstract record Condition
             throw new ContentException($"{where}: a condition must be an object or an array.");
         }
 
+        if (element.OptionalString("script") is { } script)
+        {
+            return new ScriptCondition(script);
+        }
+
         if (element.OptionalString("flag") is { } flag)
         {
             return new FlagCondition(flag);
@@ -94,6 +99,13 @@ public enum QuestCheck
     /// <summary>Active with every objective done, waiting to be handed in.</summary>
     Ready,
     Completed,
+}
+
+/// <summary>A script expression, true or false, tested through <see cref="RpgState.Scripts"/>: <c>{"script": "var(\"gold\") >= 10 and flag(\"met\")"}</c>.</summary>
+public sealed record ScriptCondition(string Source) : Condition
+{
+    public override bool Test(RpgState state) =>
+        (state.Scripts ?? throw new InvalidOperationException($"No scripts to test '{Source}'; set RpgState.Scripts.")).Test(Source);
 }
 
 public sealed record FlagCondition(string Flag) : Condition

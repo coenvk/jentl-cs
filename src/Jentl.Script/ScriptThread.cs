@@ -46,7 +46,7 @@ public sealed class ScriptThread : IScriptObject
 
         public FunctionPrototype Prototype { get; } = function.Prototype;
 
-        public LocalScope Locals { get; } = locals;
+        public LocalScope Locals { get; set; } = locals;
 
         public int StackBase { get; } = stackBase;
 
@@ -322,6 +322,18 @@ public sealed class ScriptThread : IScriptObject
                     break;
                 }
 
+                case OpCode.SetFieldBack:
+                {
+                    var value = Pop();
+                    var target = Pop();
+                    if (value.Type == ScriptType.Host && value.Raw is { } raw && raw.GetType().IsValueType)
+                    {
+                        Operations.SetField(target, frame.Prototype.Constants[instruction.A].AsText, value);
+                    }
+
+                    break;
+                }
+
                 case OpCode.GetIndex:
                 {
                     var key = Pop();
@@ -462,6 +474,12 @@ public sealed class ScriptThread : IScriptObject
                     break;
                 }
 
+                case OpCode.EnterScope:
+                    frame.Locals = new LocalScope(instruction.A, frame.Locals);
+                    break;
+                case OpCode.ExitScope:
+                    frame.Locals = frame.Locals.Parent!;
+                    break;
                 case OpCode.Closure:
                     Push(new ScriptFunction(frame.Prototype.Functions[instruction.A], frame.Locals, frame.Function.Script));
                     break;

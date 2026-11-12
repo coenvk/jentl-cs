@@ -1127,14 +1127,17 @@ and nil`) is a `ScriptException` with the calls it was in (`Trace`). A thread th
 or, with no handler, `Update` throws. A thread that runs more than `InstructionLimit` steps without waiting (an endless
 loop) fails rather than freezing the game, as do calls deeper than `MaxDepth`.
 
-The RPG kit's content files run scripts through a custom effect, `{"run": "gold += 5"}`:
+Functions made in a loop keep that time round's variables (`for i in items do push(fns, fn() return i end) end`
+gives each its own `i`), and setting a part of one of the game's structs in one go (`thing.position.x = 5`) puts the
+changed copy back; a copy kept in a variable is the script's own.
+
+The RPG kit's content files take scripts as conditions and effects, `{"script": "var(\"gold\") >= 10"}` and
+`{"script": "give(\"potion\", 2)"}`, run by whatever is set as `RpgState.Scripts`. `Jentl.Core.Rpg.RpgScripts` runs
+them with Jentl.Script, giving scripts the state: `flag`, `setFlag`, `clearFlag`, `var`, `addVar`, `has`, `give`,
+`take`, `quest` (its state as text), `startQuest`, `completeQuest`, `heal` and `say`:
 
 ```csharp
-state.CustomEffect = effect =>
-{
-    if (effect.Name == "run")
-        scripts.Load(effect.Arguments.GetProperty("run").GetString()!, "content").Run();
-};
+state.Scripts = new RpgScripts(state);   // its Engine takes more functions for a game's own content
 ```
 
 ## Online multiplayer

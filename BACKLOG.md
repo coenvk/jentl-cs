@@ -136,10 +136,8 @@ delay against a target gives stars; five levels. Still to do:
 
 ### Scripting
 
-- Functions made in a loop share the loop's variable (they should each get their own).
-- A struct read from one of the game's objects comes back as a copy, so its parts can't be set one at a time.
-- The RPG kit runs scripts only through a custom effect; content files could take script conditions and effects
-  directly.
+- Setting a part of a struct deeper than one step (`a.b.c.d = 1`), or of a struct in a list (`list[0].x = 1`), still
+  sets a copy; one step (`thing.position.x = 5`) is written back.
 - Never run in the browser (it should work: nothing is generated at run time).
 
 ### 3D

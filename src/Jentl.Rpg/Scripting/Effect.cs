@@ -7,6 +7,7 @@ namespace Jentl.Rpg.Scripting;
 /// <c>{"setFlag": "x"}</c>, <c>{"clearFlag": "x"}</c>, <c>{"addVar": "gold", "amount": 5}</c>,
 /// <c>{"give": "potion", "count": 2}</c>, <c>{"take": "glowcap", "count": 3}</c>, <c>{"startQuest": "q"}</c>,
 /// <c>{"completeQuest": "q"}</c>, <c>{"heal": 10}</c>, <c>{"message": "text"}</c> and
+/// <c>{"script": "statements"}</c> (run through <see cref="RpgState.Scripts"/>) and
 /// <c>{"if": condition, "then": [...], "else": [...]}</c>. Any other name becomes a <see cref="CustomEffect"/>
 /// that the game handles through <see cref="RpgState.CustomEffect"/>.
 /// </summary>
@@ -47,6 +48,7 @@ public abstract record Effect
                 ? new HealEffect(first.Value.GetInt32())
                 : throw new ContentException($"{where}: \"heal\" takes a number."),
             "message" => new MessageEffect(Text(first, where)),
+            "script" => new ScriptEffect(Text(first, where)),
             _ => new CustomEffect(first.Name, element.Clone()),
         };
     }
@@ -132,6 +134,13 @@ public sealed record IfEffect(Condition Test, IReadOnlyList<Effect> Then, IReadO
 
     public override IEnumerable<ContentReference> References() =>
         Test.References().Concat(Then.SelectMany(e => e.References())).Concat(Else.SelectMany(e => e.References()));
+}
+
+/// <summary>Script statements run through <see cref="RpgState.Scripts"/>.</summary>
+public sealed record ScriptEffect(string Source) : Effect
+{
+    public override void Apply(RpgState state) =>
+        (state?.Scripts ?? throw new InvalidOperationException($"No scripts to run '{Source}'; set RpgState.Scripts.")).Run(Source);
 }
 
 /// <summary>A game-specific effect; <see cref="Arguments"/> is the whole JSON object it was written as.</summary>

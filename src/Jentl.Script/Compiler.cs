@@ -50,6 +50,16 @@ internal enum OpCode : byte
 
     /// <summary>A: the inner function.</summary>
     Closure,
+
+    /// <summary>
+    /// A: a name. Pops a value and the object it was read from; when the value is one of the game's structs (a copy),
+    /// puts it back into the object under the name, so setting a part of it sticks.
+    /// </summary>
+    SetFieldBack,
+
+    /// <summary>Opens a scope of A locals inside the running function's: a loop's variables for one time round.</summary>
+    EnterScope,
+    ExitScope,
     IterateStart,
 
     /// <summary>A: where to go when done, B: how many values to push (1 or 2).</summary>
@@ -98,7 +108,7 @@ internal sealed class Compiler
     private readonly List<ScriptValue> _constants = [];
     private readonly Dictionary<ScriptValue, int> _constantIndex = [];
     private readonly List<FunctionPrototype> _functions = [];
-    private readonly List<Dictionary<string, int>> _scopes = [[]];
+    private readonly List<Scope> _scopes = [new()];
     private readonly List<Loop> _loops = [];
 
     private Compiler(Compiler? parent, FunctionPrototype prototype, bool topLevel)
@@ -112,8 +122,21 @@ internal sealed class Compiler
         }
     }
 
+    /// <summary>Names declared in a block; a runtime one has slots of its own, made afresh each time it is entered.</summary>
+    private sealed class Scope
+    {
+        public Dictionary<string, int> Names { get; } = [];
+
+        public bool Runtime { get; init; }
+
+        public int Size { get; set; }
+    }
+
     private sealed class Loop
     {
+        /// <summary>Whether each time round has a runtime scope, to leave on break and continue.</summary>
+        public bool Scoped { get; init; }
+
         public List<int> Breaks { get; } = [];
 
         public List<int> Continues { get; } = [];
@@ -195,23 +218,27 @@ internal sealed class Compiler
     private int Declare(string name, int line, int column)
     {
         var scope = _scopes[^1];
-        if (scope.ContainsKey(name))
+        if (scope.Names.ContainsKey(name))
         {
             throw new ScriptSyntaxException($"'{name}' is already declared here", _prototype.Source, line, column);
         }
 
-        var slot = _prototype.LocalCount++;
-        scope[name] = slot;
+        // The slot is in the innermost runtime scope, or else the function's own.
+        var owner = _scopes.LastOrDefault(s => s.Runtime);
+        var slot = owner is null ? _prototype.LocalCount++ : owner.Size++;
+        scope.Names[name] = slot;
         return slot;
     }
 
     private (int Depth, int Slot)? Resolve(string name)
     {
+        // Each runtime scope between here and the one holding the name's slot is a step out.
         for (var i = _scopes.Count - 1; i >= 0; i--)
         {
-            if (_scopes[i].TryGetValue(name, out var slot))
+            if (_scopes[i].Names.TryGetValue(name, out var slot))
             {
-                return (0, slot);
+                var owner = _scopes.FindLastIndex(i, s => s.Runtime);
+                return (_scopes.Skip(owner + 1).Count(s => s.Runtime), slot);
             }
         }
 
@@ -220,7 +247,7 @@ internal sealed class Compiler
 
     private void Scoped(IReadOnlyList<Statement> body)
     {
-        _scopes.Add([]);
+        _scopes.Add(new Scope());
         foreach (var statement in body)
         {
             Compile(statement);
@@ -296,6 +323,11 @@ internal sealed class Compiler
                     throw new ScriptSyntaxException($"'{(jump.Continue ? "continue" : "break")}' outside a loop", _prototype.Source, jump.Line, 1);
                 }
 
+                if (_loops[^1].Scoped)
+                {
+                    Emit(OpCode.ExitScope, jump.Line);
+                }
+
                 var at = Emit(OpCode.Jump, jump.Line);
                 (jump.Continue ? _loops[^1].Continues : _loops[^1].Breaks).Add(at);
                 break;
@@ -337,6 +369,27 @@ internal sealed class Compiler
                     Emit(OpCode.StoreGlobal, line, Constant(name.Name));
                 }
 
+                break;
+            case FieldExpression { Target: FieldExpression parent } field:
+                // a.b.c = v: b may be a struct of the game's, read as a copy; set c on it, then put it back in a.
+                Compile(parent.Target);
+                Emit(OpCode.Duplicate, line);
+                Emit(OpCode.GetField, line, Constant(parent.Name));
+                Emit(OpCode.Duplicate, line);
+                if (operation is { } partOperation)
+                {
+                    Emit(OpCode.Duplicate, line);
+                    Emit(OpCode.GetField, line, Constant(field.Name));
+                    Compile(assign.Value);
+                    Emit(partOperation, line);
+                }
+                else
+                {
+                    Compile(assign.Value);
+                }
+
+                Emit(OpCode.SetField, line, Constant(field.Name));
+                Emit(OpCode.SetFieldBack, line, Constant(parent.Name));
                 break;
             case FieldExpression field:
                 Compile(field.Target);
@@ -402,9 +455,24 @@ internal sealed class Compiler
         var start = Here;
         Compile(loop.Condition);
         var exit = Emit(OpCode.JumpIfFalse, loop.Line);
-        var record = new Loop();
+        var record = new Loop { Scoped = loop.MakesFunctions };
         _loops.Add(record);
-        Scoped(loop.Body);
+        if (loop.MakesFunctions)
+        {
+            // A scope of its own each time round, so functions made in it keep that time's variables.
+            var enter = Emit(OpCode.EnterScope, loop.Line);
+            var scope = new Scope { Runtime = true };
+            _scopes.Add(scope);
+            Scoped(loop.Body);
+            _scopes.RemoveAt(_scopes.Count - 1);
+            _code[enter] = _code[enter] with { A = scope.Size };
+            Emit(OpCode.ExitScope, loop.Line);
+        }
+        else
+        {
+            Scoped(loop.Body);
+        }
+
         _loops.RemoveAt(_loops.Count - 1);
         Emit(OpCode.Jump, loop.Line, start);
         Patch(exit, Here);
@@ -416,21 +484,30 @@ internal sealed class Compiler
     {
         Compile(loop.Source);
         Emit(OpCode.IterateStart, loop.Line);
-        _scopes.Add([]);
+        var scope = new Scope { Runtime = loop.MakesFunctions };
+        var start = Emit(OpCode.IterateNext, loop.Line, 0, loop.Second is null ? 1 : 2);
+        var enter = loop.MakesFunctions ? Emit(OpCode.EnterScope, loop.Line) : -1;
+        _scopes.Add(scope);
         var first = Declare(loop.First, loop.Line, loop.Column);
         var second = loop.Second is null ? -1 : Declare(loop.Second, loop.Line, loop.Column);
-        var start = Emit(OpCode.IterateNext, loop.Line, 0, loop.Second is null ? 1 : 2);
         if (second >= 0)
         {
             Emit(OpCode.Store, loop.Line, 0, second);
         }
 
         Emit(OpCode.Store, loop.Line, 0, first);
-        var record = new Loop();
+        var record = new Loop { Scoped = loop.MakesFunctions };
         _loops.Add(record);
         Scoped(loop.Body);
         _loops.RemoveAt(_loops.Count - 1);
         _scopes.RemoveAt(_scopes.Count - 1);
+        if (enter >= 0)
+        {
+            // Each time round its own variables: the loop's names and what the body declares.
+            _code[enter] = _code[enter] with { A = scope.Size };
+            Emit(OpCode.ExitScope, loop.Line);
+        }
+
         Emit(OpCode.Jump, loop.Line, start);
         Patch(start, Here);
         record.Breaks.ForEach(at => Patch(at, Here));
