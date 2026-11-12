@@ -1,4 +1,5 @@
-﻿using Jentl.Physics;
+﻿using Jentl.Ecs;
+using Jentl.Physics;
 using Microsoft.Xna.Framework;
 
 namespace Jentl.Core.Diagnostics;
@@ -11,6 +12,31 @@ namespace Jentl.Core.Diagnostics;
 /// </summary>
 public sealed record Inspectable(string Name, object Target, Func<Rectangle>? Bounds = null, Action<Vector2>? Move = null)
 {
+    /// <summary>
+    /// Every entity of an ECS world, its components listed under it and edited in place (a struct's change is put back
+    /// into the world). <paramref name="name"/> names an entity (by default its id); <paramref name="bounds"/>, if
+    /// given, outlines it on screen so it can be picked.
+    /// </summary>
+    public static IEnumerable<Inspectable> Entities(World world, Func<Entity, string>? name = null, Func<Entity, Rectangle?>? bounds = null)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        foreach (var entity in world.Entities)
+        {
+            InspectedMember[] components =
+            [
+                .. world.ComponentTypes(entity).Select(type => InspectedMember.Of(
+                    type.Name,
+                    type,
+                    () => world.GetComponent(entity, type),
+                    value => world.SetComponent(entity, type, value))),
+            ];
+            yield return new Inspectable(
+                name?.Invoke(entity) ?? $"entity {entity.Id}",
+                components,
+                bounds is null ? null : () => bounds(entity) ?? Rectangle.Empty);
+        }
+    }
+
     /// <summary>
     /// Every body of a physics world, outlined and draggable: <paramref name="toScreen"/> maps a world point to the
     /// scene's coordinates and <paramref name="scale"/> is screen pixels per world unit (as for <c>PhysicsDebug</c>).

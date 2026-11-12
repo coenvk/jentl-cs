@@ -68,6 +68,10 @@ public sealed class InspectedMember
     public static InspectedMember Of(string name, object? target) =>
         new(name, target?.GetType() ?? typeof(object), () => target, null);
 
+    /// <summary>A member read and written through functions: something that lives elsewhere, such as an entity's component.</summary>
+    public static InspectedMember Of(string name, Type type, Func<object?> get, Action<object?>? set) =>
+        new(name, type, get, set);
+
     /// <summary>A group whose children are the given members, for a list of things to inspect.</summary>
     public static InspectedMember Group(string name, IReadOnlyList<InspectedMember> members) =>
         new(name, typeof(IReadOnlyList<InspectedMember>), () => members, null);

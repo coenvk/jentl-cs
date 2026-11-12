@@ -9,6 +9,11 @@ internal interface IComponentStore
     bool Has(int id);
 
     bool Remove(int id);
+
+    /// <summary>The component as an object (a copy, for a struct), for tools that don't know its type.</summary>
+    object? GetBoxed(int id);
+
+    void SetBoxed(int id, object? value);
 }
 
 /// <summary>
@@ -38,6 +43,10 @@ internal sealed class ComponentStore<T> : IComponentStore
 
         return ref _items[_slots[id] - 1];
     }
+
+    public object? GetBoxed(int id) => Get(id);
+
+    public void SetBoxed(int id, object? value) => Set(id, (T)value!);
 
     public void Set(int id, T value)
     {

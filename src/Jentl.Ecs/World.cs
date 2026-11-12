@@ -26,6 +26,40 @@ public sealed class World
     /// <summary>How many entities are alive.</summary>
     public int Count { get; private set; }
 
+    /// <summary>Every entity alive, by id.</summary>
+    public IEnumerable<Entity> Entities
+    {
+        get
+        {
+            for (var id = 0; id < _alive.Count; id++)
+            {
+                if (_alive[id])
+                {
+                    yield return EntityAt(id);
+                }
+            }
+        }
+    }
+
+    /// <summary>The types of the components <paramref name="entity"/> has, for tools such as an inspector.</summary>
+    public IReadOnlyList<Type> ComponentTypes(Entity entity) =>
+        IsAlive(entity) ? [.. _stores.Where(s => s.Value.Has(entity.Id)).Select(s => s.Key)] : [];
+
+    /// <summary>One of <paramref name="entity"/>'s components as an object (a copy, for a struct); null if it hasn't one.</summary>
+    public object? GetComponent(Entity entity, Type type) =>
+        IsAlive(entity) && _stores.TryGetValue(type, out var store) && store.Has(entity.Id) ? store.GetBoxed(entity.Id) : null;
+
+    /// <summary>Puts a component back by its type (an edited copy, from a tool); the entity must have one already.</summary>
+    public void SetComponent(Entity entity, Type type, object? value)
+    {
+        if (!IsAlive(entity) || !_stores.TryGetValue(type, out var store) || !store.Has(entity.Id))
+        {
+            throw new InvalidOperationException($"{entity} has no {type.Name} to set.");
+        }
+
+        store.SetBoxed(entity.Id, value);
+    }
+
     /// <summary>Makes a new entity with no components.</summary>
     public Entity Create()
     {

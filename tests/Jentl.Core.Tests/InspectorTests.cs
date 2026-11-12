@@ -242,6 +242,27 @@ public class InspectorTests
     }
 
     [Fact]
+    public void Z_TakesChangesBack_OneAtATime()
+    {
+        var (scenes, level, input) = Start();
+        Press(scenes, input, Keys.F4);
+        var inspector = scenes.Inspector;
+        Press(scenes, input, Keys.Down);
+        Press(scenes, input, Keys.Enter);
+        GoTo(scenes, input, "Speed");
+        Press(scenes, input, Keys.Right);
+        Press(scenes, input, Keys.Right);
+        level.Paddle.Speed.Should().Be(320);
+
+        Press(scenes, input, Keys.Z);
+        level.Paddle.Speed.Should().Be(310);
+        Press(scenes, input, Keys.Z);
+        level.Paddle.Speed.Should().Be(300);
+        inspector.Undo().Should().BeFalse("nothing is left to take back");
+        inspector.Changes.Should().BeEmpty("the speed is back where it started");
+    }
+
+    [Fact]
     public void TheKeys_OpenAThing_ChangeAValue_AndLogIt()
     {
         var (scenes, level, input) = Start();

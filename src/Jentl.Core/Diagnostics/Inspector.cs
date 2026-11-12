@@ -18,6 +18,7 @@ namespace Jentl.Core.Diagnostics;
 /// <item>Click a thing in the scene to inspect it, and drag it to move it (when the scene lets it be moved).</item>
 /// <item>P runs the game while the panel stays open, N steps it one frame while paused.</item>
 /// <item>Every change is logged as <c>Paddle.speed: 300 → 420</c>; C copies the log, to put the values in the code.</item>
+/// <item>Z takes the last change or drag back, again and again; M moves the panel to the other side.</item>
 /// </list>
 /// While it is open the game gets no input of its own, so the keys never do two things.
 /// </summary>
@@ -40,6 +41,8 @@ public sealed class Inspector
     private Rectangle[] _rows = [];
     private int _firstRow;
     private (Inspectable Thing, Vector2 From, Vector2 Moved)? _drag;
+    private readonly Stack<Action> _undo = new();
+    private bool _onLeft;
 
     public Keys ToggleKey { get; set; } = Keys.F4;
 
@@ -149,7 +152,7 @@ public sealed class Inspector
         var line = (int)(size * 1.35f);
         var pad = (int)(size * 0.6f);
         var width = Math.Min(viewport.Width / 2, (int)(size * 30));
-        _panel = new Rectangle(viewport.Right - width - 8, viewport.Y + 8, width, viewport.Height - 16);
+        _panel = new Rectangle(_onLeft ? viewport.X + 8 : viewport.Right - width - 8, viewport.Y + 8, width, viewport.Height - 16);
         batch.FillRectangle(_panel, PanelColor);
 
         var y = _panel.Y + pad;
@@ -268,6 +271,26 @@ public sealed class Inspector
         {
             CopyChanges();
         }
+        else if (input.WasPressed(Keys.Z))
+        {
+            Undo();
+        }
+        else if (input.WasPressed(Keys.M))
+        {
+            _onLeft = !_onLeft;
+        }
+    }
+
+    /// <summary>Takes the last change or drag back; false when there is nothing left to take back.</summary>
+    public bool Undo()
+    {
+        if (!_undo.TryPop(out var back))
+        {
+            return false;
+        }
+
+        back();
+        return true;
     }
 
     /// <summary>Typing a value: Enter sets it (if it parses), Escape drops it.</summary>
@@ -313,6 +336,12 @@ public sealed class Inspector
                 if (drag.Moved != Vector2.Zero)
                 {
                     Log(drag.Thing.Name + " (dragged)", "(0, 0)", string.Create(CultureInfo.InvariantCulture, $"({drag.Moved.X:0}, {drag.Moved.Y:0})"));
+                    var (thing, moved) = (drag.Thing, drag.Moved);
+                    _undo.Push(() =>
+                    {
+                        thing.Move!(-moved);
+                        Log(thing.Name + " (dragged)", "(0, 0)", "(0, 0)");
+                    });
                 }
 
                 _drag = null;
@@ -428,9 +457,18 @@ public sealed class Inspector
         }
 
         var before = member.Display;
+        var old = member.Value;
         if (change(member) && member.Display is var after && after != before)
         {
-            Log(string.Join(".", _path.Append(member.Name)), before, after);
+            var key = string.Join(".", _path.Append(member.Name));
+            Log(key, before, after);
+            _undo.Push(() =>
+            {
+                if (member.Set(old))
+                {
+                    Log(key, after, member.Display);
+                }
+            });
         }
     }
 

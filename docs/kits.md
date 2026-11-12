@@ -868,11 +868,14 @@ a field behind a property that can be set is left to the property).
 | Click, drag | Click a thing in the scene to inspect it; drag it to move it |
 | P, N | Run the game with the panel open, or step it one frame while paused |
 | C | Copy the change log (`Paddle.Speed: 300 → 420`) to put the tuned values in the code |
+| Z | Take the last change or drag back, one at a time |
+| M | Move the panel to the other side, to see what it covers |
 
 A member of a struct writes the whole struct back (a vector's `X`, a colour's `G`). While the panel is open the game
 gets no keys of its own, so they never do two things. Offer the things in a scene with bounds, in the scene's
 coordinates, to outline them and make them clickable, and a move to make them draggable; `Inspectable.Bodies` does
-that for every body of a physics world:
+that for every body of a physics world, and `Inspectable.Entities` lists an ECS world's entities with their
+components (edits to a struct component go back into the world):
 
 ```csharp
 public override IEnumerable<Inspectable> Inspectables =>
@@ -880,6 +883,7 @@ public override IEnumerable<Inspectable> Inspectables =>
     new(nameof(LevelScene), this),
     new("Player", player, () => player.Bounds, delta => player.Position += delta),
     .. Inspectable.Bodies(world, ToScreen, scale),
+    .. Inspectable.Entities(ecs, entity => ecs.Has<Name>(entity) ? ecs.Get<Name>(entity).Text : $"entity {entity.Id}"),
 ];
 ```
 

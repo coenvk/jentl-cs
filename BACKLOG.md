@@ -152,8 +152,8 @@ delay against a target gives stars; five levels. Still to do:
 
 ### Inspector
 
-- Scenes list what can be inspected themselves; an ECS world's entities aren't listed automatically.
-- Its panel covers the right of the game, and there is no undo but changing a value back.
+- An ECS world's entities can be listed (`Inspectable.Entities`), but a scene still has to offer them; no game uses it
+  yet. Undo (Z) and moving the panel (M) are in.
 
 ### Games
 
