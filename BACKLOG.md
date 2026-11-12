@@ -45,7 +45,6 @@ In (0.6.34): tween sequences (`Motion`: tweens of floats, vectors and colours in
 repeats and yoyo), more easings, animation states for sprites (`AnimationStates`), frame events, Aseprite's sheets
 and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab has an Animation demo. Still to do:
 
-- See the Lab's Animation demo on screen (the screen was locked when it was built; its pieces are tested).
 - Bones for 2D (a body of parts that bend and turn, as Spine or DragonBones make): a larger piece of work, left for
   when a game needs it. (3D skins are in since 0.6.38.)
 - Use them in the games: cards dealt with sequences, Hot Pan's cook squashing on landing, hits flashing in Mossbrook.
@@ -126,7 +125,7 @@ delay against a target gives stars; five levels. Still to do:
   behind them.
 - Pedestrians and cyclists; buses on lines with stops.
 - Roadworks: more levels and tuning by play (the five are passable with simple plans, checked by the tests), overlays
-  of speed and jams, a sandbox; and seeing it on screen (built while the screen was locked).
+  of speed and jams, a sandbox. Seen on screen (offscreen screenshots, 0.6.40): the gates now keep clear of the bar.
 
 ### New games that do some good
 
@@ -190,22 +189,24 @@ told between levels. In the order I expect them to be popular, the most played f
 - Shadows, point lights and spotlights: MonoGame's basic effect has three directional lights only; these need shaders
   of our own, compiled for desktop and the browser.
 - Writing glTF files (for scenes built in code), and `KHR_texture_transform`.
-- The Lab's 3D scene on the graphics card has never been looked at (the screen was locked), nor its skinned stalk; the
-  software renderer path was checked offscreen.
+- The Lab's 3D scene is seen on both renderers, the skinned stalk bending in each (0.6.40).
 
 ### Inspector
 
-- Entities (`Inspectable.Entities`, offered by Bricks), undo (Z) and moving the panel (M) are in; none of it has been
-  looked at on screen yet.
+- Entities (`Inspectable.Entities`, offered by Bricks), undo (Z) and moving the panel (M) are in and seen on screen;
+  the footer names Z and M (0.6.40).
 
 ### Games
 
 - The flaky server test was a bot's hello racing a ten-second limit under load; the league's start limit is now a
-  setting and its tests have room. Watch for others.
+  setting and its tests have room. Watch for others: three GameServer tests failed once more in a cold run straight
+  after a fresh restore (0.6.40), and passed in five runs after; the names weren't caught.
 
 ## Built but never seen or heard
 
-These pass their tests but have not been checked by eye or ear:
+These pass their tests but have not been checked by eye or ear. Screenshots are taken out of sight now: a desktop
+game run with `--screenshot` keeps its window hidden (`JentlGame.Hidden`, `HiddenWindow`), so these can be checked
+while someone works at the screen.
 
 - The audio mixer's ducking, and sounds placed in the world.
 - Gamepad rumble on a real pad.

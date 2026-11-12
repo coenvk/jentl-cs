@@ -162,7 +162,7 @@ public sealed class Inspector
         text.Draw(batch, _path.Count == 0 ? "(choose something, or click it)" : string.Join(" > ", _path), new Vector2(x, y), size, Muted);
         y += line + pad / 2;
 
-        var footer = string.Format(c, "Left/Right change  Enter open/type  Backspace back  C copy ({0})", _changes.Count);
+        var footer = string.Format(c, "Left/Right change  Enter open/type  Backspace back  Z undo  M side  C copy ({0})", _changes.Count);
         var visible = Math.Max(1, (_panel.Bottom - pad - line - y) / line);
         var chosenRow = Math.Clamp(_selection[^1], 0, Math.Max(0, Rows.Count - 1));
         _firstRow = Menu.Scroll(_firstRow, chosenRow, Rows.Count, visible);

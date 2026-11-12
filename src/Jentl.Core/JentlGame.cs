@@ -27,6 +27,8 @@ public abstract class JentlGame : Game
     private PlayerIndex _padIndex = PlayerIndex.One;
     private InputPlayback? _playback;
     private RenderTarget2D? _target;
+    private Texture2D? _lastImage;
+    private bool _hiddenYet;
     private AssetStore? _assets;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private TimeSpan _lastDraw;
@@ -64,15 +66,30 @@ public abstract class JentlGame : Game
 
     protected GraphicsDeviceManager Graphics { get; }
 
+    /// <summary>
+    /// Keeps the window out of sight (set before <c>Run</c>): borderless, far off screen and hidden after the first
+    /// frame, the scenes drawn into a target that <see cref="SaveScreenshot"/> reads. For screenshots taken while
+    /// someone works at the screen; call <see cref="Platform.HiddenWindow.Prepare"/> before making the game as well.
+    /// </summary>
+    public bool Hidden { get; set; }
+
     protected virtual Color ClearColor => Color.Black;
 
-    /// <summary>Renders the current backbuffer to a PNG file.</summary>
+    /// <summary>Renders the current backbuffer (or, when <see cref="Hidden"/>, the last frame drawn) to a PNG file.</summary>
     public void SaveScreenshot(string path)
     {
         var parameters = GraphicsDevice.PresentationParameters;
-        var (width, height) = (parameters.BackBufferWidth, parameters.BackBufferHeight);
+        var (width, height) = Hidden && _lastImage is not null ? (_lastImage.Width, _lastImage.Height) : (parameters.BackBufferWidth, parameters.BackBufferHeight);
         var pixels = new Color[width * height];
-        GraphicsDevice.GetBackBufferData(pixels);
+        if (Hidden && _lastImage is not null)
+        {
+            _lastImage.GetData(pixels);
+        }
+        else
+        {
+            GraphicsDevice.GetBackBufferData(pixels);
+        }
+
         MakeOpaque(pixels);
         using var texture = new Texture2D(GraphicsDevice, width, height);
         texture.SetData(pixels);
@@ -160,9 +177,27 @@ public abstract class JentlGame : Game
         return default;
     }
 
+    protected override void Initialize()
+    {
+        if (Hidden)
+        {
+            Window.IsBorderless = true;
+            Platform.HiddenWindow.MoveAway(Window.Handle);
+        }
+
+        base.Initialize();
+    }
+
     protected override void Update(GameTime gameTime)
     {
         ArgumentNullException.ThrowIfNull(gameTime);
+        if (Hidden && !_hiddenYet)
+        {
+            // Shown by MonoGame as the loop starts; hidden from the first frame on.
+            _hiddenYet = true;
+            Platform.HiddenWindow.Hide(Window.Handle);
+        }
+
         var elapsed = gameTime.ElapsedGameTime;
         if (_playback?.Next() is { } frame)
         {
@@ -266,7 +301,7 @@ public abstract class JentlGame : Game
         using (Scenes.Debug.Profiler.Measure("draw"))
         {
             Scenes.DrawLayers(_batch!, ScreenBounds);
-            if (VirtualScreen is not null || Scenes.Post.IsActive)
+            if (VirtualScreen is not null || Scenes.Post.IsActive || Hidden)
             {
                 DrawOffscreen(window);
             }
@@ -311,6 +346,7 @@ public abstract class JentlGame : Game
         Scenes.Draw(_batch!, bounds);
         _batch!.End();
         var image = Scenes.Post.IsActive ? Scenes.Post.Apply(_batch, _target) : _target;
+        _lastImage = image;
         GraphicsDevice.SetRenderTarget(null);
 
         // Whole-number scaling keeps pixels square and sharp; any other scale is smoothed. Copied opaque: blending
