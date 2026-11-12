@@ -91,16 +91,15 @@ with Dutch categories), a daily deal with a streak, and custom games of three si
 
 The first version is playable (games-cs `apps/HotPan`): a side-view platformer, the chicken heating from raw pink
 through golden to black, the pan getting hotter without end, health burning away on anything too hot, ten points a
-second, leaderboards, keys, gamepad and touch. Still to do:
+second, leaderboards, keys, gamepad and touch. Since: power-ups (a cold drink, oven gloves, a lid, ice), oil that
+bubbles and spits, the spatula flipping the hottest piece, a daily pan, the pan's sizzle growing with the heat, a sigh
+of relief on cool chicken, and the cook squashing, stretching and flashing. Still to do:
 
-- Power-ups: a cold drink (health back), oven gloves (no burning for a while), a lid (the pan stops heating), ice
-  cubes to cool a piece.
-- More happening: burnt pieces that stay as hazards instead of being flicked out, a spatula that flips pieces (a hot
-  side goes down, a cooler side comes up), oil spitting, pieces landing on the cook.
-- Tuning by play: how fast pieces heat and drop, how much burning hurts; play on a phone (touch controls, sizes).
-- Character art and animation beyond shapes (walking, jumping, hopping on hot feet), and more sounds (a sizzle that
-  grows with the heat, a sigh of relief on cool chicken).
-- Questions: should the pan heat level off at some point? A choice of cooks? Daily seeds for a shared challenge?
+- Burnt pieces staying as hazards instead of being flicked out, and pieces landing on the cook: both change how the
+  game plays, so worth deciding by playing.
+- Tuning by play: how fast pieces heat and drop, how much burning and oil hurt, how often power-ups come; on a phone.
+- Character art and animation beyond shapes.
+- Questions: should the pan heat level off at some point? A choice of cooks?
 
 ### Traffic: more simulation, and the road-building game
 
