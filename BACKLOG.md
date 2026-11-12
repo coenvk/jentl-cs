@@ -66,14 +66,13 @@ and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab ha
 The first version is playable (games-cs `apps/ConnectWord`): a 4×4 grid of word cards with a deck behind it; a card
 dropped on one of its category merges with it, on any other it swaps; a category whose words are all in one row is
 matched and leaves as a coloured row; cards fall and new ones come in; twenty levels, stars by moves, progress saved.
-Still to do:
+Since: twenty Dutch levels, undo, a merged card swelling, and daily and random puzzles mixed from the language's
+categories, timed, with a streak of days. Still to do:
 
 - Check it against the Android original: whether a matched row really leaves the grid or stays frozen in place,
-  whether wrong drops should cost something (lives, or moves), and how its levels grow.
-- Dutch levels (the words are English only; the rest of the game is in both languages), and many more levels: a
-  level editor or a format others can write levels in.
-- Undo, a merge animation (cards sliding into each other), and the solved row flying up to its place.
-- Daily puzzles, and scores for time as well as moves.
+  whether wrong drops should cost something (lives, or moves), and how its levels grow. (Needs you, or the original.)
+- Many more levels written by hand, and a level editor or a format others can write them in.
+- Cards sliding into each other as they merge, and the solved row flying up to its place.
 
 ### Associate Words: more of it
 
