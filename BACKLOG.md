@@ -78,13 +78,14 @@ categories, timed, with a streak of days. Still to do:
 
 The first version is playable (games-cs `apps/AssociateWords`), built to the rules settled with you: five columns
 with their top card up, a draw pile turning one card and recycling, a few slots that a category card opens and a
-complete category frees, words on their own kind in any order in the columns, a move limit, fifteen levels. Still to
-do:
+complete category frees, words on their own kind in any order in the columns, a move limit, fifteen levels. Since:
+deals made from a bank of categories with limits from the autoplayer, giving Dutch levels (the English shapes filled
+with Dutch categories), a daily deal with a streak, and custom games of three sizes. Still to do:
 
-- Jokers, as the originals have (a card that goes with any category, or bridges two columns).
-- More levels, Dutch ones, and picture cards; a level editor, or levels made and checked by the autoplayer.
+- Jokers, as the originals have (a card that goes with any category, or bridges two columns): how they complete a
+  category is a rules question for you.
+- Picture cards; hand-made Dutch levels; a level editor.
 - Tuning the move limits by play (they are a quarter above a simple autoplayer's), and extra moves as a reward.
-- A daily deal, and a custom game: pick the size and play a fresh deal.
 
 ### Hot Pan: more for the frying pan
 
