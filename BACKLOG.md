@@ -59,7 +59,13 @@ and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab ha
 - Checking every game on a phone: layouts at small sizes, touch targets, performance (the software renderer and the
   physics), sound starting.
 - Note: the browser build already runs on phones, as a fallback until then.
-- Question: one APK holding all the games, or one app per game?
+- Decided: an app per game, games of a kind together: Solitaire (with the solo ruleset deals), Card Table, Poker,
+  Word games (Connect Word, Associate Words), Puzzles (Sokoban, CodeLock), Arcade (Bricks, Hot Pan), Mossbrook,
+  Paddock, Roadworks and Composer; not the Lab. Each has the shell cut to its own games and songs, and its own saves.
+  Ids `nl.jentl.<app>`, names in the phone's language. Debug-signed for now; a release key kept outside the
+  repositories, out of CI until the store. Tools from brew (Android command-line tools, Kotlin) and the .NET
+  workload, tested on a headless emulator. Uno is shown as Kleurenkaart / Colour Cards (a trademark), and every
+  game's name is checked against brands before the first upload.
 
 ### Connect Word: more of it
 
@@ -69,8 +75,8 @@ matched and leaves as a coloured row; cards fall and new ones come in; twenty le
 Since: twenty Dutch levels, undo, a merged card swelling, and daily and random puzzles mixed from the language's
 categories, timed, with a streak of days. Still to do:
 
-- Check it against the Android original: whether a matched row really leaves the grid or stays frozen in place,
-  whether wrong drops should cost something (lives, or moves), and how its levels grow. (Needs you, or the original.)
+- Decided: a matched row leaves the grid, and a wrong drop costs only its move (no lives), unless the Android
+  original turns out to do otherwise.
 - Many more levels written by hand, and a level editor or a format others can write them in.
 - Cards sliding into each other as they merge, and the solved row flying up to its place.
 
@@ -82,8 +88,8 @@ complete category frees, words on their own kind in any order in the columns, a 
 deals made from a bank of categories with limits from the autoplayer, giving Dutch levels (the English shapes filled
 with Dutch categories), a daily deal with a streak, and custom games of three sizes. Still to do:
 
-- Jokers, as the originals have (a card that goes with any category, or bridges two columns): how they complete a
-  category is a rules question for you.
+- Jokers (decided): a wild word that fills a slot an open category has, counting as one of its words; it can't open
+  a slot, and there is no bridging joker. About one a deal, more in the larger ones.
 - Picture cards; hand-made Dutch levels; a level editor.
 - Tuning the move limits by play (they are a quarter above a simple autoplayer's), and extra moves as a reward.
 
@@ -99,7 +105,8 @@ of relief on cool chicken, and the cook squashing, stretching and flashing. Stil
   game plays, so worth deciding by playing.
 - Tuning by play: how fast pieces heat and drop, how much burning and oil hurt, how often power-ups come; on a phone.
 - Character art and animation beyond shapes.
-- Questions: should the pan heat level off at some point? A choice of cooks?
+- Decided: the pan keeps heating without end; no choice of cooks until there is character art; burnt pieces and
+  pieces on the cook wait until it has been played.
 
 ### Traffic: more simulation, and the road-building game
 
@@ -121,16 +128,52 @@ delay against a target gives stars; five levels. Still to do:
 - Roadworks: more levels and tuning by play (the five are passable with simple plans, checked by the tests), overlays
   of speed and jams, a sandbox; and seeing it on screen (built while the screen was locked).
 
+### New games that do some good
+
+Ideas for games that are fun first and leave the world a little better, the good built into the rules rather than
+told between levels. In the order I expect them to be popular, the most played first. Each says what it builds on.
+
+1. **A garden for everyone** (cosy). Make a garden in Mossbrook's way; bees, birds, butterflies and hedgehogs come
+   when you plant for them (a small food web: flowers feed insects, insects feed birds), and paving it over sends
+   them away. Seasons, a garden to visit each day, nothing to lose. Cosy games are played widely and long. Builds on
+   the RPG kit's world and saves, tiles, and the soundtrack's calm songs.
+2. **Leftover Chef** (cooking). A cousin of Hot Pan: cook from whatever is in the fridge before it goes off; good
+   combinations score, anything thrown away costs. Quick rounds, a daily fridge, recipes unlocked. About food
+   waste. Builds on Hot Pan, the daily-puzzle streaks, and Motion for the kitchen's bustle.
+3. **Fake-News Factory** (cards). Play the misinformation maker: build posts from trick cards (a fake expert, fear,
+   a false choice, a doctored photo), chase followers, and dodge fact-checker bots. Playing the manipulator for a
+   while makes people better at spotting the tricks afterwards, as studies of the Cambridge game *Bad News* found
+   (prebunking). Builds on the cards kit and rulesets; the content is cards and short texts.
+4. **Bike Town** (city building). Roadworks grown up: people choose for themselves between car, bike, bus and
+   walking by time, safety and comfort; you score on happy travellers, few accidents, clean air and room for parks
+   rather than on car flow. Players find out by doing why Dutch towns separate cycle paths and filter cars. Builds
+   on `Jentl.Traffic` and Roadworks; needs the cyclists, buses and choice of mode on the traffic list above.
+5. **Only Together** (co-op). A puzzle on the GameServer that no one can win alone: each player sees part of it and
+   holds part of the means, so they have to talk and share. For families and classrooms. Builds on the GameServer
+   and the lobby the card games use.
+6. **Full Grid** ("netcongestie"). Run a region's electricity: sun and wind come and go, homes and factories want
+   power, cables have limits; batteries, heat pumps and moving demand ("charge the car at noon") beat waiting years
+   for new cables. Plays like a flow puzzle or tower defence. Builds on Roadworks's grid and a network solver like
+   the traffic's.
+7. **Polder** (water). Keep a polder dry with pumps, dykes and room for the river while the sea rises and storms
+   come; a flooded village can't be undone. Builds on the same grid; water flow is new.
+8. **Ear School** (music). Ear training and music theory as games: hear the interval, finish the tune, name the
+   chord, with Synth's instruments and the Composer's piano roll. Free music lessons for children who get none.
+9. **Dutch for newcomers** (words). Connect Word and Associate Words with sets for learning Dutch, with pictures and
+   spoken words, levels following the integration course's themes (shop, doctor, work, the town hall). A small
+   audience, but it matters a great deal to them. Builds on both word games and their word banks; needs picture
+   cards (on Associate Words's list) and recorded or generated speech.
+
 ## Loose ends of what is built
 
 ### Cards and rulesets
 
-- Pyramid as a ruleset: covered piles are in (`coveredBy`, `places`; the `tripeaks` example), but Pyramid's pairs
-  adding up to thirteen need a pair move rulesets don't have (two cards leaving together).
+- Pyramid as a ruleset: covered piles are in (`coveredBy`, `places`; the `tripeaks` example); next, a general pair
+  move (two cards leaving together when a condition holds, such as adding up to thirteen), then Pyramid.
 - Uno as a ruleset leaves out the "Uno!" call, challenging a +4, stacking draw cards and the starting card's effect.
   Scripts could now carry most of these (as Mau-Mau's sevens stack); the hand-written Uno has them.
-- Ruleset games for players are against bots only: no passing the device round, no online play, and one round at a
-  time (no scores carried over to a match).
+- Ruleset games for players are against bots only. Decided next: passing the device round (a screen hiding the hand
+  between turns) and scores carried over a match; online play later.
 - Uno's "rev" label is cramped on its card.
 - The ruleset bot plays well enough but simply: it doesn't count cards or think about the other players.
 
@@ -174,4 +217,4 @@ These pass their tests but have not been checked by eye or ear:
 
 ## Housekeeping
 
-- Push: nothing since Jentl 0.6.11 has been pushed, in either repository (`git log origin/main..`).
+- Both repositories are pushed after every feature.
