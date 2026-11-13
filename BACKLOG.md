@@ -63,10 +63,10 @@ and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab ha
   Farm, and the suites Words, Puzzles and Arcade (each choosing a game, "All games" to come back, saves kept apart).
   Full screen in either orientation, clear of the cut-out and gesture bar (Jentl's `Insets`); the back button is Back
   (the system's back gesture handed to the game), and on a title screen with nothing behind it the app goes to the
-  background; hints speak of tapping. Uno is shown as Colour Cards / Kleurenkaart, its call as "Last card!".
+  background, its sound held until it is back (`SoundPlayer.Suspended`); hints speak of tapping. Uno is shown as Colour Cards / Kleurenkaart, its call as "Last card!".
 - Still to do: play each game through on the phone (Solitaire's Klondike is checked by touch; the rest only to their
   title screens): layouts at phone sizes, touch targets, speed; the per-app music (only its games' songs); icons;
-  pausing and saving when the app goes to the background; the release key and AABs for the store; the brand check of
+  the release key and AABs for the store; the brand check of
   the games' names; CI (the projects are outside `Games.slnx` until the build machine has the workload).
 - Decided: an app per game, games of a kind together: Solitaire (with the solo ruleset deals), Card Table, Poker,
   Word games (Connect Word, Associate Words), Puzzles (Sokoban, CodeLock), Arcade (Bricks, Hot Pan), Mossbrook,

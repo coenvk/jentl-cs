@@ -23,6 +23,7 @@ public sealed class SoundPlayer : IDisposable
     private Playing? _music;
     private (string Name, TimeSpan Fade)? _waiting;
     private Playing? _fading;
+    private bool _suspended;
     private TimeSpan _retry;
 
     private SoundPlayer(Dictionary<string, SoundEffect> sounds, bool isAvailable)
@@ -37,6 +38,40 @@ public sealed class SoundPlayer : IDisposable
 
     /// <summary>The buses sounds play on, with their volumes, mutes and ducking.</summary>
     public AudioMixer Mixer { get; } = new();
+
+    /// <summary>
+    /// Holds all sound while the app is away (a phone app in the background): the music pauses where it is and
+    /// carries on when released, and effects asked for meanwhile stay silent. The player's own settings are untouched.
+    /// </summary>
+    public bool Suspended
+    {
+        get => _suspended;
+        set
+        {
+            if (_suspended == value)
+            {
+                return;
+            }
+
+            _suspended = value;
+            foreach (var playing in new[] { _music, _fading })
+            {
+                if (playing is null)
+                {
+                    continue;
+                }
+
+                if (value)
+                {
+                    playing.Instance.Pause();
+                }
+                else if (playing.Instance.State == SoundState.Paused)
+                {
+                    playing.Instance.Resume();
+                }
+            }
+        }
+    }
 
     /// <summary>Whether sound effects play: the effects bus not muted.</summary>
     public bool Enabled
@@ -182,7 +217,7 @@ public sealed class SoundPlayer : IDisposable
     public void Play(string name, float volume = 1f, float pan = 0, float pitch = 0, string bus = AudioMixer.Effects)
     {
         var gain = Mixer.GainOf(bus);
-        if (gain <= 0 || !_sounds.TryGetValue(name, out var sound))
+        if (_suspended || gain <= 0 || !_sounds.TryGetValue(name, out var sound))
         {
             return;
         }
@@ -254,7 +289,10 @@ public sealed class SoundPlayer : IDisposable
         instance.IsLooped = true;
         _music = new Playing(name, instance, Level: 0, Target: 1, Speed: Speed(time));
         ApplyMusicVolume();
-        Start(_music);
+        if (!_suspended)
+        {
+            Start(_music);
+        }
     }
 
     /// <summary>Fades the music out and stops it.</summary>
@@ -268,6 +306,11 @@ public sealed class SoundPlayer : IDisposable
     /// <summary>Moves fades on; call once per frame.</summary>
     public void Update(TimeSpan elapsed)
     {
+        if (_suspended)
+        {
+            return;
+        }
+
         Mixer.Update(elapsed);
         Collect();
         var seconds = (float)elapsed.TotalSeconds;
