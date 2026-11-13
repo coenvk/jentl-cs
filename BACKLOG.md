@@ -155,10 +155,11 @@ ripeness and a flavour; and cows, racks, flavours, a better kettle and road sign
 
 - The weekly cheese fair is in: one wheel judged on stars and age against three farms, prizes and rosettes.
 - The meadow is in: six fields of grass, herbs (richer milk) or left for meadow birds (chicks, and walkers at the
-  shop); cows the meadow can't feed eat bought feed. Still: mowing and hay, and seasons for the nesting.
+  shop); cows the meadow can't feed eat bought feed. Seasons are in too: summer mowing for hay, the
+  herd in the barn on hay in winter, nesting in spring and summer.
 - The cows have names, and calves are born and grow up in four weeks (games-cs). Milking by hand is a little game
   of its own each morning: squeeze in turn, steady, or she kicks the pail.
-- Cheeses of more sizes (a baby cheese, a big wheel) and selling by the piece; seasons, and the market in town.
+- Cheeses of more sizes (a baby cheese, a big wheel) and selling by the piece; the market in town.
 - A song of its own for the farm (it plays the village's songs now), and art beyond shapes.
 - Tuning by play: prices, costs, how fast neglect bites; and on a phone.
 
