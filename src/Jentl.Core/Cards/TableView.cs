@@ -36,6 +36,8 @@ public sealed class TableView
     private (Pile Pile, int Index)? _pressed;
     private (Pile Pile, int Index, Vector2 Grab)? _dragging;
     private (Pile Pile, int Index, TimeSpan Left)? _highlight;
+    private (Pile From, TimeSpan Gap)? _dealing;
+    private readonly HashSet<Card> _dealt = [];
 
     /// <summary>Card size in pixels; set by the game's layout each frame.</summary>
     public Point CardSize { get; set; } = new(100, 140);
@@ -125,6 +127,23 @@ public sealed class TableView
         return null;
     }
 
+    /// <summary>
+    /// Deals the table in: the next time the cards are drawn, each card not drawn before flies out from
+    /// <paramref name="from"/> (the stock) to its place, one after another, <paramref name="gap"/> apart (40 ms by
+    /// default). Call it when a new game is laid out.
+    /// </summary>
+    public void DealIn(Pile from, TimeSpan? gap = null)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        _drawnAt.Clear();
+        _glides.Clear();
+        _dealing = (from, gap ?? TimeSpan.FromMilliseconds(40));
+        _dealt.Clear();
+    }
+
+    /// <summary>Whether cards are still flying out from a <see cref="DealIn"/>.</summary>
+    public bool IsDealing => _dealt.Any(c => _glides.TryGetValue(c, out var glide) && !glide.Tween.IsDone);
+
     /// <summary>Outlines a card (or an empty pile, index -1) for a while, e.g. to show a hint.</summary>
     public void Highlight(Pile pile, int index, TimeSpan duration) => _highlight = (pile, index, duration);
 
@@ -208,7 +227,10 @@ public sealed class TableView
                 var at = Place(pile[i].Card, CardBounds(pile, i), out var gliding);
                 if (gliding)
                 {
-                    flying.Add((Seen(pile, i), at));
+                    // A dealt card still waiting its turn lies face down in the stock.
+                    var seen = Seen(pile, i);
+                    var waiting = _dealt.Contains(pile[i].Card) && _glides[pile[i].Card].Tween is var tween && tween.Value == tween.From;
+                    flying.Add((waiting ? seen with { FaceUp = false } : seen, at));
                 }
                 else
                 {
@@ -240,6 +262,9 @@ public sealed class TableView
             var bounds = highlight.Index >= 0 ? CardBounds(highlight.Pile, highlight.Index) : new Rectangle(Spot(highlight.Pile).Position, CardSize);
             Outline(batch, bounds, new Color(255, 199, 44), Math.Max(3, CardSize.X / 25));
         }
+
+        // Only the cards on the table when the deal began fly out; later ones arrive as usual.
+        _dealing = null;
     }
 
     private PlacedCard Seen(Pile pile, int index) => Hidden(pile, index) ? pile[index] with { FaceUp = false } : pile[index];
@@ -247,6 +272,21 @@ public sealed class TableView
     /// <summary>Where to draw a card this frame; starts a glide when its target moved since the last frame.</summary>
     private Rectangle Place(Card card, Rectangle target, out bool gliding)
     {
+        // Dealt in: a card not drawn before flies out from the stock after the ones before it, eased in at the end.
+        if (_dealing is { } dealing && !_drawnAt.ContainsKey(card) && _spots.Any(s => s.Pile == dealing.From)
+            && Spot(dealing.From).Position != target.Location)
+        {
+            // (Cards staying in the stock are there already: they neither fly nor hold the others up.)
+            var origin = Spot(dealing.From).Position.ToVector2();
+            var wait = (float)(dealing.Gap * _dealt.Count).TotalSeconds;
+            _dealt.Add(card);
+            var flight = (float)(GlideDuration * 2).TotalSeconds;
+            var total = wait + flight;
+            _glides[card] = (new Tween(origin, new Vector2(target.X, target.Y), TimeSpan.FromSeconds(total),
+                t => Easing.CubicOut(Math.Clamp(((t * total) - wait) / flight, 0, 1))), target);
+            _drawnAt[card] = target;
+        }
+
         if (_drawnAt.TryGetValue(card, out var last) && (!_glides.TryGetValue(card, out var glide) || glide.Target != target) && last != target)
         {
             var from = glide.Tween is { IsDone: false } ? Rect(glide.Tween.Value) : last;
