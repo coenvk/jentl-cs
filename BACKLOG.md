@@ -33,7 +33,9 @@ per channel and a column per bar, instruments chosen from the presets, tempo, ba
 redo, playing with a playhead (edits heard from the bar playing), songs saved and opened, copied as code, and saved
 as WAV on the desktop. Still to do:
 
-- Editing instruments themselves (wave, envelope, filter), rather than choosing a preset and a volume.
+- In (0.6.51): instruments edited (`Channel.Custom`, `InstrumentText`): the Composer's Sound panel (Sound chip, the
+  instrument's name, or I) sets the wave, envelope, ring, vibrato, slide, filter, copies and detune, breath, and the
+  pluck's and FM's own settings, heard at each change, and goes back to the preset. Not yet: harmonics drawn by hand.
 - In (0.6.50): swing (`Tune.Swing`, `Composition.Swing`, a chip in the Composer), and a loop of one, two or four bars
   to work on (the Loop chip or L; a bar's number moves it).
 - In (games-cs): notes resized from their end, moved by dragging, and selected together (Shift-drag or the Select

@@ -18,6 +18,15 @@ public sealed class Channel
 {
     public string Instrument { get; set; } = "Harp";
 
+    /// <summary>
+    /// The instrument as edited from the preset <see cref="Instrument"/> names (its wave, envelope, filter and so on),
+    /// or null to play the preset as it is.
+    /// </summary>
+    public Instrument? Custom { get; set; }
+
+    /// <summary>The preset <see cref="Instrument"/> names; a name not known is a harp.</summary>
+    public Instrument Preset => Audio.Instruments.All.GetValueOrDefault(Instrument) ?? Audio.Instruments.Harp;
+
     /// <summary>A multiple of the instrument's own volume.</summary>
     public float Volume { get; set; } = 1;
 
@@ -29,10 +38,10 @@ public sealed class Channel
     public Pattern? PatternAt(int bar) =>
         bar >= 0 && bar < Arrangement.Count && Arrangement[bar] is var index && index >= 0 && index < Patterns.Count ? Patterns[index] : null;
 
-    /// <summary>The ready-made instrument it plays, at its volume; a name not known is a harp.</summary>
+    /// <summary>The instrument it plays (edited, or the preset), at its volume.</summary>
     public Instrument Sound()
     {
-        var instrument = Audio.Instruments.All.GetValueOrDefault(Instrument) ?? Audio.Instruments.Harp;
+        var instrument = Custom ?? Preset;
         return instrument with { Volume = instrument.Volume * Volume };
     }
 }
@@ -98,8 +107,8 @@ public sealed class Composition
             var name = Instruments.All.ContainsKey(channel.Instrument)
                 ? "Instruments." + string.Concat(channel.Instrument.Split(' ').Select(w => char.ToUpperInvariant(w[0]) + w[1..]))
                 : "Instruments.Harp";
-            var volume = Math.Abs(channel.Volume - 1) < 0.001f ? "" : string.Create(CultureInfo.InvariantCulture, $" with {{ Volume = {channel.Sound().Volume:0.###}f }}");
-            voices.AddRange(Lines(channel, 0, Bars).Select(steps => $"    new Voice({name}{volume}, \"{InBars(steps)}\")"));
+            var sound = InstrumentText.ToCode(channel.Sound(), name, channel.Preset);
+            voices.AddRange(Lines(channel, 0, Bars).Select(steps => $"    new Voice({sound}, \"{InBars(steps)}\")"));
         }
 
         var swing = Swing > 0 ? string.Create(CultureInfo.InvariantCulture, $", Swing = {Swing:0.##}f") : "";
@@ -121,6 +130,7 @@ public sealed class Composition
             {
                 ["instrument"] = channel.Instrument,
                 ["volume"] = channel.Volume,
+                ["custom"] = channel.Custom is { } custom ? InstrumentText.ToJson(custom) : null,
                 ["patterns"] = patterns,
                 ["arrangement"] = new JsonArray([.. channel.Arrangement.Select(i => (JsonNode?)i)]),
             });
@@ -159,6 +169,11 @@ public sealed class Composition
             foreach (var item in node["channels"]?.AsArray() ?? [])
             {
                 var channel = new Channel { Instrument = (string?)item?["instrument"] ?? "Harp", Volume = (float?)item?["volume"] ?? 1 };
+                if (item?["custom"] is JsonObject custom)
+                {
+                    channel.Custom = InstrumentText.FromJson(custom, channel.Preset);
+                }
+
                 channel.Patterns.Clear();
                 foreach (var pattern in item?["patterns"]?.AsArray() ?? [])
                 {

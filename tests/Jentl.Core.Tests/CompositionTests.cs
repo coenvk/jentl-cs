@@ -88,6 +88,30 @@ public class CompositionTests
     }
 
     [Fact]
+    public void AnEditedInstrument_IsPlayed_Kept_AndWrittenAsThePresetWithItsChanges()
+    {
+        var song = TwoBars();
+        song.Channels[0].Custom = Instruments.Flute with { Attack = 0.3f, Cutoff = 1200, Wave = Wave.Saw };
+
+        song.ToTune().Voices[0].Instrument.Attack.Should().Be(0.3f);
+        var back = Composition.FromJson(song.ToJson());
+        back.Channels[0].Custom.Should().BeEquivalentTo(song.Channels[0].Custom);
+        back.Channels[1].Custom.Should().BeNull();
+        song.ToCode().Should().Contain("new Voice(Instruments.Flute with { Wave = Wave.Saw, Attack = 0.3f, Cutoff = 1200f }");
+    }
+
+    [Fact]
+    public void InstrumentText_KeepsEverySetting()
+    {
+        var bells = Instruments.Bells with { Partials = [1, 0.5f], Ring = !Instruments.Bells.Ring, Unison = 3 };
+
+        var back = InstrumentText.FromJson(InstrumentText.ToJson(bells), Instruments.Harp);
+
+        back.Should().BeEquivalentTo(bells);
+        InstrumentText.ToCode(Instruments.Harp, "Instruments.Harp", Instruments.Harp).Should().Be("Instruments.Harp");
+    }
+
+    [Fact]
     public void Swing_IsKept_AndWrittenIntoTheCode()
     {
         var song = TwoBars();

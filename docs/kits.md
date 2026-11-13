@@ -578,6 +578,8 @@ A `Composition` is a song as a music maker writes it, in the manner of Bosca Ceo
 preset at a volume, with patterns a bar long (notes by step, MIDI pitch and length), and an arrangement saying which
 pattern each channel plays in each bar. `ToTune` makes it a `Tune` (a chord becomes several voices; `from` and `to`
 bars play part of it), `ToJson` and `FromJson` save it, and `ToCode` writes the C# of the tune for a game to play.
+A channel's `Custom` is its preset edited (wave, envelope, filter and the rest); `InstrumentText` keeps an instrument
+as JSON and writes it as the preset `with` the settings that differ.
 `Synth.ToWav` turns samples into a WAV file, and `SoundPlayer.ReplaceMusic` swaps a track for a new rendering of it
 (the song after an edit). games-cs's Composer app is the editor.
 
