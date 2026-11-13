@@ -51,7 +51,12 @@ public sealed class Vehicle
 
     private readonly List<BusStop> _stops = [];
 
-    internal void AddStops(IEnumerable<BusStop> stops) => _stops.AddRange(stops);
+    /// <summary>Gives a bus its stops; the time standing at them is part of its trip, not a delay.</summary>
+    internal void AddStops(IEnumerable<BusStop> stops)
+    {
+        _stops.AddRange(stops);
+        FreeTime += _stops.Sum(s => s.Dwell);
+    }
 
     internal void StopMade() => _stops.RemoveAt(0);
 
@@ -80,7 +85,7 @@ public sealed class Vehicle
     public float StartTime { get; }
 
     /// <summary>How long the route takes with the roads empty.</summary>
-    public float FreeTime { get; }
+    public float FreeTime { get; private set; }
 
     /// <summary>How many times it came to a stop.</summary>
     public int Stops { get; internal set; }
