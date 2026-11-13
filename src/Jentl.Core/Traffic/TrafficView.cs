@@ -107,6 +107,16 @@ public sealed class TrafficView
             batch.DrawLine(ToScreen(area, end - across), ToScreen(area, end + across), colour, MathF.Max(2, Scale * 0.6f));
         }
 
+        // Bus stops: a yellow bay marked on the kerb side of their lane, a post beside it.
+        foreach (var stop in simulation.Lines.SelectMany(l => l.Stops).Distinct())
+        {
+            var (at, direction) = stop.Lane.Path.At(stop.At);
+            var kerb = LanePath.RightOf(direction) * (LaneWidth * 0.62f);
+            var back = direction * 6;
+            batch.DrawLine(ToScreen(area, at - back + kerb), ToScreen(area, at + (back * 0.3f) + kerb), new Color(250, 210, 50), MathF.Max(2, Scale * 0.5f));
+            batch.FillCircle(ToScreen(area, at + (kerb * 1.5f)), MathF.Max(2, Scale * 0.9f), new Color(250, 210, 50));
+        }
+
         foreach (var vehicle in simulation.Vehicles)
         {
             DrawVehicle(batch, area, vehicle);

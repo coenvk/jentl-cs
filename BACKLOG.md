@@ -142,7 +142,8 @@ delay against a target gives stars; five levels. Still to do:
 - Green waves, turning arrows, timings the player sets; demand by place and time (the morning rush).
 - Capacity: single-lane towns saturate around 1,200 vehicles an hour; left turns waiting in the lane hold up everyone
   behind them.
-- Pedestrians and cyclists; buses on lines with stops.
+- Buses on lines with stops are in (0.6.55: `BusLine`, `BusStop`; they dwell at each stop, holding up a one-lane road,
+  and keep to their lane; the Lab has a line). Still: pedestrians and cyclists, and bus lines in Roadworks.
 - Roadworks: eight levels now (Bypass, Old town ring and Market day added; each passable with a simple plan, checked by
   the tests); more, and tuning by play, overlays
   of speed and jams, a sandbox. Seen on screen (offscreen screenshots, 0.6.40): the gates now keep clear of the bar.

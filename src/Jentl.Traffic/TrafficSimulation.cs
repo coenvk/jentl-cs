@@ -40,6 +40,21 @@ public sealed class Vehicle
     /// <summary>The time from which it may change lanes again.</summary>
     internal float NextChange { get; set; }
 
+    /// <summary>The bus line it runs for; null for other traffic.</summary>
+    public BusLine? Line { get; internal set; }
+
+    /// <summary>The stops it has still to make, next first.</summary>
+    public IReadOnlyList<BusStop> StopsLeft => _stops;
+
+    /// <summary>Seconds left standing at the stop it is at; 0 when not at one.</summary>
+    public float Dwelling { get; internal set; }
+
+    private readonly List<BusStop> _stops = [];
+
+    internal void AddStops(IEnumerable<BusStop> stops) => _stops.AddRange(stops);
+
+    internal void StopMade() => _stops.RemoveAt(0);
+
     /// <summary>Takes a new way from here on: <paramref name="rest"/> replaces the route from the current lane.</summary>
     internal void Reroute(IReadOnlyList<Lane> rest)
     {
@@ -195,6 +210,102 @@ public sealed class TrafficSimulation
     /// <summary>Raised as a vehicle reaches its destination.</summary>
     public event Action<Vehicle>? Arrived;
 
+    private readonly List<BusLine> _lines = [];
+
+    /// <summary>The bus lines running.</summary>
+    public IReadOnlyList<BusLine> Lines => _lines;
+
+    /// <summary>Starts a bus line: its first bus sets out now, the next after its headway.</summary>
+    /// <exception cref="ArgumentException">There is no way from its start through its stops to its end.</exception>
+    public void AddLine(BusLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        _ = LineRoute(line) ?? throw new ArgumentException($"Line {line.Name} has no way through its stops.", nameof(line));
+        line.NextBus = Time;
+        _lines.Add(line);
+    }
+
+    /// <summary>A line's way: from its start to each stop's lane in turn, then on to its end.</summary>
+    private List<Lane>? LineRoute(BusLine line)
+    {
+        // Each leg after the first starts on the stop's own lane, which the route already has.
+        var route = new List<Lane>();
+        IEnumerable<Lane> starts = line.From.Roads.SelectMany(r => r.LeavingFrom(line.From));
+        foreach (var stop in line.Stops)
+        {
+            if (RouteTo(starts, l => l == stop.Lane) is not { } leg)
+            {
+                return null;
+            }
+
+            route.AddRange(route.Count > 0 ? leg.Skip(1) : leg);
+            starts = [stop.Lane];
+        }
+
+        if (RouteFrom(starts, line.To) is not { } last)
+        {
+            return null;
+        }
+
+        route.AddRange(route.Count > 0 ? last.Skip(1) : last);
+        return route;
+    }
+
+    /// <summary>Sends out each line's bus when it is due, if there is room at its start.</summary>
+    private void RunLines()
+    {
+        foreach (var line in _lines.Where(l => Time >= l.NextBus))
+        {
+            if (LineRoute(line) is not { } route || _onLane[route[0]] is { Count: > 0 } on && on[^1].Position - on[^1].Kind.Length < VehicleKind.Bus.Length + VehicleKind.Bus.MinGap)
+            {
+                continue;
+            }
+
+            var bus = new Vehicle(_nextId++, VehicleKind.Bus, route, 1, Time, line.To) { Position = VehicleKind.Bus.Length, Line = line };
+            bus.AddStops(line.Stops);
+            _vehicles.Add(bus);
+            _onLane[route[0]].Add(bus);
+            _entered[bus] = Time;
+            line.NextBus = Time + line.Headway;
+        }
+    }
+
+    /// <summary>The distance to the next stop of a bus, if it is on its route ahead; standing at it, the time ticks down.</summary>
+    private static float? BusStopAhead(Vehicle vehicle, float lookahead)
+    {
+        if (vehicle.StopsLeft.Count == 0)
+        {
+            return null;
+        }
+
+        var stop = vehicle.StopsLeft[0];
+        var distance = -vehicle.Position;
+        for (var i = vehicle.RouteIndex; i < vehicle.Route.Count && distance < lookahead; i++)
+        {
+            if (vehicle.Route[i] == stop.Lane)
+            {
+                var gap = distance + stop.At;
+                if (gap < 1 && vehicle.Speed < 0.5f)
+                {
+                    // At the stop: people get on and off, then it goes.
+                    vehicle.Dwelling = vehicle.Dwelling == 0 ? stop.Dwell : vehicle.Dwelling - StepSize;
+                    if (vehicle.Dwelling <= 0)
+                    {
+                        vehicle.Dwelling = 0;
+                        vehicle.StopMade();
+                        return null;
+                    }
+                }
+
+                return MathF.Max(0, gap);
+            }
+
+            distance += vehicle.Route[i].Length;
+        }
+
+        return null;
+    }
+
     /// <summary>Vehicles an hour coming in at an edge node (0 for none), each going to another edge.</summary>
     public void SetDemand(Node edge, float perHour)
     {
@@ -253,6 +364,12 @@ public sealed class TrafficSimulation
     private List<Lane>? RouteFrom(IEnumerable<Lane> starts, Node to)
     {
         var ends = to.Roads.SelectMany(r => r.ArrivingAt(to)).ToHashSet();
+        return RouteTo(starts, ends.Contains);
+    }
+
+    /// <summary>The quickest lanes from any of <paramref name="starts"/> to a lane <paramref name="isEnd"/> accepts.</summary>
+    private List<Lane>? RouteTo(IEnumerable<Lane> starts, Func<Lane, bool> isEnd)
+    {
         var cost = new Dictionary<Lane, float>();
         var previous = new Dictionary<Lane, Lane>();
         var queue = new PriorityQueue<Lane, float>();
@@ -269,7 +386,7 @@ public sealed class TrafficSimulation
                 continue;
             }
 
-            if (ends.Contains(lane))
+            if (isEnd(lane))
             {
                 var route = new List<Lane> { lane };
                 while (previous.TryGetValue(route[^1], out var before))
@@ -413,6 +530,7 @@ public sealed class TrafficSimulation
         }
 
         Demand(dt);
+        RunLines();
         foreach (var vehicle in _vehicles)
         {
             vehicle.Acceleration = AccelerationOf(vehicle);
@@ -495,6 +613,12 @@ public sealed class TrafficSimulation
         if (StopLine(vehicle, lookahead) is { } line && line < gap)
         {
             (gap, leaderSpeed) = (line, 0);
+        }
+
+        if (BusStopAhead(vehicle, lookahead) is { } stop && stop < gap)
+        {
+            // Pulling up at the stop: the stop is where its front comes to rest.
+            (gap, leaderSpeed) = (stop + vehicle.Kind.MinGap, 0);
         }
 
         var free = 1 - MathF.Pow(v / MathF.Max(desired, 0.1f), 4);
@@ -754,7 +878,7 @@ public sealed class TrafficSimulation
         }
 
         var lane = vehicle.Lane;
-        if (lane.IsJunction || lane.Road is not { } road || vehicle.Destination is not { } destination || vehicle.ChangingFrom is not null
+        if (vehicle.StopsLeft.Count > 0 || lane.IsJunction || lane.Road is not { } road || vehicle.Destination is not { } destination || vehicle.ChangingFrom is not null
             || vehicle.Committed is not null || Time < vehicle.NextChange || vehicle.Position < vehicle.Kind.Length + 2
             || lane.Length - vehicle.Position < 20)
         {
@@ -986,6 +1110,12 @@ public sealed class TrafficSimulation
         _delayTotal += MathF.Max(0, travel - vehicle.FreeTime);
         _stopsTotal += vehicle.Stops;
         _finishTimes.Enqueue(Time);
+        if (vehicle.Line is { } line)
+        {
+            line.Completed++;
+            line.RunTimes += travel;
+        }
+
         Arrived?.Invoke(vehicle);
     }
 }
