@@ -147,7 +147,7 @@ cut on the marks as the harp crosses them, choose the days in the brine), which 
 where wheels ripen from young to very old and want turning every other day; the farm shop's customers, each wanting a
 ripeness and a flavour; and cows, racks, flavours, a better kettle and road signs to buy. Still to do:
 
-- A cheese fair every week: enter the best wheel, judged on its stars and ripeness, prizes and a ribbon on the wall.
+- The weekly cheese fair is in: one wheel judged on stars and age against three farms, prizes and rosettes.
 - The meadow mattering: grass and herbs changing the milk, and room left for meadow birds (as in the ideas below).
 - Milking as a little game of its own; the cows with names; calves.
 - Cheeses of more sizes (a baby cheese, a big wheel) and selling by the piece; seasons, and the market in town.
