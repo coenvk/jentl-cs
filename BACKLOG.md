@@ -257,9 +257,10 @@ These pass their tests but have not been checked by eye or ear. Screenshots are 
 game run with `--screenshot` keeps its window hidden (`JentlGame.Hidden`, `HiddenWindow`), so these can be checked
 while someone works at the screen.
 
+- Seen: larger text (`Fonts.TextScale`, now the options' text size up to 150%) in six apps; the music notice was moved
+  clear of the buttons.
 - The audio mixer's ducking, and sounds placed in the world.
 - Gamepad rumble on a real pad.
-- Larger text (`Fonts.TextScale`) across the screens.
 - Replaying recorded input through a running game.
 - Nine-slice panels and tooltips on screen.
 - Naming a suit after a wild at the Card Table (tested in code, not on screen).
