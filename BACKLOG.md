@@ -40,7 +40,8 @@ as WAV on the desktop. Still to do:
   to work on (the Loop chip or L; a bar's number moves it).
 - In (games-cs): notes resized from their end, moved by dragging, and selected together (Shift-drag or the Select
   chip), dragged, nudged with the arrows and deleted. Not yet tried by hand: a drag can't be scripted.
-- In the browser: WAV export as a download, and the clipboard.
+- In the browser: WAV export as a download, and the clipboard, are in (games-cs `PlatformFeatures.CopyText` and
+  `Download`); not yet tried in a browser by hand.
 - Play it on a phone: the grid is small for fingers.
 
 ### Animation
