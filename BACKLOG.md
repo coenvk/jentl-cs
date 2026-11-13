@@ -97,8 +97,7 @@ complete category frees, words on their own kind in any order in the columns, a 
 deals made from a bank of categories with limits from the autoplayer, giving Dutch levels (the English shapes filled
 with Dutch categories), a daily deal with a streak, and custom games of three sizes. Still to do:
 
-- Jokers (decided): a wild word that fills a slot an open category has, counting as one of its words; it can't open
-  a slot, and there is no bridging joker. About one a deal, more in the larger ones.
+- Jokers are in (games-cs): a wild ★ card that fills a slot an open category has; one a deal, two in a large one.
 - Picture cards; hand-made Dutch levels; a level editor.
 - Tuning the move limits by play (they are a quarter above a simple autoplayer's), and extra moves as a reward.
 
