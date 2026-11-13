@@ -104,7 +104,8 @@ with Dutch categories), a daily deal with a streak, and custom games of three si
 
 - Jokers are in (games-cs): a wild ★ card that fills a slot an open category has; one a deal, two in a large one.
 - Picture cards; hand-made Dutch levels; a level editor.
-- Tuning the move limits by play (they are a quarter above a simple autoplayer's), and extra moves as a reward.
+- Tuning the move limits by play (they are a quarter above a simple autoplayer's). A move back for each category
+  finished is in (games-cs).
 
 ### Hot Pan: more for the frying pan
 
