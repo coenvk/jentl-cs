@@ -315,7 +315,7 @@ internal static class RulesetReader
 
     private static TurnRules ReadTurns(Node node)
     {
-        node.Allow("stock", "discard", "hand", "draw", "afterDraw", "afterPenalty", "reshuffle");
+        node.Allow("stock", "discard", "hand", "draw", "afterDraw", "afterPenalty", "reshuffle", "call");
         return new TurnRules
         {
             Stock = node.Get("stock")?.Text() ?? "stock",
@@ -325,7 +325,14 @@ internal static class RulesetReader
             AfterDraw = node.Get("afterDraw") is { } after ? (AfterDraw)after.Choice("afterDraw", "mayPlay", "pass", "untilPlayable") : AfterDraw.MayPlay,
             AfterPenalty = node.Get("afterPenalty") is { } penalty ? (AfterDraw)penalty.Choice("afterPenalty", "mayPlay", "pass", "untilPlayable") : null,
             Reshuffle = node.Get("reshuffle")?.Flag() ?? true,
+            Call = node.Get("call") is { } call ? ReadCall(call) : null,
         };
+    }
+
+    private static CallRule ReadCall(Node node)
+    {
+        node.Allow("name", "cards", "penalty");
+        return new CallRule(node.Get("name")?.Text() ?? "Last card!", node.Get("cards")?.Whole(1, 5) ?? 1, node.Get("penalty")?.Whole(0, 10) ?? 2);
     }
 
     private static WinRule ReadWin(Node? node, bool players)

@@ -32,7 +32,13 @@ public sealed class RulesetBot : IBot<RulesetGame, CardInput>
         var plays = moves.OfType<ClickPile>().Where(m => m.Pile == hand).ToList();
         if (plays.Count == 0)
         {
-            return moves[0];
+            return moves.FirstOrDefault(m => m is not CallOut) ?? moves[0];
+        }
+
+        // It never forgets the call before its second-last card.
+        if (moves.Contains(CallOut.Instance))
+        {
+            return CallOut.Instance;
         }
 
         var next = game.Hand((((seat + game.Direction) % game.Players) + game.Players) % game.Players);

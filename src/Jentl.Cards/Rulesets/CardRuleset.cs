@@ -319,6 +319,12 @@ public enum AfterDraw
     UntilPlayable,
 }
 
+/// <summary>
+/// A call a player makes before playing down to <paramref name="Cards"/> cards (Uno's "Uno!", Mau-Mau's "Mau!"): one who
+/// plays down to that many without having called draws <paramref name="Penalty"/> cards.
+/// </summary>
+public sealed record CallRule(string Name, int Cards = 1, int Penalty = 2);
+
 /// <summary>How turns go in a game for several players.</summary>
 public sealed record TurnRules
 {
@@ -343,6 +349,9 @@ public sealed record TurnRules
 
     /// <summary>Whether the discards (but the top) are shuffled back into an empty stock.</summary>
     public bool Reshuffle { get; init; } = true;
+
+    /// <summary>A call to make when going down to a few cards ("Last card!"), and what forgetting it costs; null for none.</summary>
+    public CallRule? Call { get; init; }
 }
 
 /// <summary>How a game is won.</summary>

@@ -205,11 +205,12 @@ told between levels. In the order I expect them to be popular, the most played f
 
 - Pyramid is a ruleset (0.6.46): `pairs` let two free cards adding up to a sum leave together, and a rank alone with
   a tap; `"faceUp": "all"` deals covered cards face up; the `pyramid` example.
-- Uno as a ruleset leaves out the "Uno!" call, challenging a +4, stacking draw cards and the starting card's effect.
-  Scripts could now carry most of these (as Mau-Mau's sevens stack); the hand-written Uno has them.
+- Colour Cards (Uno as a ruleset) has the "Last card!" call (`turns.call`, 0.6.53: forgetting costs two). It leaves out
+  challenging a +4, stacking draw cards and the starting card's effect; scripts could carry most of these (as
+  Mau-Mau's sevens stack), and the hand-written Uno has them.
 - Ruleset games for players are passed round (pass and play, a screen hiding the hand between turns) and played as
   matches to 100 points (games-cs); online play later.
-- Uno's "rev" label is cramped on its card.
+- Uno's "rev" label: seen again on the table (0.6.53), it reads well enough at hand size.
 - The ruleset bot plays well enough but simply: it doesn't count cards or think about the other players.
 
 ### Scripting

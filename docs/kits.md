@@ -199,7 +199,9 @@ RulesetLayout.Solitaire(view, game, area);             // each frame: the piles 
   the `to` pile; a rank in `alone` goes by itself with a tap. Hints and the bot take pairs first.
 - **Players**: `1` (a solitaire) or `{ "min": 2, "max": 8, "default": 4 }`. With players, `turns` names the `stock`,
   `discard` and `hand` piles, how many cards a `draw` takes, and `afterDraw`: `mayPlay` the card drawn, `pass`, or
-  `untilPlayable`; `afterPenalty` the same after a draw a script made bigger (Mau-Mau's sevens: `pass`); the discards are shuffled back into an empty stock. `effects` say what cards do, chosen by `rank`,
+  `untilPlayable`; `afterPenalty` the same after a draw a script made bigger (Mau-Mau's sevens: `pass`); the discards are shuffled back into an empty stock;
+  and a `call` (`{ "name": "Last card!", "cards": 1, "penalty": 2 }`) is made before playing down to that many cards
+  (`CallOut`), the penalty drawn by one who forgets. `effects` say what cards do, chosen by `rank`,
   `suit` or `tag`: `skip` players, `reverse` play (a skip for two), make the next player `draw`, `chooseSuit`, or
   `playAgain`.
 - **Win**: `"goals"` (every card on goal piles, for solitaires), `{ "empty": ["column"] }` (Golf), or `"emptyHand"`

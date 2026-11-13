@@ -12,6 +12,12 @@ public sealed record PassTurn : CardInput
     public static PassTurn Instance { get; } = new();
 }
 
+/// <summary>Makes the ruleset's call (<see cref="TurnRules.Call"/>) before playing down to its few cards.</summary>
+public sealed record CallOut : CardInput
+{
+    public static CallOut Instance { get; } = new();
+}
+
 /// <summary>
 /// A game played by a <see cref="CardRuleset"/>: it deals the table, and as the rules of the <see cref="Game"/> it
 /// checks and plays every input. Alone (a solitaire), the player drags cards between piles and taps piles, with undo,
@@ -29,6 +35,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
     private const string ChoosingCounter = "choosing";
     private const string SkippingCounter = "skipping";
     private const string WinnerCounter = "winner";
+    private const string CalledCounter = "called";
 
     private readonly Dictionary<Pile, (PileRule Rule, int Index)> _piles = [];
     private readonly Dictionary<string, List<Pile>> _groups = new(StringComparer.Ordinal);
@@ -98,6 +105,13 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
 
     /// <summary>Whether the current player has drawn and may now only play that card or pass.</summary>
     public bool HasDrawn => Table.Counter(DrawnCounter) != 0;
+
+    /// <summary>Whether the player whose turn it is has made the ruleset's call this turn.</summary>
+    public bool HasCalled => Table.Counter(CalledCounter) != 0;
+
+    /// <summary>Whether <paramref name="seat"/> may make the ruleset's call now: it is their turn and a card would take them down to the count.</summary>
+    public bool CanCall(int seat) => Ruleset.Turns.Call is { } call && !Ruleset.IsSolitaire && !IsOver && seat == CurrentSeat
+        && !HasCalled && !IsChoosingSuit && Hand(seat).Count is var count && count > call.Cards && count <= call.Cards + 1;
 
     /// <summary>Who won a game for several players, or null.</summary>
     public int? Winner => Table.Counter(WinnerCounter) is > 0 and var winner ? winner - 1 : null;
@@ -705,6 +719,11 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             }
         }
 
+        if (CanCall(seat))
+        {
+            moves.Add(CallOut.Instance);
+        }
+
         if (HasDrawn || !CanDraw)
         {
             moves.Add(PassTurn.Instance);
@@ -756,6 +775,10 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
                 return Draw(turn, seat);
             case DragCards drag when drag.From == Stock && drag.To == hand && !HasDrawn:
                 return Draw(turn, seat);
+            case CallOut when CanCall(seat):
+                turn.Count(CalledCounter, 1);
+                turn.Tag("call");
+                return true;
             case PassTurn when HasDrawn || !CanDraw:
                 turn.Tag("pass");
                 EndTurn(turn, seat, 0, playAgain: false);
@@ -785,6 +808,21 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             turn.Tag("win");
             return true;
         }
+
+        // Down to the call's count: called, or the penalty drawn for forgetting.
+        if (Ruleset.Turns.Call is { } call && hand.Count == call.Cards)
+        {
+            if (HasCalled)
+            {
+                turn.Tag("called");
+            }
+            else
+            {
+                turn.Tag($"forgot:{DrawCards(turn, seat, call.Penalty)}");
+            }
+        }
+
+        turn.Count(CalledCounter, -Table.Counter(CalledCounter));
 
         var effects = Ruleset.Effects.Where(e => e.Cards.Matches(face)).ToList();
         var skip = effects.Sum(e => e.Skip);
@@ -917,6 +955,7 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
     private void EndTurn(CardTurnBuilder turn, int seat, int skip, bool playAgain)
     {
         turn.Count(DrawnCounter, -Table.Counter(DrawnCounter));
+        turn.Count(CalledCounter, -Table.Counter(CalledCounter));
         if (!playAgain)
         {
             turn.Count(SeatCounter, Next(seat, 1 + skip) - seat);

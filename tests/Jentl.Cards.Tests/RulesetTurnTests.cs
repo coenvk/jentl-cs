@@ -5,7 +5,7 @@ namespace Jentl.Cards.Tests;
 
 public class RulesetTurnTests
 {
-    private static readonly CardRuleset Mini = CardRuleset.Parse("""
+    private const string MiniJson = """
         {
           "name": "Mini",
           "deck": {
@@ -27,7 +27,9 @@ public class RulesetTurnTests
           ],
           "win": "emptyHand"
         }
-        """);
+        """;
+
+    private static readonly CardRuleset Mini = CardRuleset.Parse(MiniJson);
 
     private static void Play(RulesetGame game, int seat, int index)
     {
@@ -126,6 +128,40 @@ public class RulesetTurnTests
         game.Fits(Card.Parse("2C"), game.Discard).Should().BeTrue();
         game.Fits(Card.Parse("8D"), game.Discard).Should().BeTrue();
         game.Fits(Card.Parse("2H"), game.Discard).Should().BeFalse();
+    }
+
+    private static readonly CardRuleset Calling = CardRuleset.Parse(MiniJson.Replace("\"win\": \"emptyHand\"", "\"turns\": { \"call\": { \"name\": \"Last card!\" } }, \"win\": \"emptyHand\"", StringComparison.Ordinal));
+
+    [Fact]
+    public void PlayingDownToOneCard_WithoutTheCall_DrawsTwo()
+    {
+        var game = new RulesetGame(Calling, Order(Calling, "red 1", "red 2", "blue 2", "blue 3", "red 3", "blue 1", "red skip", "red rev", "blue rev", "blue skip", "wild", "red +2", "blue +2"));
+        game.Hand(0).Count.Should().Be(3);
+        Play(game, 0, 0);
+        game.Hand(0).Count.Should().Be(2, "three cards is no call yet");
+
+        Play(game, 1, 0);
+        Play(game, 2, 0);
+        game.LegalMoves(0).Should().Contain(CallOut.Instance);
+        Play(game, 0, 0);
+        game.Hand(0).Count.Should().Be(3, "one left, and two drawn for forgetting the call");
+    }
+
+    [Fact]
+    public void PlayingDownToOneCard_AfterTheCall_Goes()
+    {
+        var game = new RulesetGame(Calling, Order(Calling, "red 1", "red 2", "blue 2", "blue 3", "red 3", "blue 1", "red skip", "red rev", "blue rev", "blue skip", "wild", "red +2", "blue +2"));
+        Play(game, 0, 0);
+        Play(game, 1, 0);
+        Play(game, 2, 0);
+
+        game.Apply(0, CallOut.Instance);
+        game.HasCalled.Should().BeTrue();
+        game.CurrentSeat.Should().Be(0, "calling is not the turn");
+        game.LegalMoves(0).Should().NotContain(CallOut.Instance);
+        Play(game, 0, 0);
+        game.Hand(0).Count.Should().Be(1);
+        game.HasCalled.Should().BeFalse();
     }
 
     [Theory]
