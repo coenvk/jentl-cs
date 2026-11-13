@@ -238,6 +238,9 @@ told between levels. In the order I expect them to be popular, the most played f
 - The flaky server test was a bot's hello racing a ten-second limit under load; the league's start limit is now a
   setting and its tests have room. Watch for others: three GameServer tests failed once more in a cold run straight
   after a fresh restore (0.6.40), and passed in five runs after; the names weren't caught.
+- Caught one (0.6.54): `RunnerEndToEndTests.ABotThatPlaysLegally_PlaysLegallyOnline` failed after ten seconds in a
+  full run under load, and passed three runs alone; likely a bot's answer counted late. Give the runner's answer
+  limit room in tests, as the league's.
 
 ## Built but never seen or heard
 
