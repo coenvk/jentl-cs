@@ -88,7 +88,7 @@ categories, timed, with a streak of days. Still to do:
 - Decided: a matched row leaves the grid, and a wrong drop costs only its move (no lives), unless the Android
   original turns out to do otherwise.
 - Many more levels written by hand, and a level editor or a format others can write them in.
-- Cards sliding into each other as they merge, and the solved row flying up to its place.
+- Merges slide in and matched rows fly up to their banner (games-cs).
 
 ### Associate Words: more of it
 
