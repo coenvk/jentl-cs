@@ -148,7 +148,8 @@ where wheels ripen from young to very old and want turning every other day; the 
 ripeness and a flavour; and cows, racks, flavours, a better kettle and road signs to buy. Still to do:
 
 - The weekly cheese fair is in: one wheel judged on stars and age against three farms, prizes and rosettes.
-- The meadow mattering: grass and herbs changing the milk, and room left for meadow birds (as in the ideas below).
+- The meadow is in: six fields of grass, herbs (richer milk) or left for meadow birds (chicks, and walkers at the
+  shop); cows the meadow can't feed eat bought feed. Still: mowing and hay, and seasons for the nesting.
 - Milking as a little game of its own; the cows with names; calves.
 - Cheeses of more sizes (a baby cheese, a big wheel) and selling by the piece; seasons, and the market in town.
 - A song of its own for the farm (it plays the village's songs now), and art beyond shapes.
