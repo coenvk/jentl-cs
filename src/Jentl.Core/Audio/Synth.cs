@@ -120,6 +120,15 @@ public sealed record Tune(int Tempo, IReadOnlyList<Voice> Voices, int StepsPerBe
 
     /// <summary>How much of a room's echo is heard: 0 none, 0.3 a hall, 0.6 a cathedral.</summary>
     public float Reverb { get; init; }
+
+    /// <summary>
+    /// How late every second step comes, as a share of a step: 0 is straight, a third the lilt of a shuffle (two to
+    /// one), a half as far as it goes. The steps are swung in pairs, so the beats themselves stay on time.
+    /// </summary>
+    public float Swing { get; init; }
+
+    /// <summary>When a step starts, in steps from the start: the off steps a little late when <see cref="Swing"/>ing.</summary>
+    public double StepTime(int step) => step + (step % 2 != 0 ? Math.Clamp(Swing, 0, 0.5f) : 0);
 }
 
 /// <summary>
@@ -212,8 +221,8 @@ public static class Synth
             {
                 if (step.Frequency > 0)
                 {
-                    var start = (int)Math.Round(position * stepSamples);
-                    var held = step.Length * stepSamples;
+                    var start = (int)Math.Round(tune.StepTime(position) * stepSamples);
+                    var held = (tune.StepTime(position + step.Length) - tune.StepTime(position)) * stepSamples;
                     Note(mix, start, held, step.Frequency, voice.Instrument, sampleRate, loop ? length : 0, noise);
                 }
 

@@ -58,6 +58,9 @@ public sealed class Composition
 
     public float Reverb { get; set; } = 0.25f;
 
+    /// <summary>How late every second step comes, 0 (straight) to 0.5: see <see cref="Tune.Swing"/>.</summary>
+    public float Swing { get; set; }
+
     /// <summary>How long the song is.</summary>
     public int Bars { get; set; } = 8;
 
@@ -83,7 +86,7 @@ public sealed class Composition
             voices.Add(new Voice(Instruments.Harp, string.Join(' ', Enumerable.Repeat(".", Math.Max(1, (end - from) * StepsPerBar)))));
         }
 
-        return new Tune(Tempo, voices, StepsPerBeat) { Reverb = Reverb };
+        return new Tune(Tempo, voices, StepsPerBeat) { Reverb = Reverb, Swing = Swing };
     }
 
     /// <summary>The composition as the C# of a <see cref="Tune"/>, for pasting into a game.</summary>
@@ -99,7 +102,8 @@ public sealed class Composition
             voices.AddRange(Lines(channel, 0, Bars).Select(steps => $"    new Voice({name}{volume}, \"{InBars(steps)}\")"));
         }
 
-        return string.Create(CultureInfo.InvariantCulture, $"// {Title}\nnew Tune({Tempo}, [\n{string.Join(",\n", voices)},\n], {StepsPerBeat}) {{ Reverb = {Reverb:0.##}f }};\n");
+        var swing = Swing > 0 ? string.Create(CultureInfo.InvariantCulture, $", Swing = {Swing:0.##}f") : "";
+        return string.Create(CultureInfo.InvariantCulture, $"// {Title}\nnew Tune({Tempo}, [\n{string.Join(",\n", voices)},\n], {StepsPerBeat}) {{ Reverb = {Reverb:0.##}f{swing} }};\n");
     }
 
     public string ToJson()
@@ -130,6 +134,7 @@ public sealed class Composition
             ["beatsPerBar"] = BeatsPerBar,
             ["stepsPerBeat"] = StepsPerBeat,
             ["reverb"] = Reverb,
+            ["swing"] = Swing,
             ["bars"] = Bars,
             ["channels"] = channels,
         }.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
@@ -148,6 +153,7 @@ public sealed class Composition
                 BeatsPerBar = Math.Clamp((int?)node["beatsPerBar"] ?? 4, 2, 7),
                 StepsPerBeat = Math.Clamp((int?)node["stepsPerBeat"] ?? 4, 1, 8),
                 Reverb = Math.Clamp((float?)node["reverb"] ?? 0.25f, 0, 1),
+                Swing = Math.Clamp((float?)node["swing"] ?? 0, 0, 0.5f),
                 Bars = Math.Clamp((int?)node["bars"] ?? 8, 1, 256),
             };
             foreach (var item in node["channels"]?.AsArray() ?? [])

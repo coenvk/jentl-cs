@@ -532,7 +532,8 @@ harmonics (organs, pianos, reeds; the higher ones may fade faster), and `Wave.Ch
 play as several detuned copies (`Unison`, `Detune`: strings, a choir), through a low-pass filter that can open
 with the envelope (`Cutoff`, `CutoffEnvelope`), with breath noise, and with a decay that rings away like a struck
 thing (`Ring`). A tune's `Reverb` puts it in a room, from a hall (0.3) to a cathedral (0.6); a loop's echo wraps
-round to its start. `Instruments` has the presets, matched in volume: harp, lute, guitar, harpsichord, pizzicato,
+round to its start. `Swing` puts every second step a little late (a third of a step for a shuffle), the beats
+staying on time. `Instruments` has the presets, matched in volume: harp, lute, guitar, harpsichord, pizzicato,
 upright bass, strings, violin, cello, flute, recorder, pan pipes, clarinet, oboe, accordion, horn, trumpet, brass,
 choir, organ, piano, electric piano, celesta, bells, marimba, timpani, frame drum, kick, snare, shaker, cymbal and
 the chiptune voices (`Instruments.All` lists them by name).
