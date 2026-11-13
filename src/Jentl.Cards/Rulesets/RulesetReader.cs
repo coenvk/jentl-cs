@@ -32,7 +32,7 @@ internal static class RulesetReader
 
     private static CardRuleset ReadRuleset(Node root)
     {
-        root.Allow("name", "description", "deck", "jokers", "players", "piles", "effects", "turns", "win", "script");
+        root.Allow("name", "description", "deck", "jokers", "players", "piles", "effects", "turns", "win", "script", "pairs");
         var (min, max, preferred) = root.Get("players") is { } players ? ReadPlayers(players) : (1, 1, 1);
         var deck = ReadDeck(root.Get("deck") ?? throw root.Error("needs a deck (\"standard\", \"uno\" or one of its own)"), root.Get("jokers"));
         var piles = root.Require("piles").Items().Select((pile, _) => ReadPile(pile)).ToList();
@@ -45,6 +45,24 @@ internal static class RulesetReader
             Effects = root.Get("effects")?.Items().Select(ReadEffect).ToList() ?? [],
             Turns = root.Get("turns") is { } turns ? ReadTurns(turns) : new TurnRules(),
             Script = root.Get("script") is { } script ? script.Source() : null,
+            Pairs = root.Get("pairs") is { } pairs ? ReadPairs(pairs, piles) : null,
+        };
+    }
+
+    private static PairRule ReadPairs(Node node, IReadOnlyList<PileRule> piles)
+    {
+        node.Allow("sum", "from", "to", "alone");
+        var names = piles.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        string Known(Node name) => names.Contains(name.Text()) ? name.Text() : throw name.Error($"'{name.Text()}' isn't one of the piles");
+        var from = node.Require("from").Items().Select(Known).ToList();
+        if (from.Count == 0)
+        {
+            throw node.Error("pairs need piles to come \"from\"");
+        }
+
+        return new PairRule(node.Require("sum").Whole(2, 200), from, Known(node.Require("to")))
+        {
+            Alone = node.Get("alone")?.Items().Select(a => a.Whole(1, 200)).ToList() ?? [],
         };
     }
 
@@ -197,8 +215,9 @@ internal static class RulesetReader
             Counts = node.Get("cards") is { } cards ? cards.Counts(count) : [0],
             Rest = node.Get("rest")?.Flag() ?? false,
             FaceDown = node.Get("faceDown")?.Counts(count),
-            FaceUp = faceUp is null || (faceUp.Element.ValueKind == JsonValueKind.String ? faceUp.Choice("faceUp", "top") >= 0 : faceUp.Flag()),
-            TopOnly = faceUp?.Element.ValueKind == JsonValueKind.String,
+            FaceUp = faceUp is null || (faceUp.Element.ValueKind == JsonValueKind.String ? faceUp.Choice("faceUp", "top", "all") >= 0 : faceUp.Flag()),
+            TopOnly = faceUp?.Element.ValueKind == JsonValueKind.String && faceUp.Text() == "top",
+            Open = faceUp?.Element.ValueKind == JsonValueKind.String && faceUp.Text() == "all",
             Not = node.Get("not")?.Text(),
         };
     }

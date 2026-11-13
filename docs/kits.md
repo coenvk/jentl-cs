@@ -177,7 +177,8 @@ RulesetLayout.Solitaire(view, game, area);             // each frame: the piles 
 - **Piles**: a `name` (a group of `count` piles is named `column0`, `column1` ...; `perPlayer` makes one per player),
   `goal` for foundations, and:
   - `deal`: `cards` (a number, a list by pile, or `"index+1"`), `rest` for the stock, `faceUp` (`true`, `false`, `"top"`),
-    `faceDown` (counts by pile, Yukon's `"index"`), `not` (a rank or tag never dealt there: no wild to start a discard).
+    `faceDown` (counts by pile, Yukon's `"index"`), `not` (a rank or tag never dealt there: no wild to start a discard);
+    `"faceUp": "top"` turns up only the top card, `"faceUp": "all"` covered piles' cards too.
   - `build`, what may be put on it: `rank` (`up`, `down`, `updown`, `same`, `any`; `wrap` from king to ace), `suit`
     (`same`, `alternate` colours, `samecolour`, `different`, `any`), `empty` (the rank an empty pile takes, or `none`),
     `max` cards (1 for a free cell), `from` (only from these piles), `runs` (whether several cards at once; goal piles
@@ -191,8 +192,11 @@ RulesetLayout.Solitaire(view, game, area);             // each frame: the piles 
   - `at`, `step` and `fan` (`stacked`, `down`, `right`): where it goes, in card sizes, for `RulesetLayout`; `places`
     lists each pile's spot (from `at`) for layouts that aren't rows.
   - `coveredBy`, for overlapping cards (TriPeaks, Pyramid): for each pile of the group, the piles of it lying over it.
-    A covered pile is dealt face down, can't be taken from, and turns up once everything over it has gone; the
-    `tripeaks` example is built this way.
+    A covered pile is dealt face down (unless the deal says `"faceUp": "all"`), can't be taken from, and turns up once
+    everything over it has gone; the `tripeaks` and `pyramid` examples are built this way.
+- **Pairs**: `"pairs": { "sum": 13, "from": ["peak", "waste"], "to": "discard", "alone": [13] }` lets cards leave in
+  twos (Pyramid): drop one free card from those piles on another and, when their ranks add up to the sum, both go to
+  the `to` pile; a rank in `alone` goes by itself with a tap. Hints and the bot take pairs first.
 - **Players**: `1` (a solitaire) or `{ "min": 2, "max": 8, "default": 4 }`. With players, `turns` names the `stock`,
   `discard` and `hand` piles, how many cards a `draw` takes, and `afterDraw`: `mayPlay` the card drawn, `pass`, or
   `untilPlayable`; `afterPenalty` the same after a draw a script made bigger (Mau-Mau's sevens: `pass`); the discards are shuffled back into an empty stock. `effects` say what cards do, chosen by `rank`,

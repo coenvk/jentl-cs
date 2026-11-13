@@ -196,8 +196,8 @@ told between levels. In the order I expect them to be popular, the most played f
 
 ### Cards and rulesets
 
-- Pyramid as a ruleset: covered piles are in (`coveredBy`, `places`; the `tripeaks` example); next, a general pair
-  move (two cards leaving together when a condition holds, such as adding up to thirteen), then Pyramid.
+- Pyramid is a ruleset (0.6.46): `pairs` let two free cards adding up to a sum leave together, and a rank alone with
+  a tap; `"faceUp": "all"` deals covered cards face up; the `pyramid` example.
 - Uno as a ruleset leaves out the "Uno!" call, challenging a +4, stacking draw cards and the starting card's effect.
   Scripts could now carry most of these (as Mau-Mau's sevens stack); the hand-written Uno has them.
 - Ruleset games for players are against bots only. Decided next: passing the device round (a screen hiding the hand

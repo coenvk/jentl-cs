@@ -188,6 +188,12 @@ public sealed record DealRule
     /// <summary>Whether only the top card is face up.</summary>
     public bool TopOnly { get; init; }
 
+    /// <summary>
+    /// Whether covered piles are dealt face up too (<c>"faceUp": "all"</c>: Pyramid, where every card shows); otherwise
+    /// a covered card lies face down until what is over it has gone (TriPeaks).
+    /// </summary>
+    public bool Open { get; init; }
+
     /// <summary>Cards of this rank or with this tag aren't dealt here: put to the back of the deck and the next one taken (no wild to start the discard).</summary>
     public string? Not { get; init; }
 
@@ -358,12 +364,25 @@ public sealed record WinRule(WinKind Kind)
 }
 
 /// <summary>
+/// Cards that leave in twos (Pyramid's pairs): two free cards from the <see cref="From"/> piles whose ranks add up to
+/// <see cref="Sum"/> go together to the <see cref="To"/> pile, dragged one onto the other; a card whose rank is in
+/// <see cref="Alone"/> (Pyramid's king) goes by itself, with a tap.
+/// </summary>
+public sealed record PairRule(int Sum, IReadOnlyList<string> From, string To)
+{
+    public IReadOnlyList<int> Alone { get; init; } = [];
+}
+
+/// <summary>
 /// A card game written down: the deck, how many play, the piles with their deal and rules, what cards do, how turns go
 /// and how it is won. <see cref="RulesetGame"/> plays it. Read one from JSON with <see cref="Parse"/>; the guide lists
 /// every field.
 /// </summary>
 public sealed record CardRuleset(string Name, CardDeck Deck, IReadOnlyList<PileRule> Piles, WinRule Win)
 {
+    /// <summary>Cards leaving in twos, or none.</summary>
+    public PairRule? Pairs { get; init; }
+
     public string Description { get; init; } = "";
 
     public int MinPlayers { get; init; } = 1;

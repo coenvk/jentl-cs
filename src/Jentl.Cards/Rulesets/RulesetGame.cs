@@ -322,6 +322,29 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
             }
         }
 
+        // Pairs, and cards that leave alone: before any other move, as they are what clears the table.
+        if (Ruleset.Pairs is { } pairing)
+        {
+            var free = _piles.Keys.Where(p => Free(p, pairing)).ToList();
+            foreach (var pile in free.Where(p => pairing.Alone.Contains(p.Top!.Value.Card.Face.Order)))
+            {
+                moves.Add((300, new ClickPile(pile, pile.Count - 1)));
+            }
+
+            for (var a = 0; a < free.Count; a++)
+            {
+                for (var b = a + 1; b < free.Count; b++)
+                {
+                    if (CanPair(free[a], free[a].Count - 1, free[b]))
+                    {
+                        // A pair from the pyramid itself first: the waste can wait.
+                        var score = 200 + (RuleOf(free[a]).Name == RuleOf(free[b]).Name ? 20 : 0);
+                        moves.Add((score, new DragCards(free[a], free[a].Count - 1, free[b])));
+                    }
+                }
+            }
+        }
+
         var hints = moves.OrderByDescending(m => m.Score).Select(m => m.Move).ToList();
         foreach (var (pile, (rule, _)) in _piles)
         {
@@ -390,9 +413,9 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
                     if (round < counts[i])
                     {
                         var card = Take(deck, rule.Deal);
-                        // A covered pile's card lies face down until what is over it has gone.
+                        // A covered pile's card lies face down until what is over it has gone, unless all are open.
                         var faceUp = dealt[i]++ >= rule.Deal.FaceDownFor(i, counts[i]);
-                        group[i].Deal(card, faceUp: faceUp && (rule.CoveredBy is not { } covers || covers[i].Count == 0));
+                        group[i].Deal(card, faceUp: faceUp && (rule.Deal.Open || rule.CoveredBy is not { } covers || covers[i].Count == 0));
                     }
                 }
             }
@@ -474,10 +497,36 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
 
     private bool PlaySolitaire(CardTurnBuilder turn, CardInput input) => input switch
     {
-        DragCards drag => drag.From != drag.To && CanMove(drag.From, drag.Index, drag.To) && Move(turn, drag.From, drag.Index, drag.To),
+        DragCards drag => drag.From != drag.To && (CanPair(drag.From, drag.Index, drag.To)
+            ? Pair(turn, drag.From, drag.To)
+            : CanMove(drag.From, drag.Index, drag.To) && Move(turn, drag.From, drag.Index, drag.To)),
         ClickPile click => Tap(turn, click.Pile, click.Index),
         _ => false,
     };
+
+    /// <summary>Whether a free card dropped on another free one makes a pair that leaves (see <see cref="PairRule"/>).</summary>
+    public bool CanPair(Pile from, int index, Pile to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+        return Ruleset.Pairs is { } pairs && from != to && index == from.Count - 1 && Free(from, pairs) && Free(to, pairs)
+            && from[index].Card.Face.Order + to.Top!.Value.Card.Face.Order == pairs.Sum;
+    }
+
+    // The top card of a pile pairs may come from, face up and not covered.
+    private bool Free(Pile pile, PairRule pairs) =>
+        !pile.IsEmpty && pairs.From.Contains(RuleOf(pile).Name) && pile.Top!.Value.FaceUp && CanTake(pile, pile.Count - 1);
+
+    private bool Pair(CardTurnBuilder turn, Pile from, Pile to)
+    {
+        var goal = Piles(Ruleset.Pairs!.To)[0];
+        turn.Move(from, from.Count - 1, goal);
+        turn.Move(to, to.Count - 1, goal);
+        turn.Tag("pair");
+        turn.Tag("goal");
+        Uncover(turn);
+        return true;
+    }
 
     private bool Move(CardTurnBuilder turn, Pile from, int index, Pile to)
     {
@@ -556,6 +605,15 @@ public sealed class RulesetGame : ICardRules, ITurnBasedGame<CardInput>
         if (index < 0 || !CanTake(pile, index))
         {
             return false;
+        }
+
+        // A card that leaves by itself (Pyramid's king).
+        if (Ruleset.Pairs is { } pairs && index == pile.Count - 1 && Free(pile, pairs) && pairs.Alone.Contains(pile[index].Card.Face.Order))
+        {
+            turn.Move(pile, index, Piles(pairs.To)[0]);
+            turn.Tag("goal");
+            Uncover(turn);
+            return true;
         }
 
         // A tap sends the card where it does most: a goal pile, else a pile it builds on, else an empty one.

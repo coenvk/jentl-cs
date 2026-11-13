@@ -30,7 +30,7 @@ public class RulesetTests
     [Fact]
     public void TheExamples_AreAllThere()
     {
-        RulesetExamples.Names.Should().Equal("crazyeights", "fortythieves", "freecell", "golf", "klondike", "maumau", "spider", "tripeaks", "uno", "yukon");
+        RulesetExamples.Names.Should().Equal("crazyeights", "fortythieves", "freecell", "golf", "klondike", "maumau", "pyramid", "spider", "tripeaks", "uno", "yukon");
     }
 
     [Theory]
@@ -39,6 +39,7 @@ public class RulesetTests
     [InlineData("spider")]
     [InlineData("golf")]
     [InlineData("tripeaks")]
+    [InlineData("pyramid")]
     [InlineData("yukon")]
     [InlineData("fortythieves")]
     [InlineData("crazyeights")]
@@ -75,6 +76,62 @@ public class RulesetTests
         }
 
         peaks.Take(18).Count(p => p.Top is not { FaceUp: false }).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Pyramid_TakesAwayFreeCardsAddingUpToThirteen_AndKingsAlone()
+    {
+        for (var seed = 1; seed < 500; seed++)
+        {
+            var game = new RulesetGame(RulesetExamples.Load("pyramid"), seed: seed);
+            var peaks = game.Piles("peak");
+            var bottom = peaks.Skip(21).ToList();
+            peaks.Should().OnlyContain(p => p.Top!.Value.FaceUp, "the whole pyramid is dealt face up");
+            peaks.Take(21).Should().OnlyContain(p => game.IsCovered(p));
+            int Rank(Pile pile) => pile.Top!.Value.Card.Face.Order;
+
+            var pair = bottom.SelectMany(a => bottom.Where(b => b != a && Rank(a) + Rank(b) == 13).Select(b => (A: a, B: b))).FirstOrDefault();
+            var king = bottom.FirstOrDefault(p => Rank(p) == 13);
+            var miss = bottom.SelectMany(a => bottom.Where(b => b != a && Rank(a) + Rank(b) != 13).Select(b => (A: a, B: b))).First();
+            if (pair.A is null || king is null)
+            {
+                continue;
+            }
+
+            // Two that don't make thirteen stay; a covered card doesn't pair even when the sum is right.
+            game.CanPair(miss.A, 0, miss.B).Should().BeFalse();
+            var covered = peaks.Take(21).FirstOrDefault(p => Rank(p) + Rank(pair.A) == 13);
+            if (covered is not null)
+            {
+                game.CanPair(pair.A, 0, covered).Should().BeFalse("it lies under others");
+            }
+
+            // The hint is a pair or a king: they clear the table.
+            game.Hints(game.Table).First().Should().Match<CardInput>(h => h is DragCards || h is ClickPile);
+
+            var turn = game.Game.Play(new DragCards(pair.A, 0, pair.B));
+            turn!.Has("pair").Should().BeTrue();
+            (pair.A.IsEmpty, pair.B.IsEmpty).Should().Be((true, true));
+            game.Table["discard"].Count.Should().Be(2);
+
+            game.Game.Play(new ClickPile(king, 0))!.Has("goal").Should().BeTrue("a king goes by itself");
+            game.Table["discard"].Count.Should().Be(3);
+            game.Game.Undo();
+            king.IsEmpty.Should().BeFalse();
+            return;
+        }
+
+        Assert.Fail("No deal had a pair and a king on the bottom row.");
+    }
+
+    [Fact]
+    public void Pairs_NameOnlyPilesThereAre()
+    {
+        const string Json = """
+            { "name": "x", "deck": "standard", "piles": [ { "name": "a", "deal": { "rest": true } } ],
+              "pairs": { "sum": 13, "from": ["a", "b"], "to": "a" } }
+            """;
+        FluentActions.Invoking(() => CardRuleset.Parse(Json)).Should().Throw<InvalidDataException>().WithMessage("*'b' isn't one of the piles*");
     }
 
     [Fact]
