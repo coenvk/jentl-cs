@@ -32,10 +32,12 @@ public static class Tooltip
         return bounds;
     }
 
-    /// <summary>Where a tooltip of <paramref name="size"/> goes for <paramref name="target"/>: centred below it, above it when it would leave <paramref name="screen"/> there.</summary>
+    /// <summary>Where a tooltip of <paramref name="size"/> goes for <paramref name="target"/>: centred below it, above it when it would leave <paramref name="screen"/> there, kept a little clear of the screen's sides.</summary>
     public static Rectangle Place(Point size, Rectangle target, Rectangle screen)
     {
-        var x = Math.Clamp(target.Center.X - size.X / 2, screen.Left, Math.Max(screen.Left, screen.Right - size.X));
+        // Clear of the screen's sides by the gap, where it is narrow enough.
+        var (left, right) = size.X + (2 * Gap) <= screen.Width ? (screen.Left + Gap, screen.Right - Gap) : (screen.Left, screen.Right);
+        var x = Math.Clamp(target.Center.X - size.X / 2, left, Math.Max(left, right - size.X));
         var y = target.Bottom + Gap;
         if (y + size.Y > screen.Bottom && target.Top - Gap - size.Y >= screen.Top)
         {

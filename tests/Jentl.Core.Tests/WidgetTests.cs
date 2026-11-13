@@ -132,8 +132,8 @@ public class WidgetTests
 
         Tooltip.Place(new Point(200, 50), new Rectangle(100, 100, 40, 40), screen).Should().Be(new Rectangle(20, 146, 200, 50));
         Tooltip.Place(new Point(200, 50), new Rectangle(100, 540, 40, 40), screen).Y.Should().Be(540 - 6 - 50);
-        Tooltip.Place(new Point(200, 50), new Rectangle(0, 100, 10, 10), screen).X.Should().Be(0);
-        Tooltip.Place(new Point(200, 50), new Rectangle(790, 100, 10, 10), screen).Right.Should().Be(800);
+        Tooltip.Place(new Point(200, 50), new Rectangle(0, 100, 10, 10), screen).X.Should().Be(6, "clear of the side");
+        Tooltip.Place(new Point(200, 50), new Rectangle(790, 100, 10, 10), screen).Right.Should().Be(794);
     }
 
     [Fact]

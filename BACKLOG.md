@@ -259,10 +259,10 @@ while someone works at the screen.
 
 - Seen: larger text (`Fonts.TextScale`, now the options' text size up to 150%) in six apps; the music notice was moved
   clear of the buttons.
+- Seen: nine-slice frames and tooltips, in the Lab's UI demo (0.6.57: tooltips keep clear of the screen's sides).
 - The audio mixer's ducking, and sounds placed in the world.
 - Gamepad rumble on a real pad.
 - Replaying recorded input through a running game.
-- Nine-slice panels and tooltips on screen.
 - Naming a suit after a wild at the Card Table (tested in code, not on screen).
 - The 3D, scripting and ruleset kits in the browser.
 
