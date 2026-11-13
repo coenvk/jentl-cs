@@ -159,8 +159,8 @@ ripeness and a flavour; and cows, racks, flavours, a better kettle and road sign
   herd in the barn on hay in winter, nesting in spring and summer.
 - The cows have names, and calves are born and grow up in four weeks (games-cs). Milking by hand is a little game
   of its own each morning: squeeze in turn, steady, or she kicks the pail.
-- Cheeses of three sizes are in (a baby cheese, the farm wheel, a big wheel). Still: selling by the piece, and the
-  market in town.
+- Cheeses of three sizes are in (a baby cheese, the farm wheel, a big wheel). The market in town is in: midweek, a cart of
+  four wheels sold by the piece.
 - A song of its own for the farm (it plays the village's songs now), and art beyond shapes.
 - Tuning by play: prices, costs, how fast neglect bites; and on a phone.
 
