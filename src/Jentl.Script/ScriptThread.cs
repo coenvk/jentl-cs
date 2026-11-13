@@ -322,13 +322,24 @@ public sealed class ScriptThread : IScriptObject
                     break;
                 }
 
-                case OpCode.SetFieldBack:
+                case OpCode.PutBackField:
                 {
                     var value = Pop();
-                    var target = Pop();
-                    if (value.Type == ScriptType.Host && value.Raw is { } raw && raw.GetType().IsValueType)
+                    if (value.Type == ScriptType.Host && value.Raw is { } part && part.GetType().IsValueType)
                     {
-                        Operations.SetField(target, frame.Prototype.Constants[instruction.A].AsText, value);
+                        Operations.SetField(Peek, frame.Prototype.Constants[instruction.A].AsText, value);
+                    }
+
+                    break;
+                }
+
+                case OpCode.PutBackIndex:
+                {
+                    var value = Pop();
+                    var key = Pop();
+                    if (value.Type == ScriptType.Host && value.Raw is { } part && part.GetType().IsValueType)
+                    {
+                        Operations.SetIndex(Peek, key, value);
                     }
 
                     break;

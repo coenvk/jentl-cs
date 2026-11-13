@@ -215,8 +215,8 @@ told between levels. In the order I expect them to be popular, the most played f
 
 ### Scripting
 
-- Setting a part of a struct deeper than one step (`a.b.c.d = 1`), or of a struct in a list (`list[0].x = 1`), still
-  sets a copy; one step (`thing.position.x = 5`) is written back.
+- In (0.6.54): setting a part of a struct any number of steps deep (`a.b.c.d = 1`, `list[0].x += 1`) writes each copy
+  back.
 - Never run in the browser (it should work: nothing is generated at run time).
 
 ### 3D

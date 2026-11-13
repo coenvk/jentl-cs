@@ -52,10 +52,13 @@ internal enum OpCode : byte
     Closure,
 
     /// <summary>
-    /// A: a name. Pops a value and the object it was read from; when the value is one of the game's structs (a copy),
-    /// puts it back into the object under the name, so setting a part of it sticks.
+    /// A: a name. Pops a value, leaving the object it was read from; when the value is one of the game's structs (a
+    /// copy), puts it back into the object under the name. For writing back along a path, <c>a.b.c.d = v</c>.
     /// </summary>
-    SetFieldBack,
+    PutBackField,
+
+    /// <summary>As <see cref="PutBackField"/>, for a value read by index: pops the value and the key, leaving the object.</summary>
+    PutBackIndex,
 
     /// <summary>Opens a scope of A locals inside the running function's: a loop's variables for one time round.</summary>
     EnterScope,
@@ -370,26 +373,8 @@ internal sealed class Compiler
                 }
 
                 break;
-            case FieldExpression { Target: FieldExpression parent } field:
-                // a.b.c = v: b may be a struct of the game's, read as a copy; set c on it, then put it back in a.
-                Compile(parent.Target);
-                Emit(OpCode.Duplicate, line);
-                Emit(OpCode.GetField, line, Constant(parent.Name));
-                Emit(OpCode.Duplicate, line);
-                if (operation is { } partOperation)
-                {
-                    Emit(OpCode.Duplicate, line);
-                    Emit(OpCode.GetField, line, Constant(field.Name));
-                    Compile(assign.Value);
-                    Emit(partOperation, line);
-                }
-                else
-                {
-                    Compile(assign.Value);
-                }
-
-                Emit(OpCode.SetField, line, Constant(field.Name));
-                Emit(OpCode.SetFieldBack, line, Constant(parent.Name));
+            case FieldExpression { Target: FieldExpression or IndexExpression } or IndexExpression { Target: FieldExpression or IndexExpression }:
+                AssignPath(assign.Target, assign.Value, operation, line);
                 break;
             case FieldExpression field:
                 Compile(field.Target);
@@ -424,6 +409,97 @@ internal sealed class Compiler
 
                 Emit(OpCode.SetIndex, line);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// <c>a.b[i].c = v</c>, any number of steps deep: each step read in turn and kept on the stack (with its key, for an
+    /// index), the last set, then each put back into the one before, from the end. A step may be one of the game's
+    /// structs, read as a copy, so the change only sticks when the copies go back.
+    /// </summary>
+    private void AssignPath(Expression target, Expression value, OpCode? operation, int line)
+    {
+        // The steps from the root out: fields and indexes.
+        var steps = new List<Expression>();
+        var root = target;
+        while (root is FieldExpression or IndexExpression)
+        {
+            steps.Add(root);
+            root = root is FieldExpression field ? field.Target : ((IndexExpression)root).Target;
+        }
+
+        steps.Reverse();
+        Compile(root);
+        foreach (var step in steps.Take(steps.Count - 1))
+        {
+            Read(step);
+        }
+
+        // The last step set on the last thing read, a copy of it kept to put back.
+        Emit(OpCode.Duplicate, line);
+        switch (steps[^1])
+        {
+            case FieldExpression last:
+                if (operation is { } fieldOperation)
+                {
+                    Emit(OpCode.Duplicate, line);
+                    Emit(OpCode.GetField, line, Constant(last.Name));
+                    Compile(value);
+                    Emit(fieldOperation, line);
+                }
+                else
+                {
+                    Compile(value);
+                }
+
+                Emit(OpCode.SetField, line, Constant(last.Name));
+                break;
+            case IndexExpression last:
+                Compile(last.Key);
+                if (operation is { } indexOperation)
+                {
+                    Emit(OpCode.DuplicateTwo, line);
+                    Emit(OpCode.GetIndex, line);
+                    Compile(value);
+                    Emit(indexOperation, line);
+                }
+                else
+                {
+                    Compile(value);
+                }
+
+                Emit(OpCode.SetIndex, line);
+                break;
+        }
+
+        for (var i = steps.Count - 2; i >= 0; i--)
+        {
+            if (steps[i] is FieldExpression field)
+            {
+                Emit(OpCode.PutBackField, line, Constant(field.Name));
+            }
+            else
+            {
+                Emit(OpCode.PutBackIndex, line);
+            }
+        }
+
+        Emit(OpCode.Pop, line);
+
+        // A step read on the way: [object] becomes [object, value], or [object, key, value] for an index.
+        void Read(Expression step)
+        {
+            if (step is FieldExpression field)
+            {
+                Emit(OpCode.Duplicate, line);
+                Emit(OpCode.GetField, line, Constant(field.Name));
+            }
+            else
+            {
+                Compile(((IndexExpression)step).Key);
+                Emit(OpCode.DuplicateTwo, line);
+                Emit(OpCode.GetIndex, line);
+            }
         }
     }
 

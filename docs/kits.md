@@ -1099,7 +1099,7 @@ The standard functions: `print`, `str`, `num`, `type`; `upper`, `lower`, `trim`,
 The game hosts scripts in a `ScriptEngine`. `Define` gives scripts a function (reading arguments from the
 `ScriptCall`, which says what was wrong with a wrong one), `Expose` one of the game's objects (its public properties,
 fields and methods, by name in any case: `player.health` is `Health`; enums by name; its lists index and its
-dictionaries with text keys read like maps; a struct comes back as a copy, so set it whole), and the indexer a shared
+dictionaries with text keys read like maps; a struct comes back as a copy, put back when a part of it is set in one go), and the indexer a shared
 value the game and scripts both read and change.
 
 ```csharp
@@ -1141,8 +1141,8 @@ or, with no handler, `Update` throws. A thread that runs more than `InstructionL
 loop) fails rather than freezing the game, as do calls deeper than `MaxDepth`.
 
 Functions made in a loop keep that time round's variables (`for i in items do push(fns, fn() return i end) end`
-gives each its own `i`), and setting a part of one of the game's structs in one go (`thing.position.x = 5`) puts the
-changed copy back; a copy kept in a variable is the script's own.
+gives each its own `i`), and setting a part of one of the game's structs in one go (`thing.position.x = 5`, as deep as it goes:
+`thing.bodies[0].centre.x += 2`) puts each changed copy back where it came from; a copy kept in a variable is the script's own.
 
 The RPG kit's content files take scripts as conditions and effects, `{"script": "var(\"gold\") >= 10"}` and
 `{"script": "give(\"potion\", 2)"}`, run by whatever is set as `RpgState.Scripts`. `Jentl.Core.Rpg.RpgScripts` runs
