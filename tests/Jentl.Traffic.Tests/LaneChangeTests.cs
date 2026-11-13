@@ -117,5 +117,82 @@ public class LaneChangeTests
         across.Should().BeInRange(0.05f, 0.95f, "part way across");
     }
 
+    /// <summary>A two-lane road from the west into a crossroads, one-lane roads north, south and east.</summary>
+    private static (TrafficSimulation Sim, Node West, Node North, Node South, Road Road) Crossroads(bool laneChanges)
+    {
+        var b = new NetworkBuilder();
+        var west = b.Node(0, 0);
+        var middle = b.Node(400, 0);
+        var north = b.Node(400, -400);
+        var south = b.Node(400, 400);
+        var east = b.Node(800, 0);
+        var road = b.Road(west, middle, 2, 50);
+        b.Road(middle, north, 1, 50);
+        b.Road(middle, south, 1, 50);
+        b.Road(middle, east, 1, 50);
+        return (new TrafficSimulation(b.Build(), seed: 1) { LaneChanges = laneChanges }, west, north, south, road);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ACarInTheWrongLaneForItsTurn_ChangesOverAndTurns(bool goingNorth)
+    {
+        var (sim, west, north, south, road) = Crossroads(laneChanges: true);
+        var to = goingNorth ? north : south;
+        var lanes = road.LeavingFrom(west);
+        var right = sim.Route(west, to)![0];
+        var wrong = lanes.Single(l => l != right);
+        var car = Put(sim, west, to, VehicleKind.Car, wrong);
+
+        car.Route[1].Should().Be(right, "its route changes over to the lane the turn is made from");
+        ArrivalOf(sim, car, within: 120).Should().BeLessThan(120, "it gets there");
+        car.LaneChanges.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public void AnEdgeWithItsBestLaneFull_StartsTheNextCarInTheOther()
+    {
+        var (sim, west, north, _, _) = Crossroads(laneChanges: true);
+        sim.Spawn(west, north, VehicleKind.Car).Should().NotBeNull();
+        var second = sim.Spawn(west, north, VehicleKind.Car);
+        second.Should().NotBeNull("the other lane has room");
+        second!.Route[1].Should().Be(sim.Route(west, north)![0], "it changes over for its turn");
+
+        var (without, w, n, _, _) = Crossroads(laneChanges: false);
+        without.Spawn(w, n, VehicleKind.Car).Should().NotBeNull();
+        without.Spawn(w, n, VehicleKind.Car).Should().BeNull("without lane changes it waits for room in its lane");
+    }
+
+    [Fact]
+    public void ACarWaitingToChange_WaitsAtTheEndOfItsLane_AndDoesNotDriveOffIt()
+    {
+        var (sim, west, north, _, road) = Crossroads(laneChanges: true);
+        var lanes = road.LeavingFrom(west);
+        var right = sim.Route(west, north)![0];
+        var wrong = lanes.Single(l => l != right);
+
+        // A column standing in the turning lane, all the way along, so there is never a gap.
+        var tractor = VehicleKind.Car with { Name = "parked", MaxSpeed = 0.001f };
+        for (var i = 0; i < (int)(right.Length / 6) - 1; i++)
+        {
+            if (sim.Spawn(west, north, tractor) is { } parked)
+            {
+                sim.PutOn(parked, right);
+                parked.Position = right.Length - 1 - (i * 6);
+            }
+        }
+
+        var car = Put(sim, west, north, VehicleKind.Car, wrong);
+        for (var t = 0; t < 900 && car.Lane == wrong; t++)
+        {
+            sim.Step(0.1f);
+        }
+
+        car.Lane.Should().Be(wrong, "there is never a gap beside");
+        car.Position.Should().BeInRange(wrong.Length - 15, wrong.Length);
+        car.Speed.Should().BeLessThan(0.5f);
+    }
+
     private static System.Numerics.Vector2 Vector(System.Numerics.Vector2 v) => v;
 }

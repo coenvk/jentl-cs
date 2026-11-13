@@ -291,6 +291,18 @@ public sealed class TrafficSimulation
                     queue.Enqueue(next, through);
                 }
             }
+
+            // With lane changes, the lane beside on the same road: driven alongside, for a few seconds more.
+            foreach (var beside in LaneChanges ? Beside(lane) : [])
+            {
+                var through = spent + ChangeCost;
+                if (through < cost.GetValueOrDefault(beside, float.PositiveInfinity))
+                {
+                    cost[beside] = through;
+                    previous[beside] = lane;
+                    queue.Enqueue(beside, through);
+                }
+            }
         }
 
         return null;
@@ -298,10 +310,43 @@ public sealed class TrafficSimulation
 
     private float Cost(Lane lane) => AvoidJams ? TravelTime(lane) : lane.Length / lane.SpeedLimit;
 
+    /// <summary>Seconds a route counts for changing to the lane beside: what it costs to find a gap and move across.</summary>
+    public float ChangeCost { get; set; } = 4;
+
+    /// <summary>The lanes either side of one on a road, going the same way.</summary>
+    private static IEnumerable<Lane> Beside(Lane lane)
+    {
+        if (lane.IsJunction || lane.Road is not { } road)
+        {
+            yield break;
+        }
+
+        var side = road.Forward.Contains(lane) ? road.Forward : road.Backward;
+        var index = side.IndexOf(lane);
+        if (index > 0)
+        {
+            yield return side[index - 1];
+        }
+
+        if (index + 1 < side.Count)
+        {
+            yield return side[index + 1];
+        }
+    }
+
+    /// <summary>Whether two lanes run side by side on a road, the same way: a route going from one to the other changes lanes.</summary>
+    private static bool AreBeside(Lane a, Lane b) => Beside(a).Contains(b);
+
+    /// <summary>Whether the vehicle's route has it change to the lane beside before the end of this one.</summary>
+    private static bool MustChange(Vehicle vehicle) =>
+        vehicle.RouteIndex + 1 < vehicle.Route.Count && AreBeside(vehicle.Lane, vehicle.Route[vehicle.RouteIndex + 1]);
+
     /// <summary>
     /// Whether vehicles change lanes on multi-lane roads (MOBIL): to overtake, to leave a lane held up (by someone
     /// waiting to turn, say) or to keep right, wherever a route to their destination goes on from the other lane and
-    /// the vehicle behind there needn't brake hard. Off by default.
+    /// the vehicle behind there needn't brake hard. Routes may then change lanes too (to the lane a turn is made from),
+    /// the vehicle moving across at the first safe gap and waiting at the lane's end for one; and a vehicle whose
+    /// best lane is full when it sets out starts in another. Off by default.
     /// </summary>
     public bool LaneChanges { get; set; }
 
@@ -312,17 +357,27 @@ public sealed class TrafficSimulation
     public Vehicle? Spawn(Node from, Node to, VehicleKind kind)
     {
         ArgumentNullException.ThrowIfNull(kind);
-        if (Route(from, to) is not { } route)
+        if (Route(from, to) is not { } best)
         {
             return null;
         }
 
+        var route = best;
+        bool Full(Lane start) => _onLane[start] is { Count: > 0 } on && on[^1].Position - on[^1].Kind.Length < kind.Length + kind.MinGap;
+        if (Full(route[0]))
+        {
+            // With lane changes, the first lane with room, changing over on the way.
+            if (!LaneChanges || from.Roads.SelectMany(r => r.LeavingFrom(from)).FirstOrDefault(l => !Full(l)) is not { } free
+                || RouteFrom([free], to) is not { } other)
+            {
+                return null;
+            }
+
+            route = other;
+        }
+
         var first = route[0];
         var lane = _onLane[first];
-        if (lane.Count > 0 && lane[^1].Position - lane[^1].Kind.Length < kind.Length + kind.MinGap)
-        {
-            return null;
-        }
 
 #pragma warning disable CA5394 // Simulation, not security.
         var vehicle = new Vehicle(_nextId++, kind, route, 0.9f + ((float)_random.NextDouble() * 0.2f), Time, to)
@@ -503,6 +558,11 @@ public sealed class TrafficSimulation
                 return (best, bestSpeed);
             }
 
+            if (i + 1 < vehicle.Route.Count && AreBeside(lane, vehicle.Route[i + 1]))
+            {
+                break;
+            }
+
             distance += lane.Length;
         }
 
@@ -516,6 +576,16 @@ public sealed class TrafficSimulation
         for (var i = vehicle.RouteIndex; i + 1 < vehicle.Route.Count && distance < lookahead; i++)
         {
             var (here, next) = (vehicle.Route[i], vehicle.Route[i + 1]);
+            if (AreBeside(here, next))
+            {
+                if (distance < vehicle.Kind.MinGap + 2 && vehicle.Speed < 0.5f)
+                {
+                    vehicle.Waiting += StepSize;
+                }
+
+                return MathF.Max(0, distance - 1);
+            }
+
             if (next.IsJunction && !here.IsJunction || next.Kind == LaneKind.Connector && here.Kind == LaneKind.Ring)
             {
                 if (!MayEnter(vehicle, here, next, i + 1, distance))
@@ -677,6 +747,12 @@ public sealed class TrafficSimulation
     /// </summary>
     private void ConsiderChange(Vehicle vehicle)
     {
+        if (MustChange(vehicle))
+        {
+            ChangeAsRouted(vehicle);
+            return;
+        }
+
         var lane = vehicle.Lane;
         if (lane.IsJunction || lane.Road is not { } road || vehicle.Destination is not { } destination || vehicle.ChangingFrom is not null
             || vehicle.Committed is not null || Time < vehicle.NextChange || vehicle.Position < vehicle.Kind.Length + 2
@@ -724,7 +800,9 @@ public sealed class TrafficSimulation
 
             // Keeping right: moving right needs less, moving left more.
             gain += step > 0 ? KeepRight : -KeepRight;
-            if (gain > ChangeThreshold && (best is null || gain > best.Value.Gain) && RouteFrom([other], destination) is { } route)
+            // Not into a lane it would have to leave again for its turn.
+            if (gain > ChangeThreshold && (best is null || gain > best.Value.Gain) && RouteFrom([other], destination) is { } route
+                && !(route.Count > 1 && AreBeside(route[0], route[1])))
             {
                 best = (other, gain, route);
             }
@@ -735,10 +813,41 @@ public sealed class TrafficSimulation
             return;
         }
 
+        ChangeTo(vehicle, change.Lane, change.Route);
+    }
+
+    /// <summary>
+    /// The lane change the route needs (to the lane a turn is made from, say): made as soon as there is room beside and
+    /// the one that would follow there needn't brake hard; till then the vehicle slows to wait at the lane's end.
+    /// </summary>
+    private void ChangeAsRouted(Vehicle vehicle)
+    {
+        var lane = vehicle.Lane;
+        var target = vehicle.Route[vehicle.RouteIndex + 1];
+        if (vehicle.ChangingFrom is not null || vehicle.Position < vehicle.Kind.Length + 2)
+        {
+            return;
+        }
+
+        var position = Math.Min(vehicle.Position * target.Length / lane.Length, target.Length - 0.5f);
+        var (ahead, behind) = Around(target, position, null);
+        if (ahead is not null && ahead.Position - ahead.Kind.Length - position < vehicle.Kind.MinGap
+            || behind is not null && position - vehicle.Kind.Length - behind.Position < behind.Kind.MinGap
+            || behind is not null && Idm(behind, vehicle, leaderAt: position) < -SafeBraking)
+        {
+            return;
+        }
+
+        ChangeTo(vehicle, target, [.. vehicle.Route.Skip(vehicle.RouteIndex + 1)]);
+    }
+
+    private void ChangeTo(Vehicle vehicle, Lane target, List<Lane> route)
+    {
+        var lane = vehicle.Lane;
         _onLane[lane].Remove(vehicle);
-        vehicle.Position *= change.Lane.Length / lane.Length;
-        vehicle.Reroute(change.Route);
-        _onLane[change.Lane].Add(vehicle);
+        vehicle.Position = Math.Min(vehicle.Position * target.Length / lane.Length, target.Length - 0.5f);
+        vehicle.Reroute(route);
+        _onLane[target].Add(vehicle);
         vehicle.ChangingFrom = lane;
         vehicle.ChangeProgress = 0;
         vehicle.LaneChanges++;
@@ -824,6 +933,12 @@ public sealed class TrafficSimulation
         else if (speed > 2)
         {
             vehicle.Stopped = false;
+        }
+
+        // A lane the route leaves sideways is not driven off the end of: it waits there for its gap.
+        if (MustChange(vehicle) && vehicle.Position > vehicle.Lane.Length - 0.1f)
+        {
+            (vehicle.Position, vehicle.Speed) = (vehicle.Lane.Length - 0.1f, 0);
         }
 
         while (vehicle.Position > vehicle.Lane.Length)
