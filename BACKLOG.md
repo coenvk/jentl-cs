@@ -36,8 +36,8 @@ as WAV on the desktop. Still to do:
 - Editing instruments themselves (wave, envelope, filter), rather than choosing a preset and a volume.
 - In (0.6.50): swing (`Tune.Swing`, `Composition.Swing`, a chip in the Composer), and a loop of one, two or four bars
   to work on (the Loop chip or L; a bar's number moves it).
-- Selecting and moving several notes, and changing a note's length from its
-  end rather than drawing it again.
+- In (games-cs): notes resized from their end, moved by dragging, and selected together (Shift-drag or the Select
+  chip), dragged, nudged with the arrows and deleted. Not yet tried by hand: a drag can't be scripted.
 - In the browser: WAV export as a download, and the clipboard.
 - Play it on a phone: the grid is small for fingers.
 
