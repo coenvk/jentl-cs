@@ -93,7 +93,7 @@ categories, timed, with a streak of days. Still to do:
 - Decided: a matched row leaves the grid, and a wrong drop costs only its move (no lives), unless the Android
   original turns out to do otherwise.
 - Many more levels written by hand, and a level editor or a format others can write them in.
-- Merges slide in and matched rows fly up to their banner (games-cs).
+- Merges slide in and matched rows fly up to their banner (games-cs); the merge seen on screen by a scripted drag.
 
 ### Associate Words: more of it
 
@@ -261,9 +261,10 @@ while someone works at the screen.
   clear of the buttons.
 - Seen: nine-slice frames and tooltips, in the Lab's UI demo (0.6.57: tooltips keep clear of the screen's sides).
 - Seen: naming a suit after a wild at the Card Table, played by keys (which the ruleset table now takes).
+- Seen: replaying recorded input (games-cs `--record` and `--replay`: a run with keys and a drag replays to the same
+  screenshot), and Connect Word's merge sliding in (a scripted `Drag:`).
 - The audio mixer's ducking, and sounds placed in the world.
 - Gamepad rumble on a real pad.
-- Replaying recorded input through a running game.
 - The 3D, scripting and ruleset kits in the browser.
 
 ## Housekeeping
