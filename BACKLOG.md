@@ -129,7 +129,7 @@ delay against a target gives stars; five levels. Still to do:
 
 - In (0.6.45): changing lanes (MOBIL, `TrafficSimulation.LaneChanges`): overtaking, leaving a held-up lane, keeping
   right, re-routing from the new lane, drawn gliding across. Still to do: lane changes a route needs (a turn from the
-  other lane), so routes needn't start in the right one; Roadworks with two-lane roads to use it.
+  other lane), so routes needn't start in the right one. Roadworks has two-lane roads (Widen) and lane changes on.
 - More junctions: turning pockets, stop and give-way signs, two-lane roundabouts, slip roads and motorways; and in
   Roadworks: roads of two lanes, faster roads, diagonal roads.
 - Green waves, turning arrows, timings the player sets; demand by place and time (the morning rush).
