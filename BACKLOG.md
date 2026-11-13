@@ -58,11 +58,16 @@ and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab ha
 - Checking every game on a phone: layouts at small sizes, touch targets, performance (the software renderer and the
   physics), sound starting.
 - Note: the browser build already runs on phones, as a fallback until then.
-- Under way: the suites are in (games-cs `suites/`: Words, Puzzles, Arcade, with "All games" on a game's title screen
-  and each game's saves kept apart), and so is the Android head (`shell/Android.props`, `MainActivity`; Solitaire's
-  project first, not yet committed). Waiting on the .NET android workload, which needs `sudo dotnet workload install
-  android` in a terminal; the SDK, emulator and an Android 36 image (device `jentl`) are installed. Still to do: the
-  per-app music (only its games' songs), the back button at the root, pausing with the app, icons.
+- In: every app has a phone project (`apps/<Game>/Android`, `suites/<Suite>/Android`, on `shell/Android.props`),
+  and all eleven start on the emulator: Solitaire, Card Table, Poker, Mossbrook, Paddock, Roadworks, Composer, Cheese
+  Farm, and the suites Words, Puzzles and Arcade (each choosing a game, "All games" to come back, saves kept apart).
+  Full screen in either orientation, clear of the cut-out and gesture bar (Jentl's `Insets`); the back button is Back
+  (the system's back gesture handed to the game), and on a title screen with nothing behind it the app goes to the
+  background; hints speak of tapping. Uno is shown as Colour Cards / Kleurenkaart, its call as "Last card!".
+- Still to do: play each game through on the phone (Solitaire's Klondike is checked by touch; the rest only to their
+  title screens): layouts at phone sizes, touch targets, speed; the per-app music (only its games' songs); icons;
+  pausing and saving when the app goes to the background; the release key and AABs for the store; the brand check of
+  the games' names; CI (the projects are outside `Games.slnx` until the build machine has the workload).
 - Decided: an app per game, games of a kind together: Solitaire (with the solo ruleset deals), Card Table, Poker,
   Word games (Connect Word, Associate Words), Puzzles (Sokoban, CodeLock), Arcade (Bricks, Hot Pan), Mossbrook,
   Paddock, Roadworks and Composer; not the Lab. Each has the shell cut to its own games and songs, and its own saves.
