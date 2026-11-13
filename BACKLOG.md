@@ -48,7 +48,7 @@ and tags (`AsepriteSheet`), and flash, squash and stretch, and shake. The Lab ha
 - Bones for 2D (a body of parts that bend and turn, as Spine or DragonBones make): a larger piece of work, left for
   when a game needs it. (3D skins are in since 0.6.38.)
 - In the games: cards are dealt in, flying from the stock one after another (`TableView.DealIn`, 0.6.49); Hot Pan's
-  cook squashes and flashes. Still to do: hits flashing in Mossbrook.
+  cook squashes and flashes; Mossbrook's map flashes whoever is hit, floats the damage and shakes when it is you.
 
 ### Android
 
