@@ -127,7 +127,9 @@ round jams by measured travel times, and the game's first version, games-cs's Ro
 gates, choose junctions (give way, lights, roundabout), within a budget; the traffic runs for ten minutes and the
 delay against a target gives stars; five levels. Still to do:
 
-- Changing lanes on the way (MOBIL), so routes needn't start in the right lane and fast traffic overtakes.
+- In (0.6.45): changing lanes (MOBIL, `TrafficSimulation.LaneChanges`): overtaking, leaving a held-up lane, keeping
+  right, re-routing from the new lane, drawn gliding across. Still to do: lane changes a route needs (a turn from the
+  other lane), so routes needn't start in the right one; Roadworks with two-lane roads to use it.
 - More junctions: turning pockets, stop and give-way signs, two-lane roundabouts, slip roads and motorways; and in
   Roadworks: roads of two lanes, faster roads, diagonal roads.
 - Green waves, turning arrows, timings the player sets; demand by place and time (the morning rush).

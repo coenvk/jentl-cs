@@ -5,11 +5,14 @@ namespace Jentl.Traffic;
 /// <summary>A vehicle on its way: where it is on its route, how fast it goes, and how long it has taken.</summary>
 public sealed class Vehicle
 {
-    internal Vehicle(int id, VehicleKind kind, IReadOnlyList<Lane> route, float eagerness, float startTime)
+    private readonly List<Lane> _route;
+
+    internal Vehicle(int id, VehicleKind kind, IReadOnlyList<Lane> route, float eagerness, float startTime, Node? destination = null)
     {
         Id = id;
         Kind = kind;
-        Route = route;
+        _route = [.. route];
+        Destination = destination;
         Eagerness = eagerness;
         StartTime = startTime;
         FreeTime = route.Sum(l => l.Length / MathF.Min(l.SpeedLimit, kind.MaxSpeed));
@@ -19,8 +22,30 @@ public sealed class Vehicle
 
     public VehicleKind Kind { get; }
 
-    /// <summary>The lanes it drives, start to finish.</summary>
-    public IReadOnlyList<Lane> Route { get; }
+    /// <summary>The lanes it drives, start to finish; what lies ahead changes when it changes lanes.</summary>
+    public IReadOnlyList<Lane> Route => _route;
+
+    /// <summary>Where it is going: the edge its route ends at.</summary>
+    public Node? Destination { get; }
+
+    /// <summary>The lane it is moving across from, while changing lanes; null otherwise.</summary>
+    public Lane? ChangingFrom { get; internal set; }
+
+    /// <summary>How far across the lane change is, 0 to 1.</summary>
+    public float ChangeProgress { get; internal set; }
+
+    /// <summary>How many times it changed lanes.</summary>
+    public int LaneChanges { get; internal set; }
+
+    /// <summary>The time from which it may change lanes again.</summary>
+    internal float NextChange { get; set; }
+
+    /// <summary>Takes a new way from here on: <paramref name="rest"/> replaces the route from the current lane.</summary>
+    internal void Reroute(IReadOnlyList<Lane> rest)
+    {
+        _route.RemoveRange(RouteIndex, _route.Count - RouteIndex);
+        _route.AddRange(rest);
+    }
 
     public int RouteIndex { get; internal set; }
 
@@ -52,17 +77,24 @@ public sealed class Vehicle
 
     internal bool Stopped { get; set; }
 
-    /// <summary>Its middle and the way it faces, for drawing.</summary>
+    /// <summary>Its middle and the way it faces, for drawing; part way between two lanes while changing.</summary>
     public (Vector2 Position, Vector2 Direction) Pose()
     {
         var middle = Position - (Kind.Length / 2);
-        if (middle >= 0 || RouteIndex == 0)
+        var (position, direction) = middle >= 0 || RouteIndex == 0
+            ? Lane.Path.At(middle)
+            : Route[RouteIndex - 1].Path.At(Route[RouteIndex - 1].Length + middle);
+        if (ChangingFrom is not { } from)
         {
-            return Lane.Path.At(middle);
+            return (position, direction);
         }
 
-        var previous = Route[RouteIndex - 1];
-        return previous.Path.At(previous.Length + middle);
+        // Eased across, from where it would be on the old lane to where it is.
+        var t = ChangeProgress * ChangeProgress * (3 - (2 * ChangeProgress));
+        var (was, _) = from.Path.At(Math.Clamp(middle * from.Length / Lane.Length, 0, from.Length));
+        var sideways = Vector2.Normalize(position - was + new Vector2(1e-4f, 0));
+        var heading = Vector2.Normalize(direction + (sideways * (1 - t) * 0.25f));
+        return (Vector2.Lerp(was, position, t), heading);
     }
 
     public override string ToString() => $"{Kind.Name} {Id}";
@@ -214,7 +246,12 @@ public sealed class TrafficSimulation
             throw new ArgumentException("Both nodes must be in the network.");
         }
 
-        var starts = from.Roads.SelectMany(r => r.LeavingFrom(from)).ToList();
+        return RouteFrom(from.Roads.SelectMany(r => r.LeavingFrom(from)), to);
+    }
+
+    /// <summary>The quickest lanes from any of <paramref name="starts"/> to an edge, or null when there is no way.</summary>
+    private List<Lane>? RouteFrom(IEnumerable<Lane> starts, Node to)
+    {
         var ends = to.Roads.SelectMany(r => r.ArrivingAt(to)).ToHashSet();
         var cost = new Dictionary<Lane, float>();
         var previous = new Dictionary<Lane, Lane>();
@@ -261,6 +298,16 @@ public sealed class TrafficSimulation
 
     private float Cost(Lane lane) => AvoidJams ? TravelTime(lane) : lane.Length / lane.SpeedLimit;
 
+    /// <summary>
+    /// Whether vehicles change lanes on multi-lane roads (MOBIL): to overtake, to leave a lane held up (by someone
+    /// waiting to turn, say) or to keep right, wherever a route to their destination goes on from the other lane and
+    /// the vehicle behind there needn't brake hard. Off by default.
+    /// </summary>
+    public bool LaneChanges { get; set; }
+
+    /// <summary>How much a driver weighs what a lane change costs or gains the others (MOBIL's politeness), 0 to 1.</summary>
+    public float Politeness { get; set; } = 0.3f;
+
     /// <summary>Puts a vehicle at the start of its route from one edge to another, if there is a way and room; null if not.</summary>
     public Vehicle? Spawn(Node from, Node to, VehicleKind kind)
     {
@@ -278,7 +325,7 @@ public sealed class TrafficSimulation
         }
 
 #pragma warning disable CA5394 // Simulation, not security.
-        var vehicle = new Vehicle(_nextId++, kind, route, 0.9f + ((float)_random.NextDouble() * 0.2f), Time)
+        var vehicle = new Vehicle(_nextId++, kind, route, 0.9f + ((float)_random.NextDouble() * 0.2f), Time, to)
         {
             Position = kind.Length,
         };
@@ -314,6 +361,14 @@ public sealed class TrafficSimulation
         foreach (var vehicle in _vehicles)
         {
             vehicle.Acceleration = AccelerationOf(vehicle);
+        }
+
+        if (LaneChanges)
+        {
+            foreach (var vehicle in _vehicles.ToList())
+            {
+                ConsiderChange(vehicle);
+            }
         }
 
         foreach (var vehicle in _vehicles.ToList())
@@ -607,8 +662,156 @@ public sealed class TrafficSimulation
         return speedingUp + ((distance - covered) / top);
     }
 
+    private const float ChangeTime = 2f;
+    private const float SafeBraking = 4f;
+    private const float ChangeThreshold = 0.1f;
+    private const float KeepRight = 0.3f;
+
+    /// <summary>
+    /// MOBIL: whether to move to a lane beside this one on the same road, and does it. A neighbour counts when a route
+    /// to the destination goes on from it and there is room; the change is safe when the vehicle that would follow there
+    /// needn't brake harder than <see cref="SafeBraking"/>; and worth it when what the driver gains, plus
+    /// <see cref="Politeness"/> times what the followers gain or lose, beats a threshold. As on European roads one keeps
+    /// right: moving right is favoured by a bias, moving left is held back by it, and no one pulls out to the left to
+    /// let the one behind past.
+    /// </summary>
+    private void ConsiderChange(Vehicle vehicle)
+    {
+        var lane = vehicle.Lane;
+        if (lane.IsJunction || lane.Road is not { } road || vehicle.Destination is not { } destination || vehicle.ChangingFrom is not null
+            || vehicle.Committed is not null || Time < vehicle.NextChange || vehicle.Position < vehicle.Kind.Length + 2
+            || lane.Length - vehicle.Position < 20)
+        {
+            return;
+        }
+
+        var side = road.Forward.Contains(lane) ? road.Forward : road.Backward;
+        var index = side.IndexOf(lane);
+        var (ahead, behind) = Around(lane, vehicle.Position, vehicle);
+        var now = Idm(vehicle, ahead);
+        var oldFollowerNow = behind is null ? 0 : Idm(behind, vehicle);
+        var oldFollowerThen = behind is null ? 0 : Idm(behind, ahead);
+
+        (Lane Lane, float Gain, List<Lane> Route)? best = null;
+        foreach (var step in new[] { 1, -1 })
+        {
+            if (index + step < 0 || index + step >= side.Count)
+            {
+                continue;
+            }
+
+            var other = side[index + step];
+            var position = vehicle.Position * other.Length / lane.Length;
+            var (newAhead, newBehind) = Around(other, position, null);
+            if (newAhead is not null && newAhead.Position - newAhead.Kind.Length - position < vehicle.Kind.MinGap
+                || newBehind is not null && position - vehicle.Kind.Length - newBehind.Position < newBehind.Kind.MinGap)
+            {
+                continue;
+            }
+
+            var then = Idm(vehicle, newAhead, gapFrom: position);
+            var newFollowerNow = newBehind is null ? 0 : Idm(newBehind, newAhead);
+            var newFollowerThen = newBehind is null ? 0 : Idm(newBehind, vehicle, leaderAt: position);
+            if (newFollowerThen < -SafeBraking)
+            {
+                continue;
+            }
+
+            // No one pulls out to the left to let the one behind past (the European rules): only moving right counts
+            // what the follower left behind gains.
+            var behindGains = step > 0 ? oldFollowerThen - oldFollowerNow : 0;
+            var gain = then - now + (Politeness * ((newFollowerThen - newFollowerNow) + behindGains));
+
+            // Keeping right: moving right needs less, moving left more.
+            gain += step > 0 ? KeepRight : -KeepRight;
+            if (gain > ChangeThreshold && (best is null || gain > best.Value.Gain) && RouteFrom([other], destination) is { } route)
+            {
+                best = (other, gain, route);
+            }
+        }
+
+        if (best is not { } change)
+        {
+            return;
+        }
+
+        _onLane[lane].Remove(vehicle);
+        vehicle.Position *= change.Lane.Length / lane.Length;
+        vehicle.Reroute(change.Route);
+        _onLane[change.Lane].Add(vehicle);
+        vehicle.ChangingFrom = lane;
+        vehicle.ChangeProgress = 0;
+        vehicle.LaneChanges++;
+        vehicle.NextChange = Time + (ChangeTime * 2);
+    }
+
+    /// <summary>Moves a vehicle onto another lane at the same place, its route going on from there (for tests).</summary>
+    internal void PutOn(Vehicle vehicle, Lane lane)
+    {
+        _onLane[vehicle.Lane].Remove(vehicle);
+        vehicle.Reroute(vehicle.Destination is { } to && RouteFrom([lane], to) is { } route ? route : [lane]);
+        _onLane[lane].Add(vehicle);
+    }
+
+    /// <summary>The nearest vehicles ahead of and behind a position on a lane (leaving out <paramref name="skip"/>).</summary>
+    private (Vehicle? Ahead, Vehicle? Behind) Around(Lane lane, float position, Vehicle? skip)
+    {
+        Vehicle? ahead = null, behind = null;
+        foreach (var other in _onLane[lane])
+        {
+            if (other == skip)
+            {
+                continue;
+            }
+
+            if (other.Position > position)
+            {
+                if (ahead is null || other.Position < ahead.Position)
+                {
+                    ahead = other;
+                }
+            }
+            else if (behind is null || other.Position > behind.Position)
+            {
+                behind = other;
+            }
+        }
+
+        return (ahead, behind);
+    }
+
+    /// <summary>
+    /// The Intelligent Driver Model's acceleration for a vehicle following <paramref name="leader"/> on the same lane
+    /// (none: free road), its front at <paramref name="gapFrom"/> (its own position unless given) and the leader's at
+    /// <paramref name="leaderAt"/> (the leader's unless given). Only the lane itself counts, not what lies beyond it.
+    /// </summary>
+    private static float Idm(Vehicle vehicle, Vehicle? leader, float? gapFrom = null, float? leaderAt = null)
+    {
+        var kind = vehicle.Kind;
+        var v = vehicle.Speed;
+        var desired = MathF.Min(kind.MaxSpeed, vehicle.Lane.SpeedLimit) * vehicle.Eagerness;
+        var acceleration = kind.Acceleration * (1 - MathF.Pow(v / MathF.Max(desired, 0.1f), 4));
+        if (leader is not null)
+        {
+            var gap = (leaderAt ?? leader.Position) - leader.Kind.Length - (gapFrom ?? vehicle.Position);
+            var wanted = kind.MinGap + MathF.Max(0, (v * kind.TimeGap) + (v * (v - leader.Speed) / (2 * MathF.Sqrt(kind.Acceleration * kind.Braking))));
+            acceleration -= kind.Acceleration * MathF.Pow(wanted / MathF.Max(gap, 0.1f), 2);
+        }
+
+        return MathF.Max(acceleration, -HardBraking);
+    }
+
     private void Move(Vehicle vehicle, float dt)
     {
+        if (vehicle.ChangingFrom is not null)
+        {
+            vehicle.ChangeProgress += dt / ChangeTime;
+            if (vehicle.ChangeProgress >= 1)
+            {
+                vehicle.ChangingFrom = null;
+            }
+        }
+
         var before = vehicle.Speed;
         var speed = MathF.Max(0, before + (vehicle.Acceleration * dt));
         vehicle.Position += (before + speed) / 2 * dt;
