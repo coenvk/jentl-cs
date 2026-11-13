@@ -61,8 +61,17 @@ public abstract class JentlGame : Game
     /// </summary>
     public VirtualScreen? VirtualScreen { get; set; }
 
-    /// <summary>The area scenes lay themselves out in: the virtual screen, or else the window.</summary>
-    public Rectangle ScreenBounds => VirtualScreen?.Bounds ?? GraphicsDevice.Viewport.Bounds;
+    /// <summary>
+    /// Room the scenes leave at the window's edges for the system's bars (a phone's status and gesture bars); none on
+    /// the desktop. The virtual screen, when there is one, is fitted inside them.
+    /// </summary>
+    public Insets Insets { get; set; }
+
+    /// <summary>The area scenes lay themselves out in: the virtual screen, or else the window inside the insets.</summary>
+    public Rectangle ScreenBounds => VirtualScreen?.Bounds ?? SafeWindow;
+
+    /// <summary>The window inside the <see cref="Insets"/>.</summary>
+    private Rectangle SafeWindow => Insets.Inside(GraphicsDevice.Viewport.Bounds);
 
     protected GraphicsDeviceManager Graphics { get; }
 
@@ -116,8 +125,23 @@ public abstract class JentlGame : Game
     {
         _batch = new SpriteBatch(GraphicsDevice);
         _assets = new AssetStore(GraphicsDevice);
-        Window.TextInput += (_, e) => Input.Type(e.Character);
+        try
+        {
+            ListenForTyping();
+        }
+        catch (MissingMethodException)
+        {
+            // MonoGame's Android build has no text input event: typing comes from the on-screen keyboard there.
+        }
     }
+
+    /// <summary>
+    /// Typed characters into <see cref="Input"/>. Its own method, kept from being inlined, so that where the platform's
+    /// window lacks the event (the engine is built against the desktop's) the call fails and is caught, not the whole
+    /// of <see cref="LoadContent"/>.
+    /// </summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void ListenForTyping() => Window.TextInput += (_, e) => Input.Type(e.Character);
 
     /// <summary>The keyboard state for this frame. Override to feed scripted input.</summary>
     protected virtual KeyboardState ReadKeyboard() => Keyboard.GetState();
@@ -204,7 +228,7 @@ public abstract class JentlGame : Game
             // The recording stands in for the devices and the clock; the wheel is still read, so turns made meanwhile
             // do not all arrive at once afterwards.
             ReadWheel();
-            VirtualScreen?.Fit(GraphicsDevice.Viewport.Bounds);
+            VirtualScreen?.Fit(SafeWindow);
             elapsed = frame.Elapsed;
             Input.Apply(frame);
         }
@@ -281,7 +305,7 @@ public abstract class JentlGame : Game
         }
 
         _realPointer = pointer;
-        var window = GraphicsDevice.Viewport.Bounds;
+        var window = SafeWindow;
         VirtualScreen?.Fit(window);
         PadCursor.Update(pad, gameTime.ElapsedGameTime, VirtualScreen?.Destination ?? window, pointer.Position);
         var cursor = PadCursor.IsActive ? PadCursor.State : pointer;
@@ -296,7 +320,7 @@ public abstract class JentlGame : Game
     protected override void Draw(GameTime gameTime)
     {
         var started = _clock.Elapsed;
-        var window = GraphicsDevice.Viewport.Bounds;
+        var window = SafeWindow;
         VirtualScreen?.Fit(window);
         using (Scenes.Debug.Profiler.Measure("draw"))
         {
