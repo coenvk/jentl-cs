@@ -97,11 +97,23 @@ public sealed class Road
 
     public IEnumerable<Lane> Lanes => Forward.Concat(Backward);
 
+    /// <summary>The cycle path on the right going from <see cref="From"/> to <see cref="To"/>, if the road has paths.</summary>
+    public Lane? CycleForward { get; internal set; }
+
+    /// <summary>The cycle path on the other side, going back.</summary>
+    public Lane? CycleBackward { get; internal set; }
+
     /// <summary>The lanes leaving <paramref name="node"/> along this road.</summary>
     public IReadOnlyList<Lane> LeavingFrom(Node node) => node == From ? Forward : Backward;
 
     /// <summary>The lanes arriving at <paramref name="node"/> along this road.</summary>
     public IReadOnlyList<Lane> ArrivingAt(Node node) => node == To ? Forward : Backward;
+
+    /// <summary>The cycle path leaving <paramref name="node"/>, if any.</summary>
+    public Lane? PathLeaving(Node node) => node == From ? CycleForward : CycleBackward;
+
+    /// <summary>The cycle path arriving at <paramref name="node"/>, if any.</summary>
+    public Lane? PathArriving(Node node) => node == To ? CycleForward : CycleBackward;
 
     public Node Other(Node node) => node == From ? To : From;
 
@@ -146,6 +158,9 @@ public sealed class Lane
     /// <summary>For connectors: which way it turns.</summary>
     public TurnKind Turn { get; internal set; }
 
+    /// <summary>Whether it is a cycle path (or a cyclists' way through a junction): bicycles only, and only bicycles.</summary>
+    public bool ForBikes { get; internal set; }
+
     /// <summary>For a road lane ending at lights: the lights it stops at.</summary>
     public SignalGroup? Signal { get; internal set; }
 
@@ -158,7 +173,7 @@ public sealed class Lane
     /// <summary>Whether vehicles must check before entering it (a turn through a junction, or an entry onto a ring).</summary>
     public bool IsJunction => Kind != LaneKind.Road;
 
-    public override string ToString() => $"lane {Id} ({Kind})";
+    public override string ToString() => ForBikes ? $"lane {Id} ({Kind}, cycle)" : $"lane {Id} ({Kind})";
 }
 
 /// <summary>A built network: nodes, roads, and every lane, with where traffic comes in and goes out.</summary>

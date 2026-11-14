@@ -8,8 +8,9 @@ namespace Jentl.Core.Traffic;
 
 /// <summary>
 /// Draws a <see cref="TrafficSimulation"/> from above: asphalt for every lane (junctions fill in from their turns),
-/// dashed lines between the two directions of a road, a green island in each roundabout, a stop line in the colour
-/// of its light at each signalled lane, and every vehicle as a box of its size with a windscreen at the front. The
+/// dashed lines between the two directions of a road, a green island in each roundabout, cycle paths in red (crossing
+/// the road in red too), a stop line in the colour of its light at each signalled lane, and every vehicle as a box of
+/// its size with a windscreen at the front (a cyclist as a bicycle with a rider). The
 /// network's metres (y north) map to the screen through <see cref="Centre"/> and <see cref="Scale"/>;
 /// <see cref="Fit"/> sets both to show a whole network.
 /// </summary>
@@ -18,6 +19,16 @@ public sealed class TrafficView
     private static readonly Color Asphalt = new(70, 72, 78);
     private static readonly Color Marking = new(236, 236, 228);
     private static readonly Color Island = new(92, 150, 82);
+    private static readonly Color CyclePath = new(168, 74, 64);
+
+    /// <summary>How wide a cycle path is drawn, in metres.</summary>
+    public float CyclePathWidth { get; set; } = 2f;
+
+    // Cyclists' coats: bright, to be seen on the red paths.
+    private static readonly Color[] CoatColours =
+    [
+        new(250, 210, 60), new(90, 170, 240), new(250, 250, 250), new(120, 220, 120), new(250, 140, 60), new(220, 120, 220),
+    ];
 
     private static readonly Color[] CarColours =
     [
@@ -56,7 +67,7 @@ public sealed class TrafficView
         var width = LaneWidth * Scale;
 
         // Asphalt: every lane a little wider than itself so neighbours join up.
-        foreach (var lane in network.Lanes)
+        foreach (var lane in network.Lanes.Where(l => !l.ForBikes))
         {
             Polyline(batch, area, lane.Path.Points, Asphalt, width * 1.15f);
         }
@@ -64,6 +75,12 @@ public sealed class TrafficView
         foreach (var node in network.Nodes.Where(n => n.Control == NodeControl.Roundabout))
         {
             batch.FillCircle(ToScreen(area, node.Position), (node.RingRadius - (LaneWidth * 0.6f)) * Scale, Island);
+        }
+
+        // Cycle paths over the asphalt, so their crossings show.
+        foreach (var lane in network.Lanes.Where(l => l.ForBikes))
+        {
+            Polyline(batch, area, lane.Path.Points, CyclePath, CyclePathWidth * Scale);
         }
 
         // Dashes between the directions of a two-way road.
@@ -123,7 +140,7 @@ public sealed class TrafficView
         }
     }
 
-    /// <summary>A vehicle's colour: buses yellow, trucks white and grey, vans white, the rest by their number.</summary>
+    /// <summary>A vehicle's colour: buses yellow, trucks white and grey, vans white, the rest (cyclists' clothes too) by their number.</summary>
     public static Color ColourOf(Vehicle vehicle)
     {
         ArgumentNullException.ThrowIfNull(vehicle);
@@ -132,6 +149,7 @@ public sealed class TrafficView
             "bus" => new Color(236, 196, 40),
             "truck" => vehicle.Id % 2 == 0 ? new Color(220, 222, 226) : new Color(120, 124, 132),
             "van" => new Color(240, 240, 244),
+            _ when vehicle.Kind.Cyclist => CoatColours[vehicle.Id % CoatColours.Length],
             _ => CarColours[vehicle.Id % CarColours.Length],
         };
     }
@@ -142,6 +160,14 @@ public sealed class TrafficView
         var at = ToScreen(area, middle);
         var rotation = MathF.Atan2(-direction.Y, direction.X);
         var size = new Vector2(vehicle.Kind.Length, vehicle.Kind.Width) * Scale;
+        if (vehicle.Kind.Cyclist)
+        {
+            // A dark frame the bicycle's length, the rider a round of colour on it: never smaller than a few pixels.
+            batch.FillRotated(at, new Vector2(MathF.Max(6, size.X), MathF.Max(1.5f, size.Y * 0.4f)), rotation, new Color(30, 32, 36));
+            batch.FillCircle(at, MathF.Max(2.5f, vehicle.Kind.Width * 0.75f * Scale), ColourOf(vehicle));
+            return;
+        }
+
         batch.FillRotated(at + new Vector2(1, 1.5f), size, rotation, new Color(0, 0, 0, 80));
         batch.FillRotated(at, size, rotation, ColourOf(vehicle));
 

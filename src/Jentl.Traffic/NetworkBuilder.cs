@@ -7,6 +7,12 @@ namespace Jentl.Traffic;
 /// right), stops them short of junctions, makes the turning lanes through each junction, a ring for each roundabout,
 /// the lights' phases (roads on one axis green together), and every place two paths cross or merge, with who goes
 /// first. Positions are in metres, x east and y north; speeds in km/h here, metres a second in the network.
+/// Roads can have cycle paths (<see cref="CyclePaths"/>): one each side, one way with the traffic beside it, joined
+/// through junctions by cyclists' own turns and round roundabouts by a ring of their own outside the road's. Where a
+/// cyclist's way crosses a car's, the usual rules decide, and a cyclist going straight on goes before a car turning
+/// across from the same direction; on a roundabout the cyclists' ring goes first, as the road's ring does. Cyclists
+/// turn left the Dutch way, in two: straight across to the far corner, where they wait (at lights, for the other
+/// road's green), then straight across the other road.
 /// </summary>
 public sealed class NetworkBuilder
 {
@@ -16,8 +22,30 @@ public sealed class NetworkBuilder
     private readonly List<(Road Road, int Forward, int Backward)> _roads = [];
     private readonly List<Lane> _lanes = [];
     private readonly Dictionary<Node, (float Green, float Amber, float AllRed, bool Actuated)> _signals = [];
+    private readonly HashSet<Road> _cycled = [];
+    private readonly Dictionary<Lane, Vector2> _corners = [];
 
     public float LaneWidth { get; set; } = 3.5f;
+
+    /// <summary>How far a cycle path's middle lies outside the road's outer lane edge, in metres.</summary>
+    public float CyclePathGap { get; set; } = 2.5f;
+
+    /// <summary>Gives the roads cycle paths, one on each side.</summary>
+    public void CyclePaths(params Road[] roads)
+    {
+        foreach (var road in roads)
+        {
+            ArgumentNullException.ThrowIfNull(road);
+            if (!_roads.Any(r => r.Road == road))
+            {
+                throw new ArgumentException($"{road} is not from this builder.", nameof(roads));
+            }
+
+            _cycled.Add(road);
+        }
+    }
+
+    private bool HasPaths(Node node) => node.Roads.Any(_cycled.Contains);
 
     public Node Node(float x, float y, NodeControl control = NodeControl.Uncontrolled)
     {
@@ -123,10 +151,15 @@ public sealed class NetworkBuilder
             if (node.Control == NodeControl.Roundabout)
             {
                 BuildRing(node);
+                if (HasPaths(node))
+                {
+                    BuildCycleRing(node);
+                }
             }
             else
             {
                 BuildTurns(node);
+                BuildCycleTurns(node);
             }
 
             if (node.Control == NodeControl.Signals)
@@ -144,8 +177,9 @@ public sealed class NetworkBuilder
     {
         1 => 0,
         2 when node.Control is NodeControl.Uncontrolled => 2,
-        _ when node.Control == NodeControl.Roundabout => node.RingRadius + LaneWidth + 5,
-        _ => 6 + (LaneWidth * node.Roads.Max(r => Math.Max(r.Forward.Count + r.Backward.Count, 2)) / 2) + (node.Control == NodeControl.Signals ? 2 : 0),
+        _ when node.Control == NodeControl.Roundabout => node.RingRadius + LaneWidth + 5 + (HasPaths(node) ? CyclePathGap + 4 : 0),
+        _ => 6 + (LaneWidth * node.Roads.Max(r => Math.Max(r.Forward.Count + r.Backward.Count, 2)) / 2) + (node.Control == NodeControl.Signals ? 2 : 0)
+            + (HasPaths(node) ? 1 : 0),
     };
 
     private Lane Add(LaneKind kind, LanePath path, float speedLimit)
@@ -184,6 +218,97 @@ public sealed class NetworkBuilder
             lane.Road = road;
             road.Backward.Add(lane);
         }
+
+        if (_cycled.Contains(road))
+        {
+            // Each path outside the lanes on its side: the half of a one-way road, or the lanes going that way.
+            var right = (oneWay ? (forward + backward) / 2f : forward) * LaneWidth;
+            var left = (oneWay ? (forward + backward) / 2f : backward) * LaneWidth;
+            road.CycleForward = Add(LaneKind.Road, centre.Offset(right + CyclePathGap), CycleSpeed);
+            road.CycleBackward = Add(LaneKind.Road, back.Offset(left + CyclePathGap), CycleSpeed);
+            foreach (var path in new[] { road.CycleForward, road.CycleBackward })
+            {
+                path.Road = road;
+                path.ForBikes = true;
+            }
+        }
+    }
+
+    private const float CycleSpeed = 25 / 3.6f;
+
+    /// <summary>The cyclists' turns through a junction: from each path arriving to every other road's path leaving.</summary>
+    private void BuildCycleTurns(Node node)
+    {
+        var through = node.Roads.Count == 2;
+        foreach (var road in node.Roads)
+        {
+            if (road.PathArriving(node) is not { } from)
+            {
+                continue;
+            }
+
+            foreach (var other in node.Roads.Where(r => r != road))
+            {
+                if (other.PathLeaving(node) is not { } to)
+                {
+                    continue;
+                }
+
+                var turn = through ? TurnKind.Straight : TurnOf(from.Path.EndDirection, to.Path.StartDirection);
+                if (turn == TurnKind.Left && Corner(from.Path.End, from.Path.EndDirection, to.Path.Start, to.Path.StartDirection) is { } corner)
+                {
+                    TurnInTwo(node, from, to, corner);
+                    continue;
+                }
+
+                CycleLink(node, from, to, LanePath.Turn(from.Path.End, from.Path.EndDirection, to.Path.Start, to.Path.StartDirection), turn);
+            }
+        }
+    }
+
+    private void CycleLink(Node node, Lane from, Lane to, LanePath path, TurnKind turn)
+    {
+        var connector = Add(LaneKind.Connector, path, CycleSpeed);
+        connector.Node = node;
+        connector.Turn = turn;
+        connector.ForBikes = true;
+        Link(from, connector);
+        Link(connector, to);
+    }
+
+    /// <summary>Where the way straight on meets the way in to the road turned into: the far corner of a left turn in two.</summary>
+    private static Vector2? Corner(Vector2 from, Vector2 fromDirection, Vector2 to, Vector2 toDirection)
+    {
+        var cross = (fromDirection.X * toDirection.Y) - (fromDirection.Y * toDirection.X);
+        if (MathF.Abs(cross) < 0.5f)
+        {
+            return null;
+        }
+
+        var along = (((to.X - from.X) * toDirection.Y) - ((to.Y - from.Y) * toDirection.X)) / cross;
+        return along > 0 ? from + (fromDirection * along) : null;
+    }
+
+    /// <summary>
+    /// A cyclist's left turn in two: across to the far corner (a junction lane), into a space to wait in there, beyond
+    /// the path crossed and beside the one to be followed, facing the new way (a road lane long enough for a bicycle, so
+    /// they stop at its end and look, or wait for their lights, clear of the crossing), then across the other road.
+    /// </summary>
+    private void TurnInTwo(Node node, Lane from, Lane to, Vector2 corner)
+    {
+        var direction = to.Path.StartDirection;
+        var back = corner + (from.Path.EndDirection * 1.6f);
+        var waitFrom = back - (direction * 5f);
+        var wait = Add(LaneKind.Road, LanePath.Line(waitFrom, back - (direction * 0.5f)), CycleSpeed);
+        wait.ForBikes = true;
+        _corners[wait] = direction;
+        var first = Add(LaneKind.Connector, LanePath.Turn(from.Path.End, from.Path.EndDirection, waitFrom, direction), CycleSpeed);
+        first.Node = node;
+        first.Turn = TurnKind.Straight;
+        first.ForBikes = true;
+        Link(from, first);
+        Link(first, wait);
+        CycleLink(node, wait, to, LanePath.Turn(wait.Path.End, direction, to.Path.Start, to.Path.StartDirection), TurnKind.Straight);
     }
 
     internal static TurnKind TurnOf(Vector2 from, Vector2 to)
@@ -233,18 +358,30 @@ public sealed class NetworkBuilder
         }
     }
 
-    private void BuildRing(Node node)
+    private void BuildRing(Node node) =>
+        BuildRing(node, node.RingRadius, LaneWidth, r => r.ArrivingAt(node), r => r.LeavingFrom(node), 50 / 3.6f, bikes: false);
+
+    /// <summary>The cyclists' ring round a roundabout, outside the road's, joining the paths of the roads that have them.</summary>
+    private void BuildCycleRing(Node node)
     {
-        var (centre, radius) = (node.Position, node.RingRadius);
-        var spread = MathF.Asin(MathF.Min(0.9f, LaneWidth / radius));
+        // Out as far as the paths are from the road's middle; one-way, the same way round as the traffic.
+        var offset = (LaneWidth * node.Roads.Where(_cycled.Contains).Max(r => Math.Max(r.Forward.Count, r.Backward.Count))) + CyclePathGap;
+        var radius = node.RingRadius + LaneWidth + CyclePathGap + 1;
+        BuildRing(node, radius, offset, r => r.PathArriving(node) is { } p ? [p] : [], r => r.PathLeaving(node) is { } p ? [p] : [], CycleSpeed, bikes: true);
+    }
+
+    private void BuildRing(Node node, float radius, float offset, Func<Road, IReadOnlyList<Lane>> arrivingOn, Func<Road, IReadOnlyList<Lane>> leavingOn, float speed, bool bikes)
+    {
+        var centre = node.Position;
+        var spread = MathF.Asin(MathF.Min(0.9f, offset / radius));
         Vector2 Point(float angle) => centre + (new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius);
         Vector2 Tangent(float angle) => new(-MathF.Sin(angle), MathF.Cos(angle));
 
         // Anticlockwise, as traffic on the right goes round: each road enters just after its own angle and leaves just before.
         var points = new List<(float Angle, Road Road, bool Entry)>();
-        foreach (var road in node.Roads)
+        foreach (var road in node.Roads.Where(r => arrivingOn(r).Count + leavingOn(r).Count > 0))
         {
-            var end = road.ArrivingAt(node) is { Count: > 0 } arriving ? arriving[0].Path.End : road.LeavingFrom(node)[0].Path.Start;
+            var end = arrivingOn(road) is { Count: > 0 } arriving ? arriving[0].Path.End : leavingOn(road)[0].Path.Start;
             var toRoad = end - centre;
             var angle = MathF.Atan2(toRoad.Y, toRoad.X);
             points.Add((Normalise(angle + spread), road, true));
@@ -256,8 +393,9 @@ public sealed class NetworkBuilder
         for (var i = 0; i < points.Count; i++)
         {
             var next = points[(i + 1) % points.Count];
-            ring[i] = Add(LaneKind.Ring, LanePath.Arc(centre, radius, points[i].Angle, next.Angle), 50 / 3.6f);
+            ring[i] = Add(LaneKind.Ring, LanePath.Arc(centre, radius, points[i].Angle, next.Angle), speed);
             ring[i].Node = node;
+            ring[i].ForBikes = bikes;
         }
 
         for (var i = 0; i < points.Count; i++)
@@ -271,11 +409,12 @@ public sealed class NetworkBuilder
             var (at, tangent) = (Point(angle), Tangent(angle));
             if (entry)
             {
-                foreach (var from in road.ArrivingAt(node))
+                foreach (var from in arrivingOn(road))
                 {
-                    var connector = Add(LaneKind.Connector, LanePath.Turn(from.Path.End, from.Path.EndDirection, at, tangent), road.SpeedLimit);
+                    var connector = Add(LaneKind.Connector, LanePath.Turn(from.Path.End, from.Path.EndDirection, at, tangent), bikes ? speed : road.SpeedLimit);
                     connector.Node = node;
                     connector.Turn = TurnKind.Right;
+                    connector.ForBikes = bikes;
                     Link(from, connector);
                     Link(connector, ring[i]);
                 }
@@ -283,11 +422,12 @@ public sealed class NetworkBuilder
             else
             {
                 var before = ring[(i - 1 + points.Count) % points.Count];
-                foreach (var to in road.LeavingFrom(node))
+                foreach (var to in leavingOn(road))
                 {
-                    var connector = Add(LaneKind.Connector, LanePath.Turn(at, tangent, to.Path.Start, to.Path.StartDirection), road.SpeedLimit);
+                    var connector = Add(LaneKind.Connector, LanePath.Turn(at, tangent, to.Path.Start, to.Path.StartDirection), bikes ? speed : road.SpeedLimit);
                     connector.Node = node;
                     connector.Turn = TurnKind.Right;
+                    connector.ForBikes = bikes;
                     Link(before, connector);
                     Link(connector, to);
                 }
@@ -326,9 +466,19 @@ public sealed class NetworkBuilder
         var plan = new SignalPlan(Math.Max(1, axes.Count), green, amber, allRed) { Actuated = actuated };
         foreach (var (road, phase) in phaseOf)
         {
-            foreach (var lane in road.ArrivingAt(node))
+            foreach (var lane in road.ArrivingAt(node).Append(road.PathArriving(node)).OfType<Lane>())
             {
                 lane.Signal = plan.Group(phase);
+            }
+        }
+
+        // Cyclists waiting at a corner to turn left go with the road they cross towards: on its axis's green.
+        foreach (var (wait, direction) in _corners.Where(c => c.Key.Next[0].Node == node))
+        {
+            var phase = axes.FindIndex(axis => MathF.Abs(Vector2.Dot(axis, direction)) > 0.7f);
+            if (phase >= 0)
+            {
+                wait.Signal = plan.Group(phase);
             }
         }
 
@@ -368,6 +518,13 @@ public sealed class NetworkBuilder
         {
             // On a roundabout, traffic on the ring goes first.
             return first.Kind == LaneKind.Ring;
+        }
+
+        if (first.ForBikes != second.ForBikes && Vector2.Dot(first.Path.StartDirection, second.Path.StartDirection) > 0.5f
+            && (first.Turn == TurnKind.Straight) != (second.Turn == TurnKind.Straight))
+        {
+            // A cyclist and a car from the same way: whichever goes straight on goes first, the other turning across.
+            return first.Turn == TurnKind.Straight;
         }
 
         if (node.Control == NodeControl.Priority)

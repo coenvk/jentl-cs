@@ -17,6 +17,12 @@ public sealed record VehicleKind(string Name, float Length, float Width, float M
 
     public static VehicleKind Motorbike { get; } = new("motorbike", 2.2f, 0.8f, 40f, 2.8f, 4f, 1.5f, 1.0f);
 
+    /// <summary>A bicycle, at about 20 km/h: it keeps to cycle paths (see <see cref="Cyclist"/>).</summary>
+    public static VehicleKind Bicycle { get; } = new("bicycle", 1.8f, 0.6f, 5.5f, 1.5f, 2.5f, 1.0f, 1.0f) { Cyclist = true };
+
+    /// <summary>Whether it rides on cycle paths rather than the road.</summary>
+    public bool Cyclist { get; init; }
+
     /// <summary>A town's mix: mostly cars, some vans, a few trucks, buses and motorbikes.</summary>
     public static IReadOnlyList<(VehicleKind Kind, float Weight)> TownMix { get; } =
         [(Car, 0.72f), (Van, 0.12f), (Truck, 0.06f), (Bus, 0.04f), (Motorbike, 0.06f)];

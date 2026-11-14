@@ -128,7 +128,7 @@ of relief on cool chicken, and the cook squashing, stretching and flashing. Stil
 The first part is in: `Jentl.Traffic` (networks, lanes, junctions with priority from the right, priority roads,
 lights and roundabouts, five vehicle kinds on the Intelligent Driver Model, routes, demand, measurements), Core's
 `TrafficView`, and a Lab demo of a small town. Decided for now: from above in 2D, driving on the right, Dutch priority
-from the right, no pedestrians or cyclists, roads drawn freely. Since (0.6.35): lights that follow the traffic, routes
+from the right, no pedestrians, roads drawn freely. Since (0.6.35): lights that follow the traffic, routes
 round jams by measured travel times, and the game's first version, games-cs's Roadworks: lay roads on a grid between
 gates, choose junctions (give way, lights, roundabout), within a budget; the traffic runs for ten minutes and the
 delay against a target gives stars; five levels. Still to do:
@@ -144,7 +144,12 @@ delay against a target gives stars; five levels. Still to do:
   behind them.
 - Buses on lines with stops are in (0.6.55: `BusLine`, `BusStop`; they dwell at each stop, holding up a one-lane road,
   and keep to their lane; the Lab has a line). Roadworks levels can ask for one (Main street has a bus
-  past its middle, 0.6.56: time at stops is no delay). Still: pedestrians and cyclists.
+  past its middle, 0.6.56: time at stops is no delay).
+- Cyclists are in (0.6.58): `CyclePaths` lays a path each side of a road, cyclists' turns through junctions (left
+  in two, waiting at the far corner, Dutch style) and their own ring round roundabouts; `VehicleKind.Bicycle`,
+  `SetCycling`. Seen in the Lab's town (zoomed in with the new `Wheel:x,y,steps` script step): queues at the red,
+  the corners used. Still: pedestrians and zebra crossings; cycle paths in Roadworks; two-way cycle paths, and
+  cycle lanes on the road itself.
 - Roadworks: eight levels now (Bypass, Old town ring and Market day added; each passable with a simple plan, checked by
   the tests); more, and tuning by play, overlays
   of speed and jams, a sandbox. Seen on screen (offscreen screenshots, 0.6.40): the gates now keep clear of the bar.

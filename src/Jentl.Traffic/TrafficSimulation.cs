@@ -148,6 +148,8 @@ public sealed class TrafficSimulation
     private readonly Dictionary<Lane, List<Vehicle>> _onLane = [];
     private readonly Dictionary<Node, float> _demand = [];
     private readonly Dictionary<Node, int> _queued = [];
+    private readonly Dictionary<Node, float> _cycling = [];
+    private readonly Dictionary<Node, int> _cyclistsQueued = [];
     private readonly Dictionary<Lane, int> _flow = [];
     private readonly Queue<float> _finishTimes = new();
     private readonly Dictionary<SignalGroup, List<Lane>> _signalled = [];
@@ -327,6 +329,22 @@ public sealed class TrafficSimulation
         }
     }
 
+    /// <summary>Cyclists an hour setting out from an edge node along its cycle path (0 for none), each to another edge's.</summary>
+    public void SetCycling(Node edge, float perHour)
+    {
+        ArgumentNullException.ThrowIfNull(edge);
+        _cycling[edge] = perHour;
+    }
+
+    /// <summary>The same cycling at every edge with a cycle path.</summary>
+    public void SetCycling(float perHour)
+    {
+        foreach (var edge in Network.Entries.Where(e => e.Roads.Any(r => r.PathLeaving(e) is not null)))
+        {
+            _cycling[edge] = perHour;
+        }
+    }
+
     /// <summary>The vehicles on a lane, front first.</summary>
     public IReadOnlyList<Vehicle> On(Lane lane) => _onLane[lane];
 
@@ -349,7 +367,7 @@ public sealed class TrafficSimulation
             Completed == 0 ? 0 : _stopsTotal / (float)Completed,
             window <= 0 ? 0 : _finishTimes.Count * 3600 / window,
             _vehicles.Count(v => v.Speed < 0.5f),
-            _queued.Values.Sum());
+            _queued.Values.Sum() + _cyclistsQueued.Values.Sum());
     }
 
     /// <summary>The quickest lanes from one edge to another (with empty roads), or null when there is no way.</summary>
@@ -365,10 +383,23 @@ public sealed class TrafficSimulation
         return RouteFrom(from.Roads.SelectMany(r => r.LeavingFrom(from)), to);
     }
 
+    /// <summary>The quickest way for a bicycle from one node to another along cycle paths, or null when there is none.</summary>
+    public IReadOnlyList<Lane>? CycleRoute(Node from, Node to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+        return RouteFrom(from.Roads.Select(r => r.PathLeaving(from)).OfType<Lane>(), to);
+    }
+
+    /// <summary>The lanes a vehicle of <paramref name="kind"/> may set out on from <paramref name="node"/>.</summary>
+    private static IEnumerable<Lane> Starts(Node node, VehicleKind kind) => kind.Cyclist
+        ? node.Roads.Select(r => r.PathLeaving(node)).OfType<Lane>()
+        : node.Roads.SelectMany(r => r.LeavingFrom(node));
+
     /// <summary>The quickest lanes from any of <paramref name="starts"/> to an edge, or null when there is no way.</summary>
     private List<Lane>? RouteFrom(IEnumerable<Lane> starts, Node to)
     {
-        var ends = to.Roads.SelectMany(r => r.ArrivingAt(to)).ToHashSet();
+        var ends = to.Roads.SelectMany(r => r.ArrivingAt(to).Append(r.PathArriving(to))).OfType<Lane>().ToHashSet();
         return RouteTo(starts, ends.Contains);
     }
 
@@ -438,7 +469,7 @@ public sealed class TrafficSimulation
     /// <summary>The lanes either side of one on a road, going the same way.</summary>
     private static IEnumerable<Lane> Beside(Lane lane)
     {
-        if (lane.IsJunction || lane.Road is not { } road)
+        if (lane.IsJunction || lane.ForBikes || lane.Road is not { } road)
         {
             yield break;
         }
@@ -479,7 +510,7 @@ public sealed class TrafficSimulation
     public Vehicle? Spawn(Node from, Node to, VehicleKind kind)
     {
         ArgumentNullException.ThrowIfNull(kind);
-        if (Route(from, to) is not { } best)
+        if ((kind.Cyclist ? CycleRoute(from, to) : Route(from, to)) is not { } best)
         {
             return null;
         }
@@ -489,7 +520,7 @@ public sealed class TrafficSimulation
         if (Full(route[0]))
         {
             // With lane changes, the first lane with room, changing over on the way.
-            if (!LaneChanges || from.Roads.SelectMany(r => r.LeavingFrom(from)).FirstOrDefault(l => !Full(l)) is not { } free
+            if (!LaneChanges || kind.Cyclist || Starts(from, kind).FirstOrDefault(l => !Full(l)) is not { } free
                 || RouteFrom([free], to) is not { } other)
             {
                 return null;
@@ -534,7 +565,8 @@ public sealed class TrafficSimulation
             plan.Advance(dt, plan.Actuated ? phase => Waiting(plan, phase) : null);
         }
 
-        Demand(dt);
+        Demand(dt, _demand, _queued, cyclists: false);
+        Demand(dt, _cycling, _cyclistsQueued, cyclists: true);
         RunLines();
         foreach (var vehicle in _vehicles)
         {
@@ -565,22 +597,22 @@ public sealed class TrafficSimulation
         .SelectMany(g => _signalled.GetValueOrDefault(g) ?? [])
         .Any(lane => _onLane[lane].Any(v => v.Position > lane.Length - 70));
 
-    private void Demand(float dt)
+    private void Demand(float dt, Dictionary<Node, float> demand, Dictionary<Node, int> queued, bool cyclists)
     {
-        foreach (var (edge, perHour) in _demand)
+        foreach (var (edge, perHour) in demand)
         {
 #pragma warning disable CA5394 // Simulation, not security.
             if (perHour > 0 && _random.NextDouble() < perHour * dt / 3600)
             {
-                _queued[edge] = _queued.GetValueOrDefault(edge) + 1;
+                queued[edge] = queued.GetValueOrDefault(edge) + 1;
             }
 
-            if (_queued.GetValueOrDefault(edge) == 0)
+            if (queued.GetValueOrDefault(edge) == 0)
             {
                 continue;
             }
 
-            var destinations = (Destinations ?? Network.Entries).Where(e => e != edge).ToList();
+            var destinations = (Destinations ?? Network.Entries).Where(e => e != edge && (!cyclists || e.Roads.Any(r => r.PathArriving(e) is not null))).ToList();
             if (destinations.Count == 0)
             {
                 continue;
@@ -589,10 +621,10 @@ public sealed class TrafficSimulation
             var to = destinations[_random.Next(destinations.Count)];
             var pick = (float)_random.NextDouble() * Mix.Sum(m => m.Weight);
 #pragma warning restore CA5394
-            var kind = Mix.First(m => (pick -= m.Weight) <= 0 || m == Mix[^1]).Kind;
+            var kind = cyclists ? VehicleKind.Bicycle : Mix.First(m => (pick -= m.Weight) <= 0 || m == Mix[^1]).Kind;
             if (Spawn(edge, to, kind) is not null)
             {
-                _queued[edge]--;
+                queued[edge]--;
             }
         }
     }
@@ -883,7 +915,7 @@ public sealed class TrafficSimulation
         }
 
         var lane = vehicle.Lane;
-        if (vehicle.StopsLeft.Count > 0 || lane.IsJunction || lane.Road is not { } road || vehicle.Destination is not { } destination || vehicle.ChangingFrom is not null
+        if (vehicle.StopsLeft.Count > 0 || lane.IsJunction || lane.ForBikes || lane.Road is not { } road || vehicle.Destination is not { } destination || vehicle.ChangingFrom is not null
             || vehicle.Committed is not null || Time < vehicle.NextChange || vehicle.Position < vehicle.Kind.Length + 2
             || lane.Length - vehicle.Position < 20)
         {

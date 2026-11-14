@@ -1567,11 +1567,20 @@ var stats = sim.Stats();                                    // on the road, arri
   its edge to another (`Destinations` limits where generated traffic goes); lanes aren't changed on the way, so it
   starts in the lane its route needs. With `AvoidJams`, routes are chosen by the travel times measured as it runs
   (`TravelTime(lane)`, which counts vehicles still stuck on a lane), so traffic goes round a jam.
+- **Cycling**: `CyclePaths(roads)` gives roads a cycle path each side, one way with the traffic beside it, joined
+  through junctions by cyclists' own turns and round a roundabout by a ring of their own outside the road's (which
+  cars crossing it give way to). Cyclists turn left the Dutch way, in two: straight across to the far corner, wait
+  there (at lights, for the other road's green), then across. A cyclist going straight on goes before a car turning
+  across from beside it; otherwise the junction's rules hold for both. `VehicleKind.Bicycle` rides only on paths
+  (`Lane.ForBikes`), `SetCycling` sets cyclists an hour at the edges as `SetDemand` does vehicles, and
+  `CycleRoute` finds a cyclist's way. A plain crossroads saturates sooner with cyclists crossing too (about 1,200
+  cars and bicycles an hour in all); lights cope better.
 - **Measurements**: `Stats()` gives the vehicles on the road, arrivals and arrivals per hour (over ten minutes), the
   average trip time, delay over empty roads, and stops, how many stand still, and how many wait to come in at the
   edges; `Flow(lane)` counts what drove along a lane, `On(lane)` lists who is on it, front first.
 
-`Jentl.Core.Traffic.TrafficView` draws it from above: asphalt, centre and lane dashes, roundabout islands, stop lines
-in the colour of their lights, and every vehicle to size, coloured by kind; `Fit` shows the whole network, and
+`Jentl.Core.Traffic.TrafficView` draws it from above: asphalt, centre and lane dashes, roundabout islands, red cycle
+paths, stop lines in the colour of their lights, and every vehicle to size, coloured by kind (a cyclist as a bicycle
+with a rider in a bright coat); `Fit` shows the whole network, and
 `Centre` and `Scale` zoom and pan. The Lab's Traffic demo puts a small town on it, and games-cs's Roadworks is a game
 of building one.
